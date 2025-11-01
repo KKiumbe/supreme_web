@@ -271,9 +271,7 @@ const CustomersScreen = () => {
     { field: "customerIdNo", headerName: "ID No", width: 130 },
     { field: "customerKraPin", headerName: "KRA PIN", width: 140 },
   
-    { field: "hasWater", headerName: "Water", width: 90 },
-    { field: "hasSewer", headerName: "Sewer", width: 90 },
-    { field: "customerDiscoType", headerName: "Disco Type", width: 120 },
+  
     { field: "schemeName", headerName: "Scheme", width: 140 },
     { field: "zoneName", headerName: "Zone", width: 120 },
     { field: "routeName", headerName: "Route", width: 120 },
@@ -285,12 +283,13 @@ const CustomersScreen = () => {
       field: "connectionNumbers",
       headerName: "Connections",
       width: 160,
-      renderCell: (params) => (
-        <Tooltip title={params.row.meterSerials}>
-          <span>{params.value}</span>
-        </Tooltip>
-      ),
-    },
+    //   renderCell: (params) => (
+    //     <Tooltip title={params.row.meterSerials}>
+    //       <span>{params.value}</span>
+    //     </Tooltip>
+    //   ),
+    // },
+},
     {
       field: "firstMeterModel",
       headerName: "Meter Model",
@@ -312,6 +311,8 @@ const CustomersScreen = () => {
       ),
     },
 
+    { field: "customerDiscoType", headerName: "Disco Type", width: 120 },
+
     // Status
     {
       field: "status",
@@ -325,6 +326,8 @@ const CustomersScreen = () => {
         />
       ),
     },
+      { field: "hasWater", headerName: "Water", width: 90 },
+    { field: "hasSewer", headerName: "Sewer", width: 90 },
 
     { field: "createdAt", headerName: "Created", width: 160 },
   ];
