@@ -70,13 +70,13 @@ const MeterScreen = () => {
       field: "connection",
       headerName: "Connection",
       width: 180,
-      valueGetter: (params) => params.row.connection?.connectionNumber ?? "-",
+      
     },
     {
       field: "customer",
       headerName: "Customer",
       width: 180,
-      valueGetter: (params) => params.row.connection?.customer?.customerName ?? "-",
+      
     },
   ];
 

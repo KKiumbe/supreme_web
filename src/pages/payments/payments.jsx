@@ -200,23 +200,40 @@ const columns = [
               <CircularProgress  />
             </Box>
           ) : (
-        <Box sx={{ height: 550, width: '100%', overflow: 'hidden' }}>
-  <DataGrid
-    autoHeight={false}
-    rows={payments}
-    columns={columns}
-    getRowId={(row) => row.id}
-    pagination
-    paginationMode="server"
-    rowCount={totalCount}
-    pageSize={pageSize}
-    page={page}
-    onPageChange={(newPage) => setPage(newPage)}
-    onPageSizeChange={(newSize) => setPageSize(newSize)}
-    rowsPerPageOptions={[10, 20, 50]}
-    
-  />
+        
+
+
+            <Box sx={{ width: '100%', height: 550 }}>
+  {loading ? (
+    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+      <CircularProgress />
+    </Box>
+  ) : (
+    <DataGrid
+      rows={payments}
+      columns={columns}
+      getRowId={(row) => row.id}
+      pagination
+      paginationMode="server"
+      rowCount={totalCount}
+      pageSize={pageSize}
+      page={page}
+      onPageChange={(newPage) => setPage(newPage)}
+      onPageSizeChange={(newSize) => setPageSize(newSize)}
+      rowsPerPageOptions={[10, 20, 50]}
+      disableColumnResize={false}
+      disableExtendRowFullWidth={false}
+      autoHeight={false}
+      sx={{
+        width: '100%',
+        '& .MuiDataGrid-virtualScroller': {
+          overflowX: 'hidden !important', // 🚫 prevent uncontrolled X scroll growth
+        },
+      }}
+    />
+  )}
 </Box>
+
 
           )}
         </Box>
