@@ -11,11 +11,15 @@ import {
   DialogContentText,
   DialogActions,
   Button,
-  useTheme, // Import useTheme for consistency
+  useTheme,
+  TextField,
+  MenuItem,
+  Select,
+  InputLabel,
+  FormControl,
 } from "@mui/material";
 import axios from "axios";
 import TitleComponent from "../../components/title";
-import { getTheme } from "../../store/theme";
 
 const SentSMSPage = () => {
   const [smsMessages, setSmsMessages] = useState([]);
@@ -24,10 +28,12 @@ const SentSMSPage = () => {
   const [totalRows, setTotalRows] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [openDialog, setOpenDialog] = useState(false); // State for modal
-  const [selectedMessage, setSelectedMessage] = useState(""); // State for selected message
+  const [openDialog, setOpenDialog] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
-  const theme = useTheme(); // Use useTheme instead of getTheme
+  const theme = useTheme();
   const BASEURL = import.meta.env.VITE_BASE_URL;
 
   const fetchSmsMessages = async () => {
@@ -35,7 +41,9 @@ const SentSMSPage = () => {
     setError(null);
     try {
       const response = await axios.get(
-        `${BASEURL}/sms-history?page=${page + 1}&limit=${pageSize}`,
+        `${BASEURL}/sms-history?page=${page + 1}&limit=${pageSize}&search=${encodeURIComponent(
+          searchQuery
+        )}&status=${statusFilter}`,
         { withCredentials: true }
       );
       console.log("API Response:", JSON.stringify(response.data, null, 2));
@@ -54,18 +62,26 @@ const SentSMSPage = () => {
 
   useEffect(() => {
     fetchSmsMessages();
-  }, [page, pageSize]);
+  }, [page, pageSize, searchQuery, statusFilter]);
 
-  // Handle opening the dialog
   const handleOpenDialog = (message) => {
     setSelectedMessage(message);
     setOpenDialog(true);
   };
 
-  // Handle closing the dialog
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setSelectedMessage("");
+  };
+
+  const handleSearchChange = (event) => {
+    setSearchQuery(event.target.value);
+    setPage(0); // Reset to first page on search
+  };
+
+  const handleStatusChange = (event) => {
+    setStatusFilter(event.target.value);
+    setPage(0); // Reset to first page on status change
   };
 
   const columns = [
@@ -79,7 +95,6 @@ const SentSMSPage = () => {
         <Box
           sx={{
             cursor: "pointer",
-          
             "&:hover": { textDecoration: "underline" },
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -118,13 +133,12 @@ const SentSMSPage = () => {
   return (
     <Box
       sx={{
-        minHeight: "100vh", // Full page height for uniformity
+        minHeight: "100vh",
         width: "100%",
-    
         padding: 2,
         display: "flex",
         flexDirection: "column",
-        alignItems: "center", // Center content horizontally
+        alignItems: "center",
       }}
     >
       <Box
@@ -141,6 +155,31 @@ const SentSMSPage = () => {
         >
           <TitleComponent title="Sent Messages History" />
         </Typography>
+
+        {/* Search and Filter Controls */}
+        <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+          <TextField
+            label="Search by Mobile or Message"
+            variant="outlined"
+            value={searchQuery}
+            onChange={handleSearchChange}
+            sx={{ width: 300 }}
+          />
+          <FormControl sx={{ width: 200 }}>
+            <InputLabel>Status</InputLabel>
+            <Select
+              value={statusFilter}
+              onChange={handleStatusChange}
+              label="Status"
+            >
+              <MenuItem value="">All</MenuItem>
+              <MenuItem value="PENDING">Pending</MenuItem>
+              <MenuItem value="SENT">Sent</MenuItem>
+              <MenuItem value="FAILED">Failed</MenuItem>
+              <MenuItem value="DELIVERED">Delivered</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
 
         {error && (
           <Alert severity="error" sx={{ mb: 2, borderRadius: 2, bgcolor: theme.palette.grey[300] }}>
@@ -167,7 +206,6 @@ const SentSMSPage = () => {
               }}
               loading={loading}
               getRowId={(row) => row.id}
-         
             />
           </Box>
         )}

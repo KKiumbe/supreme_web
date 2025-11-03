@@ -1,316 +1,268 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from 'react';
+import axios from 'axios';
 import {
-  Box,
+  Container,
   Typography,
   TextField,
-  Autocomplete,
   Button,
-  CircularProgress,
-  Snackbar,
-  Alert,
-  MenuItem,
   Paper,
   Grid,
-} from "@mui/material";
-import { useNavigate } from "react-router-dom";
-import { useAuthStore } from "../../store/authStore";
-import TitleComponent from "../../components/title";
-import axios from "axios";
-import { getTheme } from "../../store/theme";
-import debounce from "lodash/debounce";
+  Autocomplete,
+  MenuItem,
+} from '@mui/material';
+import { debounce } from 'lodash'; // Install lodash for debouncing
+import { useNavigate } from 'react-router-dom';
+import { getTheme } from '../../store/theme';
+import { useAuthStore } from '../../store/authStore';
+
+// ModeOfPayment options for selection
+const ModeOfPayment = {
+  CASH: 'CASH',
+  BANK: 'BANK',
+  MPESA: 'MPESA',
+  AIRTELMONEY: 'AIRTELMONEY',
+  // Add other modes as needed
+};
+
+const BASEURL = import.meta.env?.VITE_BASE_URL || '';
 
 const CreatePayment = () => {
+  // Type definitions
+  /**
+   * @typedef {Object} Customer
+   * @property {string} id
+   * @property {string} customerName
+   * @property {string} accountNumber
+   * @property {string} [phoneNumber]
+   */
+
+  // State
+  const [customers, setCustomers] = useState([]);
+  const [filteredCustomers, setFilteredCustomers] = useState([]);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [totalAmount, setTotalAmount] = useState('');
+  const [modeOfPayment, setModeOfPayment] = useState('');
+  const [paidBy, setPaidBy] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
   const navigate = useNavigate();
-  const currentUser = useAuthStore((state) => state.currentUser);
-  const BASEURL = import.meta.env.VITE_BASE_URL;
   const theme = getTheme();
 
-  // State management
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [isSearching, setIsSearching] = useState(false);
-  const [formData, setFormData] = useState({ totalAmount: "", modeOfPayment: "" });
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isPhoneSearch, setIsPhoneSearch] = useState(false);
+    const { currentUser } = useAuthStore();
+  
 
-  // Redirect to login if not authenticated
+  
+  
+        useEffect(() => {
+          if (!currentUser) {
+            navigate("/login");
+          }
+        }, [currentUser, navigate]);
+
+  // Fetch customers
   useEffect(() => {
-    if (!currentUser) navigate("/login");
-  }, [currentUser, navigate]);
+    const fetchCustomers = async () => {
+      try {
+        const res = await axios.get(`${BASEURL}/customers`, { withCredentials: true });
+        const fetchedCustomers = res.data?.data?.customers || [];
+        setCustomers(fetchedCustomers);
+        setFilteredCustomers(fetchedCustomers); // Initially, show all customers
+      } catch (err) {
+        console.error(err);
+        setMessage('Failed to load customers.');
+      }
+    };
+    fetchCustomers();
+  }, []);
 
-  // Unified search handler
-  const handleSearch = async (query) => {
-    const trimmedQuery = (query || "").trim();
-    if (!trimmedQuery) {
-      setSearchResults([]);
-      return;
-    }
 
-    setIsSearching(true);
-    const isPhoneNumber = /^\d+$/.test(trimmedQuery);
 
-    try {
-      const url = isPhoneNumber 
-        ? `${BASEURL}/search-customer-by-phone` 
-        : `${BASEURL}/search-customer-by-name`;
-      const params = isPhoneNumber ? { phone: trimmedQuery } : { name: trimmedQuery };
-
-      if (isPhoneNumber && trimmedQuery.length < 10) {
-        setSearchResults([]);
+  // Debounced search function
+  const fetchCustomers = useCallback(
+    debounce(async (query) => {
+      if (query.trim() === '') {
+        setFilteredCustomers(customers);
         return;
       }
 
-      const response = await axios.get(url, { params, withCredentials: true });
-      const results = isPhoneNumber 
-        ? response.data ? [response.data] : [] 
-        : Array.isArray(response.data) ? response.data : [];
-      
-      setSearchResults(results);
-      if (!results.length) {
-        setSnackbar({
-          open: true,
-          message: isPhoneNumber ? "No customer found with that phone number" : "No customer found with that name",
-          severity: "info",
+      try {
+        const res = await axios.get(`${BASEURL}/customers`, {
+          params: { search: query },
+          withCredentials: true,
         });
+        setFilteredCustomers(res.data?.data?.customers || []);
+      } catch (err) {
+        console.error(err);
+        setMessage('Failed to search customers.');
+        setFilteredCustomers(customers); // Fallback to all customers
       }
-    } catch (error) {
-      console.error("Search error:", error.message);
-      setSnackbar({
-        open: true,
-        message: error.code === "ERR_NETWORK" 
-          ? "Server not reachable. Please check if the backend is running."
-          : error.response?.status === 404 
-            ? (isPhoneNumber ? "No customer found with that phone number" : "No customer found with that name")
-            : "Error searching customers: " + (error.response?.data?.message || error.message),
-        severity: "error",
-      });
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  // Debounced phone search
-  const debouncedPhoneSearch = useCallback(
-    debounce((query) => handleSearch(query), 500),
-    []
+    }, 300),
+    [customers]
   );
 
-  // Handle input change
-  const handleInputChange = (e, value) => {
-    const newValue = e?.target?.value ?? value ?? "";
-    setSearchQuery(newValue);
-    setIsPhoneSearch(/^\d+$/.test(newValue));
-    setSelectedCustomer(null);
-
-    if (isPhoneSearch) {
-      debouncedPhoneSearch(newValue);
-    } else {
-      handleSearch(newValue);
-    }
+  // Handle search input change
+  const handleSearch = (event, value) => {
+    setSearchQuery(value);
+    fetchCustomers(value);
   };
 
   // Handle customer selection
-  const handleCustomerSelect = (event, newValue) => {
-    setSelectedCustomer(newValue);
-    if (newValue) {
-      setSearchQuery("");
-      setSearchResults([]);
-    }
-  };
-
-  // Handle form field changes
-  const handleFormChange = (field) => (e) => {
-    setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+  const handleCustomerSelect = (event, value) => {
+    setSelectedCustomer(value);
   };
 
   // Submit payment
-  const handlePaymentSubmit = async () => {
-    const { totalAmount, modeOfPayment } = formData;
-    if (!selectedCustomer || !totalAmount || !modeOfPayment) {
-      setSnackbar({ open: true, message: "Please fill all payment details", severity: "error" });
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedCustomer) {
+      setMessage('Please select a customer.');
+      return;
+    }
+    if (!totalAmount || !modeOfPayment || !paidBy) {
+      setMessage('Please fill in all required fields.');
+      return;
+    }
+    const paymentAmount = parseFloat(totalAmount);
+    if (isNaN(paymentAmount) || paymentAmount <= 0) {
+      setMessage('Invalid payment amount. Must be a positive number.');
       return;
     }
 
-    const payload = {
-      customerId: selectedCustomer.id,
-      totalAmount: parseFloat(totalAmount),
-      modeOfPayment,
-      paidBy: selectedCustomer.firstName,
-    };
+    setLoading(true);
+    setMessage('');
 
-    setIsProcessing(true);
     try {
-      await axios.post(`${BASEURL}/manual-cash-payment`, payload, { withCredentials: true });
-      setSnackbar({ open: true, message: "Payment created successfully", severity: "success" });
-      setSelectedCustomer(null);
-      setFormData({ totalAmount: "", modeOfPayment: "" });
-      setTimeout(() => navigate("/payments"), 2000);
-    } catch (error) {
-      console.error("Payment error:", error);
-      setSnackbar({
-        open: true,
-        message: "Error creating payment: " + (error.response?.data?.message || error.message),
-        severity: "error",
+      const payload = {
+        customerId: selectedCustomer.id,
+        totalAmount: paymentAmount,
+        modeOfPayment,
+        paidBy,
+      };
+
+      const res = await axios.post(`${BASEURL}/receipt/create-payment`, payload, {
+        withCredentials: true,
       });
+
+      setMessage(res.data?.message || 'Payment created successfully!');
+      setSelectedCustomer(null);
+      setTotalAmount('');
+      setModeOfPayment('');
+      setPaidBy('');
+      setSearchQuery('');
+      setFilteredCustomers(customers); // Reset filtered customers
+    } catch (err) {
+      console.error(err);
+      const errorMessage =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        'Error creating payment.';
+      setMessage(errorMessage);
     } finally {
-      setIsProcessing(false);
+      setLoading(false);
     }
   };
 
-  // Render phone search results
-  const renderPhoneSearchResults = () => (
-    searchResults.length > 0 && (
-      <Box sx={{ mt: 2 }}>
-        {searchResults.map((customer) => (
-          <Box
-            key={customer.id}
-            sx={{ p: 1, cursor: "pointer", "&:hover": { bgcolor: theme.palette.grey[800] } }}
-            onClick={() => handleCustomerSelect(null, customer)}
-          >
-            <Typography sx={{ color: theme.palette.grey[100] }}>
-              {`${customer.firstName || "Unknown"} ${customer.lastName || ""} (${customer.phoneNumber || "N/A"})`}
-            </Typography>
-          </Box>
-        ))}
-      </Box>
-    )
-  );
-
   return (
-    <Box sx={{  p: 3, justifyContent: "left", alignItems: "center", width: "100vw", margin: 0, boxSizing: "border-box" }}>
-      <TitleComponent title="Create Payment" />
-      <Paper sx={{ maxWidth:600, ml:30}}>
-        <Typography variant="h6" gutterBottom sx={{ mb: 2, color: theme.palette.grey[100], justifyContent: "center", alignItems: "center" , ml:20 }}>
-          Search Customer
+    <Container maxWidth="md" sx={{ mt: 6, ml: 10 }}>
+      <Paper sx={{ p: 4, borderRadius: 3, boxShadow: 3 }}>
+        <Typography variant="h5" gutterBottom>
+          Create Payment
         </Typography>
-        
-        {isPhoneSearch ? (
-          <TextField
-            label="Search by Phone"
-            variant="outlined"
-            value={searchQuery}
-            onChange={handleInputChange}
-            fullWidth
-            disabled={isSearching}
-            inputProps={{ maxLength: 15 }}
-            sx={{
-              maxWidth: "300px",
-              justifyContent: "center",
-              ml:20,
-              "& .MuiOutlinedInput-root": {
-                "& fieldset": { borderColor: theme.palette.grey[300] },
-                "&:hover fieldset": { borderColor: theme.palette.greenAccent.main },
-                "&.Mui-focused fieldset": { borderColor: theme.palette.greenAccent.main },
-              },
-              "& .MuiInputLabel-root": { color: theme.palette.grey[100] },
-              "& .MuiInputBase-input": { color: theme.palette.grey[100] },
-              mb: 2,
-            }}
-          />
-        ) : (
-          <Autocomplete
-            freeSolo
-            options={searchResults}
-            getOptionLabel={(option) => `${option.firstName || "Unknown"} ${option.lastName || ""} (${option.phoneNumber || "N/A"})`}
-            onChange={handleCustomerSelect}
-            onInputChange={handleInputChange}
-            loading={isSearching}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Search by Name"
-                variant="outlined"
-                InputProps={{
-                  ...params.InputProps,
-                  endAdornment: isSearching ? <CircularProgress size={20} /> : params.InputProps.endAdornment,
-                }}
-                sx={{
-                  maxWidth: "300px",
-                  justifyContent: "center",
-                  ml:20,
-                  "& .MuiOutlinedInput-root": {
-                    "& fieldset": { borderColor: theme.palette.grey[300] },
-                    "&:hover fieldset": { borderColor: theme.palette.greenAccent.main },
-                    "&.Mui-focused fieldset": { borderColor: theme.palette.greenAccent.main },
-                  },
-                  "& .MuiInputLabel-root": { color: theme.palette.grey[100] },
-                  "& .MuiInputBase-input": { color: theme.palette.grey[100] },
-                  mb: 2,
-                }}
+
+        <form onSubmit={handleSubmit}>
+          <Grid container spacing={2}>
+            {/* Customer Search with Autocomplete */}
+            <Grid item xs={12} sm={6}>
+              <Autocomplete
+                options={filteredCustomers}
+                getOptionLabel={(option) =>
+                  `${option.customerName} (${option.accountNumber})${
+                    option.phoneNumber ? ` - ${option.phoneNumber}` : ''
+                  }`
+                }
+                onInputChange={handleSearch}
+                onChange={handleCustomerSelect}
+                value={selectedCustomer}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    fullWidth
+                    label="Search Customer (Name, Phone, Account)"
+                    placeholder="Enter name, phone, or account number"
+                    required
+                  />
+                )}
+                noOptionsText="No customers found"
+                isOptionEqualToValue={(option, value) => option.id === value.id}
               />
-            )}
-          />
-        )}
-
-        {isPhoneSearch && renderPhoneSearchResults()}
-
-        {selectedCustomer && (
-          <Box sx={{ mt: 3 }}>
-            <Typography variant="h6" gutterBottom sx={{ mb: 2, color: theme.palette.grey[100] }}>
-              Payment Details
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <Typography variant="subtitle1" sx={{ color: theme.palette.grey[100] }}>
-                  Customer: {selectedCustomer.firstName} {selectedCustomer.lastName} ({selectedCustomer.phoneNumber})
-                </Typography>
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  label="Amount (KES)"
-                  variant="outlined"
-                  type="number"
-                  value={formData.totalAmount}
-                  onChange={handleFormChange("totalAmount")}
-                  fullWidth
-                  sx={{ "& .MuiOutlinedInput-root": { "& fieldset": { borderColor: theme.palette.grey[300] }, "&:hover fieldset": { borderColor: theme.palette.greenAccent.main }, "&.Mui-focused fieldset": { borderColor: theme.palette.greenAccent.main } }, "& .MuiInputLabel-root": { color: theme.palette.grey[100] }, "& .MuiInputBase-input": { color: theme.palette.grey[100] } }}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  select
-                  label="Mode of Payment"
-                  variant="outlined"
-                  value={formData.modeOfPayment}
-                  onChange={handleFormChange("modeOfPayment")}
-                  fullWidth
-                  sx={{ "& .MuiOutlinedInput-root": { "& fieldset": { borderColor: theme.palette.grey[300] }, "&:hover fieldset": { borderColor: theme.palette.greenAccent.main }, "&.Mui-focused fieldset": { borderColor: theme.palette.greenAccent.main } }, "& .MuiInputLabel-root": { color: theme.palette.grey[100] }, "& .MuiInputBase-input": { color: theme.palette.grey[100] } }}
-                >
-                  {["CASH", "MPESA", "BANK_TRANSFER", "CREDIT_CARD", "DEBIT_CARD"].map((option) => (
-                    <MenuItem key={option} value={option} sx={{ color: theme.palette.grey[100] }}>{option}</MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
-              <Grid item xs={12}>
-                <Button
-                  variant="contained"
-                  onClick={handlePaymentSubmit}
-                  disabled={isProcessing}
-                  fullWidth
-                  sx={{ bgcolor: theme.palette.greenAccent.main, color: "#fff", "&:hover": { bgcolor: theme.palette.greenAccent.main, opacity: 0.9 }, "&:disabled": { bgcolor: theme.palette.grey[300] }, borderRadius: 20, py: 1.5 }}
-                >
-                  {isProcessing ? <CircularProgress size={24} sx={{ color: "#fff" }} /> : "Submit Payment"}
-                </Button>
-              </Grid>
             </Grid>
-          </Box>
-        )}
 
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={6000}
-          onClose={() => setSnackbar({ ...snackbar, open: false })}
-          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        >
-          <Alert severity={snackbar.severity} sx={{ width: "100%", bgcolor: theme.palette.grey[300], color: theme.palette.grey[100] }}>
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
+            {/* Mode of Payment */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                select
+                fullWidth
+                label="Mode of Payment"
+                value={modeOfPayment}
+                onChange={(e) => setModeOfPayment(e.target.value)}
+                required
+              >
+                {Object.values(ModeOfPayment).map((mode) => (
+                  <MenuItem key={mode} value={mode}>
+                    {mode}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+
+            {/* Total Amount */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Total Amount (KES)"
+                type="number"
+                value={totalAmount}
+                onChange={(e) => setTotalAmount(e.target.value)}
+                required
+                inputProps={{ min: 0, step: '0.01' }}
+              />
+            </Grid>
+
+            {/* Paid By */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Paid By"
+                value={paidBy}
+                onChange={(e) => setPaidBy(e.target.value)}
+                required
+              />
+            </Grid>
+
+            {/* Submit */}
+            <Grid item xs={12}>
+              <Button
+                type="submit"
+                variant="contained"
+                fullWidth
+                disabled={loading}
+                sx={{ mt: 2 }}
+              >
+                {loading ? 'Processing...' : 'Create Payment'}
+              </Button>
+            </Grid>
+          </Grid>
+        </form>
+
+        {message && (
+          <Typography sx={{ mt: 2, color: message.includes('Error') ? 'error.main' : 'success.main' }}>
+            {message}
+          </Typography>
+        )}
       </Paper>
-    </Box>
+    </Container>
   );
 };
 

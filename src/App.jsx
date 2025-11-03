@@ -12,7 +12,7 @@ import AddPropertyScreen from "./pages/property/addProperty";
 import AddUnitScreen from "./pages/property/addUnit";
 import BuildingDetailsScreen from "./pages/property/propertyDetails";
 import EditBuildingScreen from "./pages/property/editBuilding";
-import InvoiceList from "./pages/billing/Invoices";
+import BillList from "./pages/billing/Invoices"
 import CreateInvoice from "./pages/billing/createInvoice";
 import CreateCustomerScreen from "./pages/customers/addCustomers";
 import InvoiceDetails from "./pages/billing/InvoiceDetail";
@@ -57,6 +57,8 @@ import MeterScreen from "./pages/meterInventory/meters";
 import ConnectionsScreen from "./pages/connections/connection";
 import NewCustomersScreen from "./pages/customers/newCustomers";
 import AbnormalMeterReadingsList from "./pages/meterReading/abnormalReadings";
+import BillTypeScreen from "./pages/billing/billtypes";
+import UnreceipedPayments from "./pages/payments/unreceipted";
 
 const App = () => {
   const { darkMode } = useThemeStore();
@@ -171,7 +173,7 @@ const App = () => {
                   path="/invoices"
                   element={
                     <ProtectedRoute>
-                      <InvoiceList />
+                      <BillList/>
                     </ProtectedRoute>
                   }
                 />
@@ -458,6 +460,27 @@ const App = () => {
                     </ProtectedRoute>
                   }
                 /> 
+
+
+
+                   <Route
+                  path="bill-types"
+                  element={
+                    <ProtectedRoute>
+                      <BillTypeScreen />
+                    </ProtectedRoute>
+                  }
+                /> 
+
+                    <Route
+                  path="unreceipted-payments"
+                  element={
+                    <ProtectedRoute>
+                      <UnreceipedPayments />
+                    </ProtectedRoute>
+                  }
+                /> 
+
 
 
                

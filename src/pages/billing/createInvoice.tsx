@@ -1,457 +1,333 @@
 import React, { useEffect, useState, useCallback } from "react";
+import axios from "axios";
 import {
+  Container,
+  Typography,
   TextField,
   Button,
-  Snackbar,
-  Alert,
-  CircularProgress,
-  Card,
-  CardContent,
-  Typography,
+  MenuItem,
+  Paper,
+  Grid,
+  IconButton,
+  Divider,
   Autocomplete,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  useTheme,
-  Box,
 } from "@mui/material";
-import axios from "axios";
-import TitleComponent from "../../components/title";
+import { AddCircleOutline, RemoveCircleOutline } from "@mui/icons-material";
+import { debounce } from "lodash"; // Install lodash for debouncing
 import { useNavigate } from "react-router-dom";
-import { useAuthStore } from "../../store/authStore";
-import { useThemeStore } from "../../store/authStore";
-import debounce from "lodash/debounce";
-import { LocalizationProvider } from "@mui/x-date-pickers";
-import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { getTheme } from "../../store/theme";
+
+const BASEURL = (import.meta as any).env?.VITE_BASE_URL || "";
 
 const CreateInvoice = () => {
-  const navigate = useNavigate();
-  const theme = useTheme();
-  const darkMode = useThemeStore((state) => state.darkMode);
-  const currentUser = useAuthStore((state) => state.currentUser);
-
-  // State management
-  const [searchQuery, setSearchQuery] = useState("");
-  // Define a type for Customer
   type Customer = {
-    id: number;
-    firstName: string;
-    lastName: string;
-    phoneNumber: string;
-    category?: string;
-    monthlyCharge?: number;
-    closingBalance?: number;
-    // Add other fields as needed
+    id: string;
+    customerName: string;
+    accountNumber: string;
+    phoneNumber?: string;
   };
 
-  const [searchResults, setSearchResults] = useState<Customer[]>([]);
+  type BillType = {
+    id: string;
+    name: string;
+  };
+
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+  const [billTypes, setBillTypes] = useState<BillType[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [formData, setFormData] = useState({ description: "", amount: "", quantity: "" });
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
-  const [isSearching, setIsSearching] = useState(false);
+  const [selectedBillType, setSelectedBillType] = useState("");
+  const [billPeriod, setBillPeriod] = useState("");
+  const [items, setItems] = useState([{ description: "", amount: "", quantity: 1 }]);
   const [loading, setLoading] = useState(false);
-  const [isPhoneSearch, setIsPhoneSearch] = useState(false);
-  const [openGenerateDialog, setOpenGenerateDialog] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState(null); // New state for month-year picker
+  const [message, setMessage] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const BASEURL = import.meta.env.VITE_BASE_URL || "https://taqa.co.ke/api";
 
-  // Debug theme
+    const navigate = useNavigate();
+    const theme = getTheme();
+
+  // Fetch customers and bill types
   useEffect(() => {
-    //console.log("Theme Mode:", theme.palette.mode);
-    //console.log("background.default:", theme.palette.background.default);
-    //console.log("background.paper:", theme.palette.background.paper);
-  }, [theme, darkMode]);
+    const fetchData = async () => {
+      try {
+        const [custRes, billRes] = await Promise.all([
+          axios.get(`${BASEURL}/customers`, { withCredentials: true }),
+          axios.get(`${BASEURL}/get-bill-types`, { withCredentials: true }),
+        ]);
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!currentUser) navigate("/login");
-  }, [currentUser, navigate]);
+        const fetchedCustomers = custRes.data?.data?.customers || [];
+        setCustomers(fetchedCustomers);
+        setFilteredCustomers(fetchedCustomers); // Initially, show all customers
+        setBillTypes(billRes.data?.data || []);
+      } catch (err) {
+        console.error(err);
+        setMessage("Failed to load data.");
+      }
+    };
+    fetchData();
+  }, []);
 
-  // Clean search query
-  const cleanSearchQuery = (query) => query.replace(/\s*\([^)]+\)/g, "").trim();
-
-  // Unified search handler
-  const handleSearch = async (query) => {
-    if (!query.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
-    setIsSearching(true);
-    const isPhoneNumber = /^\d+$/.test(query);
-
-    try {
-      const url = isPhoneNumber
-        ? `${BASEURL}/search-customer-by-phone`
-        : `${BASEURL}/search-customer-by-name`;
-      const params = isPhoneNumber ? { phone: query } : { name: cleanSearchQuery(query) };
-
-      if (isPhoneNumber && query.length < 10) {
-        setSearchResults([]);
+  // Debounced search function
+  const fetchCustomers = useCallback(
+    debounce(async (query: string) => {
+      if (query.trim() === "") {
+        setFilteredCustomers(customers);
         return;
       }
 
-      const response = await axios.get(url, { params, withCredentials: true });
-      const results = isPhoneNumber
-        ? [response.data]
-        : Array.isArray(response.data) ? response.data : [];
-
-      setSearchResults(results.length ? results : []);
-      if (!results.length) {
-        setSnackbar({
-          open: true,
-          message: isPhoneNumber ? "No customer found with that phone number" : "No customer found with that name",
-          severity: "info",
+      try {
+        const res = await axios.get(`${BASEURL}/customers`, {
+          params: { search: query },
+          withCredentials: true,
         });
+        setFilteredCustomers(res.data?.data?.customers || []);
+      } catch (err) {
+        console.error(err);
+        setMessage("Failed to search customers.");
+        setFilteredCustomers(customers); // Fallback to all customers
       }
-    } catch (error) {
-      console.error("Search error:", error.response || error);
-      setSnackbar({
-        open: true,
-        message: error.response?.status === 404
-          ? isPhoneNumber
-            ? "No customer found with that phone number"
-            : "No customer found with that name"
-          : `Error searching customers: ${error.response?.data?.message || error.message}`,
-        severity: "error",
-      });
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  // Debounced phone search
-  const debouncedPhoneSearch = useCallback(
-    debounce((query) => {
-      if (isPhoneSearch) handleSearch(query);
-    }, 500),
-    [isPhoneSearch]
+    }, 300),
+    [customers]
   );
 
-  // Handle input change for search
-  const handleInputChange = (e, value) => {
-    const newValue = e ? e.target.value : value;
-    setSearchQuery(newValue);
-    setIsPhoneSearch(/^\d+$/.test(newValue));
-    setSelectedCustomer(null);
-
-    if (isPhoneSearch) {
-      debouncedPhoneSearch(newValue);
-    } else {
-      handleSearch(newValue);
-    }
+  // Handle search input change
+  const handleSearch = (event: React.ChangeEvent<{}>, value: string) => {
+    setSearchQuery(value);
+    fetchCustomers(value);
   };
 
   // Handle customer selection
-  const handleCustomerSelect = (event, newValue) => {
-    setSelectedCustomer(newValue);
-    if (!isPhoneSearch && newValue) {
+  const handleCustomerSelect = (event: React.ChangeEvent<{}>, value: Customer | null) => {
+    setSelectedCustomer(value);
+  };
+
+  // Handle dynamic items
+  const handleItemChange = (index: number, field: string, value: string) => {
+    const newItems = [...items];
+    newItems[index][field] = value;
+    setItems(newItems);
+  };
+
+  const addItem = () => {
+    setItems([...items, { description: "", amount: "", quantity: 1 }]);
+  };
+
+  const removeItem = (index: number) => {
+    const newItems = items.filter((_, i) => i !== index);
+    setItems(newItems);
+  };
+
+  // Calculate total
+  const totalAmount = items.reduce(
+    (sum, item) => sum + Number(item.amount || 0) * Number(item.quantity || 1),
+    0
+  );
+
+  // Submit invoice
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCustomer) {
+      setMessage("Please select a customer.");
+      return;
+    }
+
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const payload = {
+        customerId: selectedCustomer.id,
+        billTypeId: selectedBillType,
+        billPeriod,
+        items: items.map((i) => ({
+          description: i.description,
+          amount: parseFloat(i.amount),
+          quantity: parseInt(String(i.quantity), 10) || 1,
+        })),
+      };
+
+      const res = await axios.post(`${BASEURL}/create-bill`, payload, {
+        withCredentials: true,
+      });
+
+      setMessage(res.data?.message || "Invoice created successfully!");
+      setItems([{ description: "", amount: "", quantity: 1 }]);
+      setSelectedCustomer(null);
+      setSelectedBillType("");
+      setBillPeriod("");
       setSearchQuery("");
-      setSearchResults([]);
-    }
-  };
-
-  // Handle form field changes
-  const handleFormChange = (field) => (e) => {
-    setFormData((prev) => ({ ...prev, [field]: e.target.value }));
-  };
-
-  // Create invoice for a single customer
-  const handleCreateInvoice = async () => {
-    const { description, amount, quantity } = formData;
-    if (!description || !amount || !quantity || !selectedCustomer) {
-      setSnackbar({ open: true, message: "Please fill in all fields and select a customer", severity: "error" });
-      return;
-    }
-
-    const invoiceData = {
-      customerId: selectedCustomer.id,
-      invoiceItemsData: [{ description, amount: parseFloat(amount), quantity: parseInt(quantity) }],
-    };
-
-    setLoading(true);
-    try {
-      const response = await axios.post(`${BASEURL}/create-invoice`, invoiceData, { withCredentials: true });
-      setSnackbar({ open: true, message: "Invoice created successfully!", severity: "success" });
-      navigate(`/get-invoice/${response.data.newInvoice.id}`);
-    } catch (error) {
-      console.error("Error creating invoice:", error);
-      setSnackbar({ open: true, message: "Failed to create invoice. Please try again.", severity: "error" });
+      setFilteredCustomers(customers); // Reset filtered customers
+    } catch (err) {
+      console.error(err);
+      setMessage("Error creating invoice.");
     } finally {
       setLoading(false);
     }
   };
-
-  // Open the generate invoices dialog
-  const handleGenerateAllClick = () => {
-    setOpenGenerateDialog(true);
-  };
-
-  // Format the selected period to YYYY-MM
-  const formatPeriod = (date) => {
-    if (!date) return "";
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0"); // Months are 0-based
-    return `${year}-${month}`;
-  };
-
-  // Generate invoices for all active customers
-  const handleGenerateAllConfirm = async () => {
-    if (!selectedPeriod) {
-      setSnackbar({ open: true, message: "Please select a billing period", severity: "error" });
-      return;
-    }
-
-    const period = formatPeriod(selectedPeriod);
-    setLoading(true);
-    setOpenGenerateDialog(false);
-    try {
-      await axios.post(
-        `${BASEURL}/generate-invoices-for-all`,
-        { period },
-        { withCredentials: true }
-      );
-      setSnackbar({
-        open: true,
-        message: `Invoices generated successfully for all active customers for ${period}!`,
-        severity: "success",
-      });
-    } catch (error) {
-      console.error("Error generating invoices for all:", error);
-      setSnackbar({
-        open: true,
-        message: `Failed to generate invoices for ${period}. Please try again.`,
-        severity: "error",
-      });
-    } finally {
-      setLoading(false);
-      setSelectedPeriod(null); // Reset the period after submission
-    }
-  };
-
-  // Render search results for phone search
-  const renderPhoneSearchResults = () =>
-    searchResults.length > 0 ? (
-      <Card sx={{ mt: 2, mb: 2 }}>
-        <CardContent>
-          <Typography variant="h6">Search Results</Typography>
-          {searchResults.map((customer) => (
-            <Box
-              key={customer.id}
-              sx={{ p: 1, cursor: "pointer", "&:hover": { backgroundColor: theme.palette.grey[100] } }}
-              onClick={() => setSelectedCustomer(customer)}
-            >
-              <Typography>{`${customer.firstName} ${customer.lastName} (${customer.phoneNumber})`}</Typography>
-            </Box>
-          ))}
-        </CardContent>
-      </Card>
-    ) : (
-      !isSearching &&
-      searchQuery &&
-      searchQuery.length >= 10 && (
-        <Card sx={{ mt: 2, mb: 2 }}>
-          <CardContent>
-            <Typography variant="h6">Search Results</Typography>
-            <Typography>No customer found with phone number: {searchQuery}</Typography>
-          </CardContent>
-        </Card>
-      )
-    );
-
-  // Render selected customer
-  const renderSelectedCustomer = () =>
-    selectedCustomer && (
-      <Card sx={{ mt: 2 }}>
-        <CardContent>
-          <Typography variant="h6">Selected Customer</Typography>
-          <Typography>Name: {`${selectedCustomer.firstName} ${selectedCustomer.lastName}`}</Typography>
-          <Typography>Phone: {selectedCustomer.phoneNumber}</Typography>
-          <Typography>Category: {selectedCustomer.category}</Typography>
-          <Typography>Monthly Charge: {selectedCustomer.monthlyCharge}</Typography>
-          <Typography>Closing Balance: {selectedCustomer.closingBalance}</Typography>
-        </CardContent>
-      </Card>
-    );
 
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        width: "100%",
-        bgcolor: theme.palette.background.paper,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        p: 0,
-      }}
-    >
-      {/* Generate Invoices for All Button */}
-      <Box sx={{ mb: 2, display: "flex", justifyContent: "flex-end", ml: 100 }}>
-        <Button
-          variant="contained"
-          color="secondary"
-          onClick={handleGenerateAllClick}
-          disabled={loading}
-        >
-          {loading ? <CircularProgress size={24} /> : "Generate Invoices for All Customers"}
-        </Button>
-      </Box>
+    <Container maxWidth="md" sx={{ mt: 6 ,ml:10 }}>
+      <Paper sx={{ p: 4, borderRadius: 3, boxShadow: 3 }}>
+        <Typography variant="h5" gutterBottom>
+          Create Invoice
+        </Typography>
 
-      {/* Main Content */}
-      <Box sx={{ maxWidth: 600, width: "100%" }}>
-        <TitleComponent title="Create an Invoice" />
-
-        {/* Search Input */}
-        {isPhoneSearch ? (
-          <TextField
-            label="Search Customer by Phone"
-            variant="outlined"
-            value={searchQuery}
-            onChange={handleInputChange}
-            fullWidth
-            disabled={isSearching}
-            inputProps={{ maxLength: 15 }}
-            sx={{ mb: 2 }}
-          />
-        ) : (
-          <Autocomplete
-            options={searchResults}
-            getOptionLabel={(option) => `${option?.firstName} ${option?.lastName} (${option?.phoneNumber})`}
-            onInputChange={handleInputChange}
-            onChange={handleCustomerSelect}
-            loading={isSearching}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Search Customer by Name"
-                variant="outlined"
-                fullWidth
-                InputProps={{
-                  ...params.InputProps,
-                  endAdornment: isSearching ? <CircularProgress size={20} /> : params.InputProps.endAdornment,
-                }}
+        <form onSubmit={handleSubmit}>
+          <Grid container spacing={2}>
+            {/* Customer Search with Autocomplete */}
+            <Grid item xs={12} sm={6}>
+              <Autocomplete
+                options={filteredCustomers}
+                getOptionLabel={(option) =>
+                  `${option.customerName} (${option.accountNumber})${
+                    option.phoneNumber ? ` - ${option.phoneNumber}` : ""
+                  }`
+                }
+                onInputChange={handleSearch}
+                onChange={handleCustomerSelect}
+                value={selectedCustomer}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    fullWidth
+                    label="Search Customer (Name, Phone, Account)"
+                    placeholder="Enter name, phone, or account number"
+                    required
+                  />
+                )}
+                noOptionsText="No customers found"
+                isOptionEqualToValue={(option, value) => option.id === value.id}
               />
-            )}
-            sx={{ mb: 2 }}
-          />
+            </Grid>
+
+            {/* Bill Type */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                select
+                fullWidth
+                label="Select Bill Type"
+                value={selectedBillType}
+                onChange={(e) => setSelectedBillType(e.target.value)}
+                required
+              >
+                {billTypes.map((bt) => (
+                  <MenuItem key={bt.id} value={bt.id}>
+                    {bt.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+
+            {/* Billing Period */}
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                type="month"
+                label="Billing Period"
+                value={billPeriod}
+                onChange={(e) => setBillPeriod(e.target.value)}
+                required
+              />
+            </Grid>
+
+            {/* Items */}
+            <Grid item xs={12}>
+              <Typography variant="h6" sx={{ mt: 2 }}>
+                Items
+              </Typography>
+              {items.map((item, index) => (
+                <Grid
+                  container
+                  spacing={1}
+                  alignItems="center"
+                  key={index}
+                  sx={{ mt: 1 }}
+                >
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      label="Description"
+                      value={item.description}
+                      onChange={(e) =>
+                        handleItemChange(index, "description", e.target.value)
+                      }
+                      required
+                    />
+                  </Grid>
+                  <Grid item xs={3}>
+                    <TextField
+                      fullWidth
+                      label="Amount"
+                      type="number"
+                      value={item.amount}
+                      onChange={(e) =>
+                        handleItemChange(index, "amount", e.target.value)
+                      }
+                      required
+                    />
+                  </Grid>
+                  <Grid item xs={2}>
+                    <TextField
+                      fullWidth
+                      label="Qty"
+                      type="number"
+                      value={item.quantity}
+                      onChange={(e) =>
+                        handleItemChange(index, "quantity", e.target.value)
+                      }
+                      required
+                    />
+                  </Grid>
+                  <Grid item xs={1}>
+                    <IconButton
+                      color="error"
+                      onClick={() => removeItem(index)}
+                      disabled={items.length === 1}
+                    >
+                      <RemoveCircleOutline />
+                    </IconButton>
+                  </Grid>
+                </Grid>
+              ))}
+
+              <Button
+                startIcon={<AddCircleOutline  />}
+                sx={{ mt: 2, color:theme.palette.primary.contrastText }}
+                onClick={addItem}
+              >
+                Add Item
+              </Button>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="subtitle1">
+                Total Amount: <strong>KES {totalAmount.toFixed(2)}</strong>
+              </Typography>
+            </Grid>
+
+            {/* Submit */}
+            <Grid item xs={12}>
+              <Button
+                type="submit"
+                variant="contained"
+                fullWidth
+                disabled={loading}
+              >
+                {loading ? "Creating..." : "Create Invoice"}
+              </Button>
+            </Grid>
+          </Grid>
+        </form>
+
+        {message && (
+          <Typography  sx={{ mt: 2 }}>
+            {message}
+          </Typography>
         )}
-
-        {/* Phone Search Results */}
-        {isPhoneSearch && renderPhoneSearchResults()}
-
-        {/* Selected Customer */}
-        {renderSelectedCustomer()}
-
-        {/* Invoice Form */}
-        <TextField
-          label="Description"
-          value={formData.description}
-          onChange={handleFormChange("description")}
-          fullWidth
-          margin="normal"
-        />
-        <TextField
-          label="Amount"
-          value={formData.amount}
-          onChange={handleFormChange("amount")}
-          fullWidth
-          margin="normal"
-          type="number"
-        />
-        <TextField
-          label="Quantity"
-          value={formData.quantity}
-          onChange={handleFormChange("quantity")}
-          fullWidth
-          margin="normal"
-          type="number"
-          inputProps={{ min: 0, step: 1 }}
-        />
-
-        <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-end" }}>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleCreateInvoice}
-            disabled={loading}
-          >
-            {loading ? <CircularProgress size={24} /> : "Create Invoice"}
-          </Button>
-        </Box>
-      </Box>
-
-      {/* Generate Invoices for All Confirmation Dialog */}
-      <Dialog
-        open={openGenerateDialog}
-        onClose={() => {
-          setOpenGenerateDialog(false);
-          setSelectedPeriod(null); // Reset period on close
-        }}
-        aria-labelledby="generate-dialog-title"
-        aria-describedby="generate-dialog-description"
-      >
-        <DialogTitle id="generate-dialog-title">Confirm Generate Invoices</DialogTitle>
-        <DialogContent>
-          <DialogContentText id="generate-dialog-description">
-            This action will create invoices for all active customers and update their balances for the selected period. This cannot be undone. Are you sure you want to proceed?
-          </DialogContentText>
-          <LocalizationProvider dateAdapter={AdapterDateFns}>
-            <DatePicker
-              views={["year", "month"]}
-              label="Select Billing Period (Year-Month)"
-              value={selectedPeriod}
-              onChange={(newValue) => setSelectedPeriod(newValue)}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  fullWidth
-                  margin="normal"
-                  helperText="Format: YYYY-MM (e.g., 2025-04)"
-                />
-              )}
-              maxDate={new Date()} // Prevent future dates
-            />
-          </LocalizationProvider>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              setOpenGenerateDialog(false);
-              setSelectedPeriod(null);
-            }}
-            color="primary"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleGenerateAllConfirm}
-            color="primary"
-            variant="contained"
-            disabled={loading}
-          >
-            {loading ? <CircularProgress size={20} /> : "Confirm"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert severity={snackbar.severity} sx={{ width: "100%" }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Box>
+      </Paper>
+    </Container>
   );
 };
 

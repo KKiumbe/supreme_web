@@ -12,7 +12,7 @@ const ZoneList = ({ zones, selectedZone, onSelect, onAdd }) => (
 
       <Box sx={{ overflowY: 'auto', flex: 1, pr: 1 }}>
         {zones.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" >
             Select a scheme to view its zones.
           </Typography>
         ) : (

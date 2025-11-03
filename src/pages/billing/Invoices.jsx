@@ -4,21 +4,20 @@ import {
   Typography,
   Paper,
   TextField,
-  Button,
-  MenuItem,
-  Grid,
   IconButton,
   Tooltip,
   Chip,
+  Grid,
+  Autocomplete,
+  MenuItem,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
-import {
-  Search as SearchIcon,
-  Refresh as RefreshIcon,
-} from "@mui/icons-material";
+import { Search as SearchIcon, Refresh as RefreshIcon } from "@mui/icons-material";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 
+// Debounce hook (reused from CustomersScreen)
 const useDebounce = (value, delay = 500) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
   useEffect(() => {
@@ -28,214 +27,173 @@ const useDebounce = (value, delay = 500) => {
   return debouncedValue;
 };
 
-// Types
-/**
- * @typedef {Object} BillType
- * @property {number} id
- * @property {string} name
- */
+const BASEURL = import.meta.env.VITE_BASE_URL || "";
 
-/**
- * @typedef {Object} Bill
- * @property {string} id
- * @property {string} billNumber
- * @property {{customerName?: string, phoneNumber?: string}=} customer
- * @property {number} billAmount
- * @property {number} amountPaid
- * @property {number} closingBalance
- * @property {string} status
- * @property {{name: string}=} type
- * @property {string} billPeriod
- * @property {string} createdAt
- */
-
-/**
- * @typedef {Object} Pagination
- * @property {number} page
- * @property {number} limit
- * @property {number} total
- * @property {number} totalPages
- */
-
-const InvoiceList = () => {
+const BillList = () => {
   const { currentUser } = useAuthStore();
-  const BASEURL = import.meta.env.VITE_BASE_URL;
+  const navigate = useNavigate();
 
   // State
-  const [rawBills, setRawBills] = useState([]);
-  const [billTypes, setBillTypes] = useState([]);
+  const [bills, setBills] = useState([]);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
     total: 0,
     totalPages: 1,
+    hasNext: false,
+    hasPrev: false,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  // Filters
+  const [customers, setCustomers] = useState([]);
+  const [billTypes, setBillTypes] = useState([]);
   const [search, setSearch] = useState("");
+  const [billType, setBillType] = useState("");
   const [status, setStatus] = useState("");
-  const [typeId, setTypeId] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-
   const debouncedSearch = useDebounce(search);
 
-  // Fetch bill types
+  // Fetch customers and bill types
   useEffect(() => {
-    const fetchBillTypes = async () => {
+    const fetchDropdowns = async () => {
       try {
-        const res = await axios.get(`${BASEURL}/get-bill-types`, {
-          withCredentials: true,
-        });
-        // Ensure we always have an array
-        const data = Array.isArray(res.data.data) ? res.data.data : [];
-        setBillTypes(data);
+        const [customersRes, billTypesRes] = await Promise.all([
+          axios.get(`${BASEURL}/customers`, { withCredentials: true }),
+          axios.get(`${BASEURL}/get-bill-types`, { withCredentials: true }),
+        ]);
+
+        setCustomers(customersRes.data?.data?.customers || []);
+        setBillTypes(billTypesRes.data?.data || []);
       } catch (err) {
-        console.error("Failed to load bill types", err);
-        setBillTypes([]); // Fallback
+        console.error("Failed to load dropdowns:", err);
+        setError("Failed to load customers or bill types");
       }
     };
-    fetchBillTypes();
-  }, [BASEURL]);
+    fetchDropdowns();
+  }, []);
 
   // Fetch bills
-
-
   const fetchBills = useCallback(async () => {
-  setLoading(true);
-  setError(null);
-  try {
-    const params = new URLSearchParams({
-      page: pagination.page.toString(),
-      limit: pagination.limit.toString(),
-      ...(debouncedSearch && { search: debouncedSearch }),
-      ...(status && { status }),
-      ...(typeId && { typeId }),
-      ...(dateFrom && { dateFrom }),
-      ...(dateTo && { dateTo }),
-    });
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString(),
+        ...(debouncedSearch && { search: debouncedSearch }),
+        ...(billType && { billType }),
+        ...(status && { status }),
+      });
 
-    const res = await axios.get(`${BASEURL}/get-bills?${params}`, {
-      withCredentials: true,
-    });
+      const res = await axios.get(`${BASEURL}/get-bills?${params}`, { withCredentials: true });
+      
+      // Validate response structure
+      if (!res.data?.success || !res.data?.data) {
+        throw new Error("Invalid API response structure");
+      }
 
-    // ✅ FIX HERE
-    const bills = Array.isArray(res.data.data) ? res.data.data : [];
-    const pag = res.data.pagination || {
-      page: 1,
-      limit: 10,
-      total: bills.length,
-      totalPages: 1,
-    };
-
-    setRawBills(bills);
-    setPagination({
-      page: pag.page,
-      limit: pag.limit,
-      total: pag.total || 0,
-      totalPages: pag.totalPages || 1,
-    });
-  } catch (err) {
-    console.error("Error fetching bills:", err);
-    setError(err.response?.data?.message || "Failed to load invoices");
-    setRawBills([]);
-  } finally {
-    setLoading(false);
-  }
-}, [
-  BASEURL,
-  pagination.page,
-  pagination.limit,
-  debouncedSearch,
-  status,
-  typeId,
-  dateFrom,
-  dateTo,
-]);
-
+      setBills(res.data.data || []);
+      setPagination({
+        page: res.data.pagination?.page || 1,
+        limit: res.data.pagination?.limit || 20,
+        total: res.data.pagination?.total || 0,
+        totalPages: res.data.pagination?.totalPages || 1,
+        hasNext: res.data.pagination?.hasNext || false,
+        hasPrev: res.data.pagination?.hasPrev || false,
+      });
+    } catch (err) {
+      console.error("Failed to fetch bills:", err);
+      setError(err.response?.data?.message || "Failed to load bills");
+      setBills([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [pagination.page, pagination.limit, debouncedSearch, billType, status]);
 
   useEffect(() => {
     fetchBills();
   }, [fetchBills]);
 
-  // Reset filters
-  const handleReset = () => {
-    setSearch("");
-    setStatus("");
-    setTypeId("");
-    setDateFrom("");
-    setDateTo("");
+  // Handle search and customer selection
+  const handleSearch = (event, value) => {
+    setSearch(value || "");
     setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
-  // Normalize data for DataGrid
-  const normalizedBills = useMemo(() => {
-    return rawBills.map((b) => ({
-      id: b.id,
-      billNumber: b.billNumber,
-      customerName: b.customer?.customerName || "-",
-      customerPhone: b.customer?.phoneNumber || "-",
-      billAmount: b.billAmount,
-      amountPaid: b.amountPaid,
-      closingBalance: b.closingBalance,
-      status: b.status,
-      type: b.type?.name || "-",
-      billPeriod: b.billPeriod.split("T")[0], // Format date
-      createdAt: new Date(b.createdAt).toLocaleDateString(),
-    }));
-  }, [rawBills]);
+  const handleCustomerSelect = (event, value) => {
+    setSearch(value ? value.customerName : "");
+    setPagination((prev) => ({ ...prev, page: 1 }));
+  };
 
+  // Reset filters
+  const handleReset = () => {
+    setSearch("");
+    setBillType("");
+    setStatus("");
+    setPagination((prev) => ({ ...prev, page: 1 }));
+  };
+
+  // Normalize bill data
+  const normalizedBills = useMemo(() => {
+    const billTypeMap = Object.fromEntries(billTypes.map((bt) => [bt.id, bt.name]));
+    return bills.map((bill) => ({
+      id: bill.id,
+      billNumber: bill.billNumber || "-",
+      customerName: bill.customer?.customerName || "-",
+      phoneNumber: bill.customer?.phoneNumber || "-",
+      billAmount: bill.billAmount ? `KES ${bill.billAmount.toFixed(2)}` : "-",
+      amountPaid: bill.amountPaid ? `KES ${bill.amountPaid.toFixed(2)}` : "-",
+      closingBalance: bill.closingBalance ? `KES ${bill.closingBalance.toFixed(2)}` : "-",
+      status: bill.status || "-",
+      billPeriod: bill.billPeriod ? new Date(bill.billPeriod).toLocaleDateString() : "-",
+      createdAt: bill.createdAt ? new Date(bill.createdAt).toLocaleString() : "-",
+      billType: billTypeMap[bill.type?.id] || bill.type?.name || "-",
+      items: bill.items?.length
+        ? bill.items
+            .map((item) => `${item.description} (Qty: ${item.quantity}, KES ${item.amount.toFixed(2)})`)
+            .join(", ")
+        : "-",
+    }));
+  }, [bills, billTypes]);
+
+  // DataGrid columns
   const columns = [
-    { field: "billNumber", headerName: "Bill No.", width: 160 },
-    { field: "customerName", headerName: "Customer", width: 180 },
-    { field: "customerPhone", headerName: "Phone", width: 140 },
-    {
-      field: "type",
-      headerName: "Type",
-      width: 150,
-    },
-    {
-      field: "billAmount",
-      headerName: "Bill Amount (KES)",
-      width: 160,
-      valueFormatter: (params) => `KES ${params.value?.toLocaleString() || 0}`,
-    },
-    {
-      field: "amountPaid",
-      headerName: "Paid (KES)",
-      width: 140,
-      valueFormatter: (params) => `KES ${params.value?.toLocaleString() || 0}`,
-    },
-    {
-      field: "closingBalance",
-      headerName: "Balance (KES)",
-      width: 150,
-      valueFormatter: (params) => `KES ${params.value?.toLocaleString() || 0}`,
-    },
+    { field: "billNumber", headerName: "Bill Number", width: 150 },
+    { field: "customerName", headerName: "Customer Name", width: 180 },
+    { field: "phoneNumber", headerName: "Phone Number", width: 140 },
+    { field: "billAmount", headerName: "Bill Amount", width: 120 },
+    { field: "amountPaid", headerName: "Amount Paid", width: 120 },
+    { field: "closingBalance", headerName: "Closing Balance", width: 120 },
     {
       field: "status",
       headerName: "Status",
-      width: 130,
-      renderCell: (params) => {
-        const status = params.value;
-        const color =
-          status === "PAID"
-            ? "success"
-            : status === "PARTIALLY_PAID"
-            ? "warning"
-            : status === "CANCELLED"
-            ? "error"
-            : "default";
-        return <Chip label={status.replace(/_/g, " ")} color={color} size="small" />;
-      },
+      width: 100,
+      renderCell: (params) => (
+        <Chip
+          label={params.value}
+          color={params.value === "PAID" ? "success" : params.value === "UNPAID" ? "warning" : "default"}
+          size="small"
+        />
+      ),
     },
-    { field: "billPeriod", headerName: "Period", width: 130 },
-    { field: "createdAt", headerName: "Created", width: 180 },
+    { field: "billPeriod", headerName: "Bill Period", width: 120 },
+    { field: "createdAt", headerName: "Created At", width: 160 },
+    { field: "billType", headerName: "Bill Type", width: 120 },
+    {
+      field: "items",
+      headerName: "Items",
+      width: 250,
+      renderCell: (params) => (
+        <Tooltip title={params.value}>
+          <span>{params.value}</span>
+        </Tooltip>
+      ),
+    },
   ];
 
-  if (!currentUser) return null;
+  if (!currentUser) {
+    navigate("/login");
+    return null;
+  }
 
   return (
     <Box sx={{ p: 3 }}>
@@ -244,27 +202,58 @@ const InvoiceList = () => {
         <Typography variant="h5" fontWeight="bold">
           Bills
         </Typography>
-        <Tooltip title="Refresh">
-          <IconButton onClick={fetchBills}>
-            <RefreshIcon />
-          </IconButton>
-        </Tooltip>
       </Grid>
 
       {/* Filters */}
       <Paper sx={{ p: 2, mb: 3 }}>
         <Grid container spacing={2}>
-          <Grid item xs={12} md={3}>
+          <Grid item xs={12} md={4}>
+            <Autocomplete
+              options={customers}
+              getOptionLabel={(option) =>
+                `${option.customerName} (${option.accountNumber})${
+                  option.phoneNumber ? ` - ${option.phoneNumber}` : ""
+                }`
+              }
+              onInputChange={handleSearch}
+              onChange={handleCustomerSelect}
+              freeSolo
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  fullWidth
+                  size="small"
+                  placeholder="Search by name, phone, or connection number"
+                  InputProps={{
+                    ...params.InputProps,
+                    startAdornment: <SearchIcon sx={{ mr: 1, color: "text.secondary" }} />,
+                  }}
+                />
+              )}
+              noOptionsText="No customers found"
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+            />
+          </Grid>
+
+          <Grid item xs={12} md={2}>
             <TextField
+              select
               fullWidth
               size="small"
-              placeholder="Search by Bill No. or Customer"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              InputProps={{
-                startAdornment: <SearchIcon sx={{ mr: 1, color: "text.secondary" }} />,
+              label="Bill Type"
+              value={billType}
+              onChange={(e) => {
+                setBillType(e.target.value);
+                setPagination((prev) => ({ ...prev, page: 1 }));
               }}
-            />
+            >
+              <MenuItem value="">All</MenuItem>
+              {billTypes.map((bt) => (
+                <MenuItem key={bt.id} value={bt.name}>
+                  {bt.name}
+                </MenuItem>
+              ))}
+            </TextField>
           </Grid>
 
           <Grid item xs={12} md={2}>
@@ -274,56 +263,15 @@ const InvoiceList = () => {
               size="small"
               label="Status"
               value={status}
-              onChange={(e) => setStatus(e.target.value)}
+              onChange={(e) => {
+                setStatus(e.target.value);
+                setPagination((prev) => ({ ...prev, page: 1 }));
+              }}
             >
               <MenuItem value="">All</MenuItem>
-              <MenuItem value="UNPAID">Unpaid</MenuItem>
-              <MenuItem value="PARTIALLY_PAID">Partially Paid</MenuItem>
               <MenuItem value="PAID">Paid</MenuItem>
-              <MenuItem value="CANCELLED">Cancelled</MenuItem>
+              <MenuItem value="UNPAID">Unpaid</MenuItem>
             </TextField>
-          </Grid>
-
-          <Grid item xs={12} md={2}>
-            <TextField
-              select
-              fullWidth
-              size="small"
-              label="Type"
-              value={typeId}
-              onChange={(e) => setTypeId(e.target.value)}
-            >
-              <MenuItem value="">All</MenuItem>
-              {billTypes.map((t) => (
-                <MenuItem key={t.id} value={t.id}>
-                  {t.name}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          <Grid item xs={12} md={2}>
-            <TextField
-              type="date"
-              fullWidth
-              size="small"
-              label="From"
-              InputLabelProps={{ shrink: true }}
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-            />
-          </Grid>
-
-          <Grid item xs={12} md={2}>
-            <TextField
-              type="date"
-              fullWidth
-              size="small"
-              label="To"
-              InputLabelProps={{ shrink: true }}
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-            />
           </Grid>
 
           <Grid item xs={12} md={1}>
@@ -361,9 +309,14 @@ const InvoiceList = () => {
           disableRowSelectionOnClick
           slots={{
             noRowsOverlay: () => (
-              <Box display="flex" alignItems="center" justifyContent="center" height="100%">
+              <Box
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+                height="100%"
+              >
                 <Typography color="text.secondary">
-                  {error || "No invoices found"}
+                  {error || "No bills found"}
                 </Typography>
               </Box>
             ),
@@ -374,4 +327,4 @@ const InvoiceList = () => {
   );
 };
 
-export default InvoiceList;
+export default BillList;

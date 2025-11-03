@@ -234,7 +234,7 @@ const NewCustomersScreen = () => {
         <DialogActions>
           <Button onClick={() => setAssignModalOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={handleAssignConnection}>
-            Assign & Activate
+            Assign & to generate connection bill
           </Button>
         </DialogActions>
       </Dialog>

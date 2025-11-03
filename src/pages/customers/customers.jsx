@@ -34,7 +34,7 @@ const useDebounce = (value, delay = 500) => {
 const CustomersScreen = () => {
   const { currentUser } = useAuthStore();
   const navigate = useNavigate();
-  const BASEURL = import.meta.env.VITE_BASE_URL;
+  const BASEURL = import.meta.env.VITE_BASE_URL || "";
 
   // State
   const [rawCustomers, setRawCustomers] = useState([]);
@@ -83,7 +83,8 @@ const CustomersScreen = () => {
         );
         setTariffCategories(uniqueCats);
       } catch (err) {
-        console.error("Failed to load dropdowns", err);
+        console.error("Failed to load dropdowns:", err);
+        setError("Failed to load dropdown data");
       }
     };
     fetchDropdowns();
@@ -91,7 +92,10 @@ const CustomersScreen = () => {
 
   // Zones → when scheme changes
   useEffect(() => {
-    if (!schemeId) return setZones([]);
+    if (!schemeId) {
+      setZones([]);
+      return;
+    }
     const fetchZones = async () => {
       try {
         const res = await axios.get(`${BASEURL}/schemes/${schemeId}`, { withCredentials: true });
@@ -105,7 +109,10 @@ const CustomersScreen = () => {
 
   // Routes → when zone changes
   useEffect(() => {
-    if (!zoneId) return setRoutes([]);
+    if (!zoneId) {
+      setRoutes([]);
+      return;
+    }
     const fetchRoutes = async () => {
       try {
         const res = await axios.get(`${BASEURL}/zones/${zoneId}/routes`, { withCredentials: true });
@@ -134,19 +141,23 @@ const CustomersScreen = () => {
       });
 
       const res = await axios.get(`${BASEURL}/customers?${params}`, { withCredentials: true });
-      const { customers, pagination: pag } = res.data.data;
+      const { customers, pagination: pag } = res.data.data || {};
 
-      setRawCustomers(customers);
+      console.log("Customer API response:", JSON.stringify(res.data));
+
+      setRawCustomers(customers || []);
       setPagination({
-        page: pag.page,
-        limit: pag.limit,
-        total: pag.total,
-        totalPages: pag.totalPages,
-        hasNext: pag.hasNext,
-        hasPrev: pag.hasPrev,
+        page: pag?.page || 1,
+        limit: pag?.limit || 20,
+        total: pag?.total || 0,
+        totalPages: pag?.totalPages || 1,
+        hasNext: pag?.hasNext || false,
+        hasPrev: pag?.hasPrev || false,
       });
     } catch (err) {
+      console.error("Failed to fetch customers:", err);
       setError(err.response?.data?.message || "Failed to load customers");
+      setRawCustomers([]);
     } finally {
       setLoading(false);
     }
@@ -179,159 +190,158 @@ const CustomersScreen = () => {
 
   const handleAddCustomer = () => navigate("/add-customer");
 
-  // ==============================
-  // NORMALIZE DATA
-  // ==============================
-  const normalizedCustomers = useMemo(() => {
-    // Build lookup maps
-    const schemeMap = Object.fromEntries(schemes.map((s) => [s.id, s.name]));
-    const zoneMap = Object.fromEntries(zones.map((z) => [z.id, z.name]));
-    const routeMap = Object.fromEntries(routes.map((r) => [r.id, r.name]));
-    const tariffMap = Object.fromEntries(tariffCategories.map((t) => [t.id, t.name]));
+  // Normalize data
 
-    return rawCustomers.map((c) => {
-      const connections = c.connections || [];
 
-      // Extract connection numbers
-      const connectionNumbers = connections
-        .map((conn) => conn.connectionNumber)
-        .filter(Boolean)
-        .join(", ") || "-";
+  // Normalize data
+const normalizedCustomers = useMemo(() => {
+ 
+  
 
-      // Extract meter serials
-      const meterSerials = connections
-        .map((conn) => conn.meter?.serialNumber)
-        .filter(Boolean)
-        .join(", ") || "-";
+  return rawCustomers.map((c) => {
+    const connections = c.connections || [];
+    const connectionNumbers = connections
+      .map((conn) => conn.connectionNumber)
+      .filter(Boolean)
+      .join(", ") || "-";
 
-      // First meter model
-      const firstMeterModel =
-        connections.find((conn) => conn.meter)?.meter?.model || "-";
+     const schemeName = connections.find((conn) => conn.scheme)?.scheme?.name || "-";
+     const zoneName = connections.find((conn) => conn.zone)?.zone?.name || "-";
+      const tarrifName = connections.find((conn) => conn.tariffCategory)?.tariffCategory?.name|| "-";
+     const routeName =connections.find((conn) => conn.route)?.route?.name || "-";
+    const meterSerials = connections
+      .map((conn) => conn.meter?.serialNumber)
+      .filter(Boolean)
+      .join(", ") || "-";
+    const firstMeterModel = connections.find((conn) => conn.meter)?.meter?.model || "-";
+    const firstReading = connections
+      .flatMap((conn) => conn.meter?.meterReadings || [])
+      .sort((a, b) => new Date(b.readingDate) - new Date(a.readingDate))[0];
 
-      // Latest reading (first reading of first meter)
-      const firstReading = connections
-        .flatMap((conn) => conn.meter?.meterReadings || [])
-        .sort((a, b) => new Date(b.readingDate) - new Date(a.readingDate))[0];
+    return {
+      id: c.id || "",
+      accountNumber: c.accountNumber || "-",
+      customerName: c.customerName || "-",
+      customerBalance: c.closingBalance ? `KES ${parseFloat(c.closingBalance).toFixed(2)}` : "-",
+      phoneNumber: c.phoneNumber || "-",
+      email: c.email || "-",
+      customerIdNo: c.customerIdNo || "-",
+      customerKraPin: c.customerKraPin || "-",
+      customerDeposit: c.customerDeposit ? `KES ${c.customerDeposit}` : "-",
+      hasWater: c.hasWater ? "Yes" : "No",
+      hasSewer: c.hasSewer ? "Yes" : "No",
+      customerDiscoType: c.customerDiscoType || "-",
+      customerDob: c.customerDob ? new Date(c.customerDob).toLocaleDateString() : "-",
+      schemeName: schemeName || "_",
+      zoneName: zoneName || "-",
+      routeName: routeName|| "-",
+      tariffName: tarrifName || "-",
+      connectionNumbers,
+      meterSerials,
+      firstMeterModel,
+      previousReading: firstReading?.previousReading ? `${firstReading.previousReading}` : "-",
+      currentReading: firstReading?.currentReading ? `${firstReading.currentReading}` : "-",
+      consumption: firstReading?.consumption ? `${firstReading.consumption}` : "-",
+      latestReadingDate: firstReading
+        ? `(${new Date(firstReading.readingDate).toLocaleDateString()})`
+        : "",
+      status: c.status || "-",
+      createdAt: c.createdAt ? new Date(c.createdAt).toLocaleString() : "-",
+    };
+  });
+}, [rawCustomers, schemes, zones, routes, tariffCategories]);
 
-      const latestReading = firstReading?.reading ?? null;
-      const latestReadingDate = firstReading
-        ? new Date(firstReading.readingDate).toLocaleDateString()
-        : null;
+// Columns
 
-      return {
-        id: c.id,
-        accountNumber: c.accountNumber,
-        customerName: c.customerName,
-        email: c.email,
-        phoneNumber: c.phoneNumber,
-        customerIdNo: c.customerIdNo || "-",
-        customerKraPin: c.customerKraPin || "-",
-        customerDeposit: c.customerDeposit ? `KES ${c.customerDeposit}` : "-",
-        hasWater: c.hasWater ? "Yes" : "No",
-        hasSewer: c.hasSewer ? "Yes" : "No",
-        customerDiscoType: c.customerDiscoType || "-",
-        customerDob: c.customerDob
-          ? new Date(c.customerDob).toLocaleDateString()
-          : "-",
-
-        // Normalized location
-        schemeName: schemeMap[c.customerSchemeId] || "-",
-        zoneName: zoneMap[c.customerZoneId] || "-",
-        routeName: routeMap[c.customerRouteId] || "-",
-        tariffName: tariffMap[c.tariffCategoryId ?? ""] || "-",
-
-        // Connections
-        connectionNumbers,
-        meterSerials,
-        firstMeterModel,
-
-        // Latest reading
-        latestReading: latestReading ? `${latestReading}` : "-",
-        latestReadingDate: latestReadingDate ? `(${latestReadingDate})` : "",
-
-        status: c.status,
-        createdAt: new Date(c.createdAt).toLocaleString(),
-      };
-    });
-  }, [rawCustomers, schemes, zones, routes, tariffCategories]);
 
   if (!currentUser) {
     navigate("/login");
     return null;
   }
 
-  // ==============================
-  // COLUMNS
-  // ==============================
+  // Columns
+
+
   const columns = [
-    { field: "accountNumber", headerName: "Account #", width: 130 },
-    { field: "customerName", headerName: "Name", width: 180 },
-    { field: "phoneNumber", headerName: "Phone", width: 140 },
-    { field: "email", headerName: "Email", width: 200 },
-    { field: "customerIdNo", headerName: "ID No", width: 130 },
-    { field: "customerKraPin", headerName: "KRA PIN", width: 140 },
-  
-  
-    { field: "schemeName", headerName: "Scheme", width: 140 },
-    { field: "zoneName", headerName: "Zone", width: 120 },
-    { field: "routeName", headerName: "Route", width: 120 },
-    { field: "tariffName", headerName: "Tariff", width: 150 },
-      { field: "customerDeposit", headerName: "Deposit", width: 110 },
-
-    // Connections
-    {
-      field: "connectionNumbers",
-      headerName: "Connections",
-      width: 160,
-    //   renderCell: (params) => (
-    //     <Tooltip title={params.row.meterSerials}>
-    //       <span>{params.value}</span>
-    //     </Tooltip>
-    //   ),
-    // },
-},
-    {
-      field: "firstMeterModel",
-      headerName: "Meter Model",
-      width: 140,
-    },
-
-    // Last Reading
-    {
-      field: "latestReading",
-      headerName: "Last Reading",
-      width: 180,
-      renderCell: (params) => (
-        <span>
-          {params.value}{" "}
-          <Typography component="span" color="text.secondary" fontSize="0.75rem">
-            {params.row.latestReadingDate}
-          </Typography>
-        </span>
-      ),
-    },
-
-    { field: "customerDiscoType", headerName: "Disco Type", width: 120 },
-
-    // Status
-    {
-      field: "status",
-      headerName: "Status",
-      width: 100,
-      renderCell: (params) => (
-        <Chip
-          label={params.value}
-          color={params.value === "ACTIVE" ? "success" : params.value === "NEW" ? "warning" : "default"}
-          size="small"
-        />
-      ),
-    },
-      { field: "hasWater", headerName: "Water", width: 90 },
-    { field: "hasSewer", headerName: "Sewer", width: 90 },
-
-    { field: "createdAt", headerName: "Created", width: 160 },
-  ];
-
+  { field: "accountNumber", headerName: "Account #", width: 130 },
+  {
+    field: "status",
+    headerName: "Status",
+    width: 100,
+    renderCell: (params) => (
+      <Chip
+        label={params.value}
+        color={params.value === "ACTIVE" ? "success" : params.value === "NEW" ? "warning" : "default"}
+        size="small"
+      />
+    ),
+  },
+  { field: "customerName", headerName: "Name", width: 180 },
+  { field: "customerBalance", headerName: "Balance", width: 140 },
+  { field: "phoneNumber", headerName: "Phone", width: 140 },
+  { field: "email", headerName: "Email", width: 200 },
+  { field: "customerIdNo", headerName: "ID No", width: 130 },
+  { field: "customerKraPin", headerName: "KRA PIN", width: 140 },
+  { field: "schemeName", headerName: "Scheme", width: 140 },
+  { field: "zoneName", headerName: "Zone", width: 120 },
+  { field: "routeName", headerName: "Route", width: 120 },
+  { field: "tariffName", headerName: "Tariff", width: 150 },
+  { field: "customerDeposit", headerName: "Deposit", width: 110 },
+  {
+    field: "connectionNumbers",
+    headerName: "Connections",
+    width: 160,
+    renderCell: (params) => (
+      <Tooltip title={params.row.meterSerials}>
+        <span>{params.value}</span>
+      </Tooltip>
+    ),
+  },
+  { field: "firstMeterModel", headerName: "Meter Model", width: 140 },
+  {
+    field: "previousReading",
+    headerName: "Previous Reading",
+    width: 150,
+    renderCell: (params) => (
+      <span>
+        {params.value}
+        <Typography component="span" color="text.secondary" fontSize="0.75rem">
+          {params.row.latestReadingDate}
+        </Typography>
+      </span>
+    ),
+  },
+  {
+    field: "currentReading",
+    headerName: "Current Reading",
+    width: 150,
+    renderCell: (params) => (
+      <span>
+        {params.value}
+        <Typography component="span" color="text.secondary" fontSize="0.75rem">
+          {params.row.latestReadingDate}
+        </Typography>
+      </span>
+    ),
+  },
+  {
+    field: "consumption",
+    headerName: "Consumption",
+    width: 150,
+    renderCell: (params) => (
+      <span>
+        {params.value}
+        <Typography component="span" color="text.secondary" fontSize="0.75rem">
+          {params.row.latestReadingDate}
+        </Typography>
+      </span>
+    ),
+  },
+  { field: "customerDiscoType", headerName: "Disco Type", width: 120 },
+  { field: "hasWater", headerName: "Water", width: 90 },
+  { field: "hasSewer", headerName: "Sewer", width: 90 },
+  { field: "createdAt", headerName: "Created", width: 160 },
+];
   return (
     <Box sx={{ p: 3 }}>
       {/* Header */}
@@ -359,7 +369,6 @@ const CustomersScreen = () => {
               }}
             />
           </Grid>
-
           <Grid item xs={12} md={2}>
             <TextField
               select
@@ -381,7 +390,6 @@ const CustomersScreen = () => {
               ))}
             </TextField>
           </Grid>
-
           <Grid item xs={12} md={2}>
             <TextField
               select
@@ -403,7 +411,6 @@ const CustomersScreen = () => {
               ))}
             </TextField>
           </Grid>
-
           <Grid item xs={12} md={2}>
             <TextField
               select
@@ -422,7 +429,6 @@ const CustomersScreen = () => {
               ))}
             </TextField>
           </Grid>
-
           <Grid item xs={12} md={2}>
             <TextField
               select
@@ -440,7 +446,6 @@ const CustomersScreen = () => {
               ))}
             </TextField>
           </Grid>
-
           <Grid item xs={12} md={1}>
             <Tooltip title="Reset Filters">
               <IconButton onClick={handleReset}>
@@ -452,7 +457,7 @@ const CustomersScreen = () => {
       </Paper>
 
       {/* DataGrid */}
-      <Paper sx={{ height: 680 }}>
+      <Paper sx={{ height: 680, overflowX: "auto" }}>
         <DataGrid
           rows={normalizedCustomers}
           getRowId={(row) => row.id}

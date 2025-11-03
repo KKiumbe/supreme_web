@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -24,11 +24,13 @@ import { useNavigate } from "react-router-dom";
  * @typedef {Object} Zone
  * @property {string} id
  * @property {string} name
+ * @property {string} schemeId
  */
 /**
  * @typedef {Object} Route
  * @property {string} id
  * @property {string} name
+ * @property {string} zoneId
  */
 /**
  * @typedef {Object} TariffCategory
@@ -37,8 +39,9 @@ import { useNavigate } from "react-router-dom";
  */
 
 const CreateCustomer = () => {
-    const currentUser = useAuthStore((state) => state.currentUser);
-  const BASEURL = import.meta.env.VITE_BASE_URL;
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const BASEURL = import.meta.env.VITE_BASE_URL || "";
+  const navigate = useNavigate();
 
   /* ---------- Loading & data ---------- */
   const [loading, setLoading] = useState(false);
@@ -62,21 +65,16 @@ const CreateCustomer = () => {
     customerKraPin: "",
     customerDob: "", // YYYY-MM-DD
     customerDeposit: "",
-    customerTariffId: "",
-    customerDiscoType: "",
     customerIdNo: "",
     hasSewer: false,
     hasWater: false,
-    // The four IDs are handled via the dropdowns
   });
 
- const navigate = useNavigate();
-
-    useEffect(() => {
-      if (!currentUser) {
-        navigate("/login");
-      }
-    }, [currentUser, navigate]);
+  useEffect(() => {
+    if (!currentUser) {
+      navigate("/login");
+    }
+  }, [currentUser, navigate]);
 
   /* ---------- Fetch schemes + tariff categories ---------- */
   useEffect(() => {
@@ -87,14 +85,24 @@ const CreateCustomer = () => {
           axios.get(`${BASEURL}/tarrifs/block`, { withCredentials: true }),
         ]);
 
-        setSchemes(schemeRes.data.data || []);
-        const uniqCats = Object.values(
-          (tariffRes.data.data || []).reduce((acc, t) => {
-            acc[t.category.id] = t.category;
+        const schemesData = schemeRes.data.data || [];
+        setSchemes(schemesData);
+        const allZones = schemesData.flatMap((scheme) => scheme.zones || []);
+        setZones(allZones);
+        const allRoutes = allZones.flatMap((zone) => zone.routes || []);
+        setRoutes(allRoutes);
+
+        const tariffData = tariffRes.data.data || [];
+        const uniqueCategories = Object.values(
+          tariffData.reduce((acc, t) => {
+            acc[t.categoryId] = {
+              id: t.categoryId,
+              name: t.category.name,
+            };
             return acc;
           }, {})
         );
-        setTariffCategories(uniqCats);
+        setTariffCategories(uniqueCategories);
       } catch (err) {
         console.error("Failed to load schemes/tariffs", err);
       }
@@ -102,110 +110,74 @@ const CreateCustomer = () => {
     fetchInitial();
   }, [BASEURL]);
 
-  /* ---------- Scheme → Zones ---------- */
-  const handleSchemeChange = async (schemeId) => {
-    setSelectedScheme(schemeId);
-    setSelectedZone("");
-    setSelectedRoute("");
-    setZones([]);
-    setRoutes([]);
+  /* ---------- Filter zones and routes ---------- */
+  const filteredZones = useMemo(() => {
+    if (!selectedScheme) return zones;
+    return zones.filter((zone) => zone.schemeId === parseInt(selectedScheme));
+  }, [zones, selectedScheme]);
 
-    if (!schemeId) return;
-
-    try {
-      const res = await axios.get(`${BASEURL}/schemes/${schemeId}`, {
-        withCredentials: true,
-      });
-      setZones(res.data.data || []);
-    } catch (err) {
-      console.error("Zones fetch error", err);
-    }
-  };
-
-  /* ---------- Zone → Routes ---------- */
-  const handleZoneChange = async (zoneId) => {
-    setSelectedZone(zoneId);
-    setSelectedRoute("");
-    setRoutes([]);
-
-    if (!zoneId) return;
-
-    try {
-      const res = await axios.get(`${BASEURL}/zones/${zoneId}/routes`, {
-        withCredentials: true,
-      });
-      setRoutes(res.data.data || []);
-    } catch (err) {
-      console.error("Routes fetch error", err);
-    }
-  };
+  const filteredRoutes = useMemo(() => {
+    if (!selectedZone) return routes;
+    return routes.filter((route) => route.zoneId === parseInt(selectedZone));
+  }, [routes, selectedZone]);
 
   /* ---------- Submit ---------- */
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
 
+    const required = [form.accountNumber, form.customerName, form.phoneNumber];
+    if (required.some((f) => !f)) {
+      alert("Please fill all required fields (Account Number, Customer Name, Phone Number).");
+      setLoading(false);
+      return;
+    }
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setLoading(true);
+    const payload = {
+      accountNumber: form.accountNumber,
+      customerName: form.customerName,
+      email: form.email || null,
+      phoneNumber: form.phoneNumber,
+      customerKraPin: form.customerKraPin || null,
+      customerDob: form.customerDob || null,
+      customerDeposit: form.customerDeposit ? Number(form.customerDeposit) : null,
+      customerIdNo: form.customerIdNo || null,
+      hasSewer: form.hasSewer,
+      hasWater: form.hasWater,
+    };
 
-  const required = [
-    form.accountNumber,
-    form.customerName,
-    form.phoneNumber,
-    selectedScheme,
-    selectedZone,
-    selectedRoute,
-    selectedTariff,
-  ];
-  if (required.some((f) => !f)) {
-    alert("Please fill all required fields.");
-    setLoading(false);
-    return;
-  }
+    try {
+      await axios.post(`${BASEURL}/customers`, payload, {
+        withCredentials: true,
+      });
 
-  const payload = {
-    ...form,
-    customerSchemeId: Number(selectedScheme),
-    customerZoneId: Number(selectedZone),
-    customerRouteId: Number(selectedRoute),
-    tariffCategoryId: selectedTariff && selectedTariff !== "" ? selectedTariff : null,
+      alert("Customer created successfully!");
+
+      // Reset form
+      setForm({
+        accountNumber: "",
+        customerName: "",
+        email: "",
+        phoneNumber: "",
+        customerKraPin: "",
+        customerDob: "",
+        customerDeposit: "",
+        customerIdNo: "",
+        hasSewer: false,
+        hasWater: false,
+      });
+      setSelectedScheme("");
+      setSelectedZone("");
+      setSelectedRoute("");
+      setSelectedTariff("");
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || "Failed to create customer");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  try {
-    await axios.post(`${BASEURL}/customers`, payload, {
-      withCredentials: true,
-    });
-
-    alert("Customer created successfully!");
-
-    // Reset form
-    setForm({
-      accountNumber: "",
-      customerName: "",
-      email: "",
-      phoneNumber: "",
-      customerKraPin: "",
-      customerDob: "",
-      customerDeposit: "",
-      customerTariffId: "",
-      customerDiscoType: "",
-      customerIdNo: "",
-      hasSewer: false,
-      hasWater: false,
-    });
-    setSelectedScheme("");
-    setSelectedZone("");
-    setSelectedRoute("");
-    setSelectedTariff("");
-    setZones([]);
-    setRoutes([]);
-
-  } catch (err) {
-    console.error(err);
-    alert(err.response?.data?.message || "Failed to create customer");
-  } finally {
-    setLoading(false);
-  }
-};
   /* ---------- Helper for controlled inputs ---------- */
   const update = (field) => (e) => {
     const { value, checked, type } = e.target;
@@ -216,12 +188,12 @@ const handleSubmit = async (e) => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ height: "100vh", display: "flex", flexDirection: "column", p: 2 }}>
       <Typography variant="h5" fontWeight="bold" mb={2}>
         Create Customer
       </Typography>
 
-      <Paper sx={{ p: 3, overflowY: "auto", maxHeight: "85vh" }}>
+      <Paper sx={{ flex: 1, p: 3, overflowY: "auto" }}>
         <form onSubmit={handleSubmit}>
           <Grid container spacing={2}>
             {/* ---------- Account & Name ---------- */}
@@ -293,21 +265,13 @@ const handleSubmit = async (e) => {
               />
             </Grid>
 
-            {/* ---------- IDs & Disco ---------- */}
+            {/* ---------- ID Number ---------- */}
             <Grid item xs={12} md={6}>
               <TextField
                 label="ID Number"
                 fullWidth
                 value={form.customerIdNo}
                 onChange={update("customerIdNo")}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                label="Disco Type"
-                fullWidth
-                value={form.customerDiscoType}
-                onChange={update("customerDiscoType")}
               />
             </Grid>
 
@@ -336,100 +300,9 @@ const handleSubmit = async (e) => {
             </Grid>
 
             {/* ---------- Scheme ---------- */}
-            <Grid item xs={12} md={6}>
-              <TextField
-                select
-                label="Scheme"
-                fullWidth
-                required
-                value={selectedScheme}
-                onChange={(e) => handleSchemeChange(e.target.value)}
-              >
-                <MenuItem value="">Select Scheme</MenuItem>
-                {schemes.map((s) => (
-                  <MenuItem key={s.id} value={s.id}>
-                    {s.name}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-
+            
             {/* ---------- Zone ---------- */}
-            <Grid item xs={12} md={6}>
-              {zones.length > 0 ? (
-                <TextField
-                  select
-                  label="Zone"
-                  fullWidth
-                  required
-                  value={selectedZone}
-                  onChange={(e) => handleZoneChange(e.target.value)}
-                >
-                  <MenuItem value="">Select Zone</MenuItem>
-                  {zones.map((z) => (
-                    <MenuItem key={z.id} value={z.id}>
-                      {z.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              ) : selectedScheme ? (
-                <Typography color="text.secondary">
-                  No zones for this scheme.{" "}
-                  <Button variant="text" size="small">
-                    Add Zone
-                  </Button>
-                </Typography>
-              ) : null}
-            </Grid>
-
-            {/* ---------- Route ---------- */}
-            <Grid item xs={12} md={6}>
-              {routes.length > 0 ? (
-                <TextField
-                  select
-                  label="Route"
-                  fullWidth
-                  required
-                  value={selectedRoute}
-                  onChange={(e) => setSelectedRoute(e.target.value)}
-                >
-                  <MenuItem value="">Select Route</MenuItem>
-                  {routes.map((r) => (
-                    <MenuItem key={r.id} value={r.id}>
-                      {r.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              ) : selectedZone ? (
-                <Typography color="text.secondary">
-                  No routes for this zone.{" "}
-                  <Button variant="text" size="small">
-                    Add Route
-                  </Button>
-                </Typography>
-              ) : null}
-            </Grid>
-
-            {/* ---------- Tariff Category ---------- */}
-            <Grid item xs={12} md={6}>
-            <TextField
-  select
-  label="Tariff Category"
-  fullWidth
-  required
-  value={selectedTariff}
-  onChange={(e) => setSelectedTariff(e.target.value)}
->
-  <MenuItem value="">Select Category</MenuItem>
-  {tariffCategories.map((t) => (
-    <MenuItem key={t.id} value={t.id}>
-      {t.name}
-    </MenuItem>
-  ))}
-</TextField>
-
-            </Grid>
-
+            
             {/* ---------- Submit ---------- */}
             <Grid item xs={12}>
               <Box textAlign="center" mt={3}>

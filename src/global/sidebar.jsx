@@ -39,14 +39,15 @@ const Sidebar = () => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(true); // Sidebar width
   const [submenuOpen, setSubmenuOpen] = useState({
-    customers: false,
-    invoices: false,
+    Accounts: false,
+    Billing: false,
     payments: false,
     communication: false,
     settings: false,
     reports: false,
-    metering: false,
+    meterManager: false,
     meterReading: false,
+  
   });
 
   const toggleSidebar = () => setOpen(!open);
@@ -55,23 +56,31 @@ const Sidebar = () => {
     setSubmenuOpen((prev) => ({ ...prev, [menu]: !prev[menu] }));
   };
 
-  const renderSubmenu = (menuKey, items) => (
-    <Collapse in={submenuOpen[menuKey]} timeout="auto" unmountOnExit>
-      <List component="div" disablePadding>
-        {items.map(({ icon, label, path }, idx) => (
-          <ListItem
-            button
-            key={idx}
-            sx={{ pl: 3, py: 0.5 }}
-            onClick={() => navigate(path)}
-          >
-            <ListItemIcon sx={{ minWidth: 30 }}>{icon}</ListItemIcon>
-            {open && <ListItemText primary={label} sx={{ fontSize: "0.8rem" }} />}
-          </ListItem>
-        ))}
-      </List>
-    </Collapse>
-  );
+const renderSubmenu = (menuKey, items) => (
+  <Collapse in={submenuOpen[menuKey]} timeout="auto" unmountOnExit>
+    <List component="div" disablePadding>
+      {items.map(({ icon, label, path, isSubmenu, submenuKey }, idx) => (
+        <ListItem
+          button
+          key={idx}
+          sx={{ pl: 3, py: 0.5 }}
+          onClick={() =>
+            isSubmenu
+              ? toggleSubmenu(submenuKey)
+              : navigate(path)
+          }
+        >
+          <ListItemIcon sx={{ minWidth: 30 }}>{icon}</ListItemIcon>
+          {open && <ListItemText primary={label} />}
+          {open && isSubmenu && (
+            submenuOpen[submenuKey] ? <ExpandLess /> : <ExpandMore />
+          )}
+        </ListItem>
+      ))}
+    </List>
+  </Collapse>
+);
+
 
   return (
     <Drawer
@@ -102,62 +111,74 @@ const Sidebar = () => {
 
      
       {/* Customers */}
-<ListItem button onClick={() => toggleSubmenu("customers")} sx={{ py: 1 }}>
+<ListItem button onClick={() => toggleSubmenu("Accounts")} sx={{ py: 1 }}>
   <ListItemIcon sx={{ minWidth: 40 }}>
     <Person sx={{ fontSize: 24 }} />
   </ListItemIcon>
-  {open && <ListItemText primary="Customers" sx={{ fontSize: "0.9rem" }} />}
-  {open && (submenuOpen.customers ? <ExpandLess /> : <ExpandMore />)}
+  {open && <ListItemText primary="Accounts" sx={{ fontSize: "0.9rem" }} />}
+  {open && (submenuOpen.Accounts ? <ExpandLess /> : <ExpandMore />)}
 </ListItem>
-{renderSubmenu("customers", [
+{renderSubmenu("Accounts", [
   { icon: <Person sx={{ fontSize: 20 }} />, label: "Customers", path: "/customers" },
   { icon: <Add sx={{ fontSize: 20 }} />, label: "Add Customer", path: "/add-customer" },
   { icon: <Person sx={{ fontSize: 20 }} />, label: "New Customers", path: "/new-customers" }, // <-- new submenu
+
+    { icon: <AccountTree sx={{ fontSize: 20 }} />, label: "Schemes & Zones", path: "/schemes/zones" },
 ])}
 
-
-        {/* Utilities */}
-        <ListItem button onClick={() => toggleSubmenu("meterReading")} sx={{ py: 1 }}>
-          <ListItemIcon sx={{ minWidth: 40 }}>
-            <Settings sx={{ fontSize: 24 }} />
-          </ListItemIcon>
-          {open && <ListItemText primary="Meter Readings" sx={{ fontSize: "0.9rem" }} />}
-          {open && (submenuOpen.meterReading ? <ExpandLess /> : <ExpandMore />)}
-        </ListItem>
-        {renderSubmenu("meterReading", [
-          { icon: <Water sx={{ fontSize: 20 }} />, label: "Normal Readings", path: "/water-readings" },
-          { icon: <Water sx={{ fontSize: 20 }} />, label: "Abnormal Readings", path: "/abnormal-readings" },
-         
-        ])}
-
-      
-      
-      {/* Meter Inventory */}
-<ListItem button onClick={() => toggleSubmenu("metering")} sx={{ py: 1 }}>
+{/* Billing */}
+<ListItem button onClick={() => toggleSubmenu("Billing")} sx={{ py: 1 }}>
   <ListItemIcon sx={{ minWidth: 40 }}>
-    <Business sx={{ fontSize: 24 }} />
+    <Receipt sx={{ fontSize: 24 }} />
   </ListItemIcon>
-  {open && <ListItemText primary="Meter & connections" sx={{ fontSize: "0.9rem" }} />}
-  {open && (submenuOpen.metering ? <ExpandLess /> : <ExpandMore />)}
+  {open && <ListItemText primary="Billing" sx={{ fontSize: "0.9rem" }} />}
+  {open && (submenuOpen.Billing ? <ExpandLess /> : <ExpandMore />)}
 </ListItem>
-{renderSubmenu("metering", [
-  { icon: <Business sx={{ fontSize: 20 }} />, label: "Meter Inventory", path: "/meter-inventory" },
-  { icon: <HomeWorkIcon sx={{ fontSize: 20 }} />, label: "Connections", path: "/connections" },
+{renderSubmenu("Billing", [
+  { icon: <Receipt sx={{ fontSize: 20 }} />, label: "View", path: "/invoices" },
+  { icon: <Add sx={{ fontSize: 20 }} />, label: "Create", path: "/create-invoice" },
+
+  // Add the Meter Reading section trigger
+  {
+    icon: <Water sx={{ fontSize: 20 }} />,
+    label: "Meter Reading",
+    path: null, // not navigable — toggles sub-submenu
+    isSubmenu: true,
+    submenuKey: "meterReading",
+  },
 ])}
 
+{/* Nested Meter Reading submenu */}
+<Collapse in={submenuOpen.meterReading} timeout="auto" unmountOnExit>
+  <List component="div" disablePadding sx={{ pl: 4 }}>
+    <ListItem
+      button
+      sx={{ py: 0.5 }}
+      onClick={() => navigate("/water-readings")}
+    >
+      <ListItemIcon sx={{ minWidth: 30 }}>
+        <Water sx={{ fontSize: 20 }} />
+      </ListItemIcon>
+      {open && <ListItemText primary="Normal Readings" />}
+    </ListItem>
 
-        {/* Invoices */}
-        <ListItem button onClick={() => toggleSubmenu("invoices")} sx={{ py: 1 }}>
-          <ListItemIcon sx={{ minWidth: 40 }}>
-            <Receipt sx={{ fontSize: 24 }} />
-          </ListItemIcon>
-          {open && <ListItemText primary="Invoices" sx={{ fontSize: "0.9rem" }} />}
-          {open && (submenuOpen.invoices ? <ExpandLess /> : <ExpandMore />)}
-        </ListItem>
-        {renderSubmenu("invoices", [
-          { icon: <Receipt sx={{ fontSize: 20 }} />, label: "View", path: "/invoices" },
-          { icon: <Add sx={{ fontSize: 20 }} />, label: "Create", path: "/create-invoice" },
-        ])}
+    <ListItem
+      button
+      sx={{ py: 0.5 }}
+      onClick={() => navigate("/abnormal-readings")}
+    >
+      <ListItemIcon sx={{ minWidth: 30 }}>
+        <FlashOn sx={{ fontSize: 20 }} />
+      </ListItemIcon>
+      {open && <ListItemText primary="Abnormal Readings" />}
+    </ListItem>
+  </List>
+</Collapse>
+
+      
+      
+
+
 
         {/* Payments */}
         <ListItem button onClick={() => toggleSubmenu("payments")} sx={{ py: 1 }}>
@@ -169,9 +190,26 @@ const Sidebar = () => {
         </ListItem>
         {renderSubmenu("payments", [
           { icon: <Payment sx={{ fontSize: 20 }} />, label: "View", path: "/payments" },
+          //unreceipted-payments
+          { icon: <Payment sx={{ fontSize: 20 }} />, label: "Unreceipted", path: "/unreceipted-payments" },
           { icon: <AttachMoney sx={{ fontSize: 20 }} />, label: "Create", path: "/add-payment" },
           { icon: <ReceiptLong sx={{ fontSize: 20 }} />, label: "Receipts", path: "/receipts" },
         ])}
+
+
+              
+      {/* Meter Inventory */}
+<ListItem button onClick={() => toggleSubmenu("meterManager")} sx={{ py: 1 }}>
+  <ListItemIcon sx={{ minWidth: 40 }}>
+    <Business sx={{ fontSize: 24 }} />
+  </ListItemIcon>
+  {open && <ListItemText primary="Meter manager" sx={{ fontSize: "0.9rem" }} />}
+  {open && (submenuOpen. meterManager ? <ExpandLess /> : <ExpandMore />)}
+</ListItem>
+{renderSubmenu("meterManager", [
+  { icon: <Business sx={{ fontSize: 20 }} />, label: "Meter Inventory", path: "/meter-inventory" },
+  { icon: <HomeWorkIcon sx={{ fontSize: 20 }} />, label: "Connections", path: "/connections" },
+])}
 
         {/* Communication */}
         <ListItem button onClick={() => toggleSubmenu("communication")} sx={{ py: 1 }}>
@@ -212,7 +250,7 @@ const Sidebar = () => {
         {renderSubmenu("settings", [
           { icon: <Person sx={{ fontSize: 20 }} />, label: "Users", path: "/users" },
           { icon: <BusinessIcon sx={{ fontSize: 20 }} />, label: "Org Details", path: "/org-details" },
-          { icon: <AccountTree sx={{ fontSize: 20 }} />, label: "Schemes & Zones", path: "/schemes/zones" },
+        
         ])}
       </List>
     </Drawer>
