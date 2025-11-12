@@ -16,6 +16,7 @@ import { AddCircleOutline, RemoveCircleOutline } from "@mui/icons-material";
 import { debounce } from "lodash"; // Install lodash for debouncing
 import { useNavigate } from "react-router-dom";
 import { getTheme } from "../../store/theme";
+import { useAuthStore } from "../../store/authStore";
 
 const BASEURL = (import.meta as any).env?.VITE_BASE_URL || "";
 
@@ -43,10 +44,17 @@ const CreateInvoice = () => {
   const [message, setMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
+  const { currentUser } = useAuthStore();
 
     const navigate = useNavigate();
     const theme = getTheme();
 
+
+      useEffect(() => {
+        if (!currentUser) {
+          navigate("/login");
+        }
+      }, [currentUser, navigate]);
   // Fetch customers and bill types
   useEffect(() => {
     const fetchData = async () => {

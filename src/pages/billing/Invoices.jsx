@@ -140,16 +140,16 @@ const BillList = () => {
       billNumber: bill.billNumber || "-",
       customerName: bill.customer?.customerName || "-",
       phoneNumber: bill.customer?.phoneNumber || "-",
-      billAmount: bill.billAmount ? `KES ${bill.billAmount.toFixed(2)}` : "-",
-      amountPaid: bill.amountPaid ? `KES ${bill.amountPaid.toFixed(2)}` : "-",
-      closingBalance: bill.closingBalance ? `KES ${bill.closingBalance.toFixed(2)}` : "-",
+      billAmount: bill.billAmount ? `KES ${bill.billAmount}` : "-",
+      amountPaid: bill.amountPaid ? `KES ${bill.amountPaid}` : "-",
+      closingBalance: bill.closingBalance ? `KES ${bill.closingBalance}` : "-",
       status: bill.status || "-",
-      billPeriod: bill.billPeriod ? new Date(bill.billPeriod).toLocaleDateString() : "-",
-      createdAt: bill.createdAt ? new Date(bill.createdAt).toLocaleString() : "-",
+      billPeriod: bill.billPeriod ? new Date(bill.billPeriod) : "-",
+      createdAt: bill.createdAt ? new Date(bill.createdAt) : "-",
       billType: billTypeMap[bill.type?.id] || bill.type?.name || "-",
       items: bill.items?.length
         ? bill.items
-            .map((item) => `${item.description} (Qty: ${item.quantity}, KES ${item.amount.toFixed(2)})`)
+            .map((item) => `${item.description} (Qty: ${item.quantity}, KES ${item.amount})`)
             .join(", ")
         : "-",
     }));
@@ -169,8 +169,8 @@ const BillList = () => {
       width: 100,
       renderCell: (params) => (
         <Chip
-          label={params.value}
-          color={params.value === "PAID" ? "success" : params.value === "UNPAID" ? "warning" : "default"}
+          label={params?.value}
+          color={params?.value === "PAID" ? "success" : params?.value === "UNPAID" ? "warning" : "default"}
           size="small"
         />
       ),
@@ -183,8 +183,8 @@ const BillList = () => {
       headerName: "Items",
       width: 250,
       renderCell: (params) => (
-        <Tooltip title={params.value}>
-          <span>{params.value}</span>
+        <Tooltip title={params?.value}>
+          <span>{params?.value}</span>
         </Tooltip>
       ),
     },
@@ -211,7 +211,7 @@ const BillList = () => {
             <Autocomplete
               options={customers}
               getOptionLabel={(option) =>
-                `${option.customerName} (${option.accountNumber})${
+                `${option.customerName} (${option.nationalId})${
                   option.phoneNumber ? ` - ${option.phoneNumber}` : ""
                 }`
               }

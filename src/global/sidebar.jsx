@@ -47,6 +47,7 @@ const Sidebar = () => {
     reports: false,
     meterManager: false,
     meterReading: false,
+     tasks: false,
   
   });
 
@@ -119,12 +120,21 @@ const renderSubmenu = (menuKey, items) => (
   {open && (submenuOpen.Accounts ? <ExpandLess /> : <ExpandMore />)}
 </ListItem>
 {renderSubmenu("Accounts", [
-  { icon: <Person sx={{ fontSize: 20 }} />, label: "Customers", path: "/customers" },
-  { icon: <Add sx={{ fontSize: 20 }} />, label: "Add Customer", path: "/add-customer" },
-  { icon: <Person sx={{ fontSize: 20 }} />, label: "New Customers", path: "/new-customers" }, // <-- new submenu
+  { icon: <Person sx={{ fontSize: 20 }} />, label: "Account Inquiry", path: "/customers" },
+  { icon: <Add sx={{ fontSize: 20 }} />, label: "Create Survey", path: "/add-survey" },
+  { icon: <Add sx={{ fontSize: 20 }} />, label: "surveys", path: "/surveys" },
+  { icon: <Person sx={{ fontSize: 20 }} />, label: "Approvals", path: "/new-customers" }, // <-- new submenu
+//approved-customers
+
+//add-customer
+  
+  { icon: <Add sx={{ fontSize: 20 }} />, label: "connect-customer", path: "/approved-customers" },
+   { icon: <Add sx={{ fontSize: 20 }} />, label: "create-customer", path: "/add-customer" },
 
     { icon: <AccountTree sx={{ fontSize: 20 }} />, label: "Schemes & Zones", path: "/schemes/zones" },
 ])}
+
+
 
 {/* Billing */}
 <ListItem button onClick={() => toggleSubmenu("Billing")} sx={{ py: 1 }}>
@@ -210,6 +220,25 @@ const renderSubmenu = (menuKey, items) => (
   { icon: <Business sx={{ fontSize: 20 }} />, label: "Meter Inventory", path: "/meter-inventory" },
   { icon: <HomeWorkIcon sx={{ fontSize: 20 }} />, label: "Connections", path: "/connections" },
 ])}
+
+
+
+{/* Task Management */}
+<ListItem button onClick={() => toggleSubmenu("tasks")} sx={{ py: 1 }}>
+  <ListItemIcon sx={{ minWidth: 40 }}>
+    <Assignment sx={{ fontSize: 24 }} />
+  </ListItemIcon>
+  {open && <ListItemText primary="Tasks" sx={{ fontSize: "0.9rem" }} />}
+  {open && (submenuOpen.tasks ? <ExpandLess /> : <ExpandMore />)}
+</ListItem>
+
+{renderSubmenu("tasks", [
+  { icon: <Assignment sx={{ fontSize: 20 }} />, label: "Task Board", path: "/tasks" },
+  { icon: <Add sx={{ fontSize: 20 }} />, label: "Create Task", path: "/tasks/create" },
+  { icon: <ReceiptLong sx={{ fontSize: 20 }} />, label: "Task Types", path: "/tasks/types" },
+  { icon: <AttachMoney sx={{ fontSize: 20 }} />, label: "Attachments", path: "/tasks/attachments" },
+])}
+
 
         {/* Communication */}
         <ListItem button onClick={() => toggleSubmenu("communication")} sx={{ py: 1 }}>

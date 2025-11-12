@@ -14,7 +14,7 @@ import BuildingDetailsScreen from "./pages/property/propertyDetails";
 import EditBuildingScreen from "./pages/property/editBuilding";
 import BillList from "./pages/billing/Invoices"
 import CreateInvoice from "./pages/billing/createInvoice";
-import CreateCustomerScreen from "./pages/customers/addCustomers";
+
 import InvoiceDetails from "./pages/billing/InvoiceDetail";
 import CustomerDetails from "./pages/customers/customerDetails";
 
@@ -38,8 +38,8 @@ import AddUser from "./pages/settings/addUser";
 import UserDetails from "./pages/settings/users/userDetails";
 import Organization from "./pages/settings/org/orgDetails";
 import EditOrganization from "./pages/settings/org/editOrg";
-import AssignTaskScreen from "./pages/task/createTask";
-import FetchTasksScreen from "./pages/task/fetchTasks";
+
+
 import TaskDetailsScreen from "./pages/task/taskDetails";
 import SchemeZoneRouteScreen from "./pages/settings/schemes/scheme";
 import { useAuthStore, useThemeStore } from "./store/authStore";
@@ -59,6 +59,11 @@ import NewCustomersScreen from "./pages/customers/newCustomers";
 import AbnormalMeterReadingsList from "./pages/meterReading/abnormalReadings";
 import BillTypeScreen from "./pages/billing/billtypes";
 import UnreceipedPayments from "./pages/payments/unreceipted";
+import TaskBoard from "./pages/tasks/tasks";
+import Surveys from "./pages/surveys/survey";
+import ApprovedCustomersScreen from "./pages/customers/assignMeter/assignMeter";
+import CreateSurvey from "./pages/surveys/addsurvey";
+import CreateCustomerScreen from "./pages/customers/addCustomer";
 
 const App = () => {
   const { darkMode } = useThemeStore();
@@ -178,10 +183,10 @@ const App = () => {
                   }
                 />
                 <Route
-                  path="/add-customer"
+                  path="/add-survey"
                   element={
                     <ProtectedRoute>
-                      <CreateCustomerScreen />
+                      <CreateSurvey />
                     </ProtectedRoute>
                   }
                 />
@@ -389,23 +394,9 @@ const App = () => {
                 />
 
 
-                  <Route
-                  path="tasks/create"
-                  element={
-                    <ProtectedRoute>
-                      <AssignTaskScreen />
-                    </ProtectedRoute>
-                  }
-                />
+               
 
-                  <Route
-                  path="tasks"
-                  element={
-                    <ProtectedRoute>
-                      <FetchTasksScreen />
-                    </ProtectedRoute>
-                  }
-                />  
+                 
 
 <Route
                   path="task-details/:taskId"
@@ -480,6 +471,46 @@ const App = () => {
                     </ProtectedRoute>
                   }
                 /> 
+
+                    <Route
+                  path="tasks"
+                  element={
+                    <ProtectedRoute>
+                      <TaskBoard />
+                    </ProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="surveys"
+                  element={
+                    <ProtectedRoute>
+                      <Surveys />
+                    </ProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="approved-customers"
+                  element={
+                    <ProtectedRoute>
+                      <ApprovedCustomersScreen />
+                    </ProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="add-customer"
+                  element={
+                    <ProtectedRoute>
+                      <CreateCustomerScreen />
+                    </ProtectedRoute>
+                  }
+                />
+
+
+
+
 
 
 
