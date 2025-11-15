@@ -13,7 +13,6 @@ import {
 import { DataGrid } from "@mui/x-data-grid";
 import {
   Add as AddIcon,
-  Delete as DeleteIcon,
   Search as SearchIcon,
   Edit as EditIcon,
 } from "@mui/icons-material";
@@ -23,14 +22,14 @@ import { useNavigate } from "react-router-dom";
 import TitleComponent from "../../components/title";
 import AddReadingStepperModal from "../../components/meterReading/addReading";
 import EditAbnormalReadingModal from "../../components/meterReading/updateAbnormal";
+import ImageIcon from "@mui/icons-material/Image"; // Add this import at the top
 
 const BASEURL = import.meta.env.VITE_BASE_URL;
 
 export default function MeterReadingsList() {
   const { currentUser } = useAuthStore();
   const navigate = useNavigate();
-
-  const theme = useThemeStore()
+  const theme = useThemeStore();
 
   const [readings, setReadings] = useState([]);
   const [pagination, setPagination] = useState({
@@ -44,21 +43,17 @@ export default function MeterReadingsList() {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
-
-
   const [editModal, setEditModal] = useState({
-  open: false,
-  reading: null,
-});
-
-
+    open: false,
+    reading: null,
+  });
 
   // Redirect if not logged in
   useEffect(() => {
     if (!currentUser) navigate("/login");
   }, [currentUser, navigate]);
 
-  // ✅ Fetch readings
+  // Fetch readings
   const fetchReadings = useCallback(async () => {
     setLoading(true);
     try {
@@ -87,7 +82,9 @@ export default function MeterReadingsList() {
         currentReading: item.currentReading || "-",
         readingDate: item.readingDate,
         notes: item.notes,
-        status: item.status,
+        type: item.type,
+        imageUrl: item.imageUrl || "", // Add imageUrl
+        ExceptionId: item.ExceptionId, // Add ExceptionId
       }));
 
       setReadings(normalized);
@@ -113,30 +110,91 @@ export default function MeterReadingsList() {
     fetchReadings();
   }, [fetchReadings]);
 
-  // ✅ Delete reading
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this reading?")) return;
-
-    try {
-      await axios.delete(`${BASEURL}/delete-meter-reading/${id}`, {
-        withCredentials: true,
-      });
-      alert("Reading deleted");
-      fetchReadings();
-    } catch  {
-      alert("Failed to delete");
-    }
+  const openEditModal = (reading) => {
+    setEditModal({ open: true, reading });
+  };
+  const closeEditModal = () => {
+    setEditModal({ open: false, reading: null });
   };
 
-  const openEditModal = (reading) => {
-  setEditModal({ open: true, reading });
-};
-const closeEditModal = () => {
-  setEditModal({ open: false, reading: null });
-};
-
-  // ✅ DataGrid columns
+  // DataGrid columns
   const columns = [
+      {
+    field: "imageUrl",
+    headerName: "Image",
+    width: 100,
+    headerAlign: "center",
+    align: "center",
+    renderCell: (params) =>
+      params.value ? (
+        <Tooltip title="View meter reading image">
+          <IconButton
+            size="small"
+            onClick={() => window.open(params.value, "_blank")} // Opens image in new tab
+            sx={{ color: "text.secondary" }}
+          >
+            <ImageIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      ) : (
+        <Typography color="text.secondary">-</Typography>
+      ),
+  },
+    {
+      field: "edit",
+      headerName: "",
+      width: 70,
+      sortable: false,
+      filterable: false,
+      disableColumnMenu: true,
+      headerAlign: "center",
+      align: "center",
+      renderCell: (params) =>
+        params.row.ExceptionId ? (
+          <Tooltip title="Edit abnormal reading">
+            <IconButton
+              color="primary"
+              size="small"
+              onClick={() => openEditModal(params.row)}
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        ) : null,
+    },
+    {
+      field: "type",
+      headerName: "type",
+      width: 130,
+      headerAlign: "center",
+      align: "center",
+      renderCell: (params) => {
+        const status = params.value;
+        let chipColor = "default";
+        let textColor = "inherit";
+
+        if (status === "ABNORMAL" || params.row.ExceptionId) {
+          chipColor = "warning";
+          textColor = "#fff";
+        } else if (status === "NORMAL") {
+          chipColor = "success";
+          textColor = "#fff";
+        }
+
+        return (
+          <Chip
+            label={status || "UNKNOWN"}
+            color={chipColor}
+            size="small"
+            sx={{
+              fontWeight: 600,
+              color: textColor,
+              textTransform: "capitalize",
+            }}
+          />
+        );
+      },
+    },
     {
       field: "meterId",
       headerName: "Meter ID",
@@ -145,72 +203,13 @@ const closeEditModal = () => {
       align: "center",
     },
     {
-  field: "edit",
-  headerName: "",
-  width: 70,
-  sortable: false,
-  filterable: false,
-  disableColumnMenu: true,
-  headerAlign: "center",
-  align: "center",
-  renderCell: (params) =>
-    params.row.status === "ABNORMAL" ? (
-      <Tooltip title="Correct reading">
-        <IconButton
-          color= {theme?.palette?.primary?.main}
-          size="small"
-          onClick={() => openEditModal(params.row)}
-        >
-          <EditIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
-    ) : null,
-},
-
-    {
-  field: "status",
-  headerName: "Status",
-  width: 130,
-  headerAlign: "center",
-  align: "center",
-  renderCell: (params) => {
-    const status = params.value;
-    let chipColor = "default";
-   let textColor = "inherit";
-
-    if (status === "ABNORMAL") {
-      chipColor = "warning"; // yellow
-      textColor = "#fff";
-    } else if (status === "NORMAL") {
-      chipColor = "success"; // green
-      textColor = "#fff";
-    }
-
-    return (
-      <Chip
-        label={status || "UNKNOWN"}
-        color={chipColor}
-        size="small"
-        sx={{
-          fontWeight: 600,
-          color: textColor,
-          textTransform: "capitalize",
-        }}
-      />
-    );
-  },
-},
-
-   
-    {
       field: "connectionNumber",
       headerName: "Connection #",
       width: 130,
       headerAlign: "center",
       align: "center",
     },
-
-      {
+    {
       field: "previousReading",
       headerName: "Previous",
       width: 110,
@@ -303,7 +302,6 @@ const closeEditModal = () => {
         </a>
       ),
     },
-  
     {
       field: "notes",
       headerName: "Notes",
@@ -323,7 +321,7 @@ const closeEditModal = () => {
         </Typography>
       ),
     },
-     {
+    {
       field: "serialNumber",
       headerName: "Serial #",
       width: 130,
@@ -337,15 +335,13 @@ const closeEditModal = () => {
       headerAlign: "center",
       align: "center",
     },
-   
   ];
 
   return (
     <Box p={3}>
-     <Typography variant="h6" gutterBottom>
-
-     Meter Readings
-     </Typography>
+      <Typography variant="h6" gutterBottom>
+        Meter Readings
+      </Typography>
 
       {/* Header: Add + Search */}
       <Grid container justifyContent="space-between" alignItems="center" mb={2}>
@@ -392,6 +388,17 @@ const closeEditModal = () => {
             }))
           }
           disableRowSelectionOnClick
+          getRowClassName={(params) =>
+            params.row.ExceptionId ? "highlight-row" : ""
+          }
+          sx={{
+            "& .highlight-row": {
+              backgroundColor: "#fff3e0", // Light orange for highlighting
+              "&:hover": {
+                backgroundColor: "#ffe0b2", // Slightly darker on hover
+              },
+            },
+          }}
           slots={{
             noRowsOverlay: () => (
               <Box
@@ -409,7 +416,7 @@ const closeEditModal = () => {
         />
       </Paper>
 
-      {/* ✅ Reusable Add Reading Modal */}
+      {/* Reusable Add Reading Modal */}
       <AddReadingStepperModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -417,12 +424,12 @@ const closeEditModal = () => {
       />
 
       {/* Edit Abnormal Reading Modal */}
-<EditAbnormalReadingModal
-  open={editModal.open}
-  onClose={closeEditModal}
-  reading={editModal.reading}
-  onSuccess={fetchReadings}   // refresh table after save
-/>
+      <EditAbnormalReadingModal
+        open={editModal.open}
+        onClose={closeEditModal}
+        reading={editModal.reading}
+        onSuccess={fetchReadings}
+      />
     </Box>
   );
 }

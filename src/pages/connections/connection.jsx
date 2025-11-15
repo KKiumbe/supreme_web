@@ -508,7 +508,7 @@ const ConnectionsScreen = () => {
             {params?.row?.status === "PENDING_METER" ? (
               <Tooltip title="Assign Meter Installation Task">
                 <IconButton
-                  color="primary"
+                  color='theme.palette.primary.contrastText'
                   onClick={(e) => {
                     e.stopPropagation();
                     openTaskDialog(params.row);

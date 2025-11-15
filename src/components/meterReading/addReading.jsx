@@ -27,21 +27,31 @@ const BASE_URL = import.meta.env.VITE_BASE_URL;
 export default function AddReadingStepperModal({ open, onClose, onReadingAdded }) {
   const [step, setStep] = useState(0);
   const steps = ["Search Customer", "Select Connection", "Enter & Review"];
+
   const [search, setSearch] = useState("");
   const [customers, setCustomers] = useState([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
 
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [selectedConnectionNumber, setSelectedConnectionNumber] = useState("");
-  const [selectedMeter, setSelectedMeter] = useState(null);
+  const [selectedConnection, setSelectedConnection] = useState(null);
+
   const [previousReading, setPreviousReading] = useState("");
   const [currentReading, setCurrentReading] = useState("");
   const [notes, setNotes] = useState("");
+  const [exceptionId, setExceptionId] = useState(null);
+
+  const [exceptions, setExceptions] = useState([]);
+
   const [saving, setSaving] = useState(false);
 
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "info",
+  });
 
-  // Reset modal state when closed
+  // Reset modal on close
   useEffect(() => {
     if (!open) {
       setStep(0);
@@ -49,14 +59,27 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
       setCustomers([]);
       setSelectedCustomer(null);
       setSelectedConnectionNumber("");
-      setSelectedMeter(null);
+      setSelectedConnection(null);
       setPreviousReading("");
       setCurrentReading("");
       setNotes("");
+      setExceptionId(null);
     } else {
       fetchCustomers();
+      fetchExceptions();
     }
   }, [open]);
+
+  const fetchExceptions = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/exceptions`, {
+        withCredentials: true,
+      });
+      setExceptions(res.data?.data || []);
+    } catch (err) {
+      console.error("fetch exceptions error:", err);
+    }
+  };
 
   const fetchCustomers = useCallback(async (q = "") => {
     setLoadingCustomers(true);
@@ -85,7 +108,7 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
     if (!cust) return;
 
     setSelectedCustomer(cust);
-    setCustomers([cust]); // hide others
+    setCustomers([cust]);
     setStep(1);
 
     setSnackbar({
@@ -101,15 +124,21 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
     const conn = selectedCustomer?.connections?.find(
       (c) => String(c.connectionNumber) === String(connectionNumber)
     );
-    const meter = conn?.meter || null;
-    setSelectedMeter(meter);
-    setStep(2);
 
-    const lastReading = meter?.meterReadings?.[0];
+    if (!conn) return;
+
+    setSelectedConnection(conn);
+
+    const lastReading = conn.meter?.meterReadings?.[0] || null;
+
     setPreviousReading(
       String(lastReading?.currentReading ?? lastReading?.previousReading ?? "0")
     );
+
     setCurrentReading("");
+    setExceptionId(null);
+
+    setStep(2);
 
     setSnackbar({
       open: true,
@@ -125,9 +154,15 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
     return curr - prev;
   })();
 
+  const isAbnormal = (() => {
+    const prev = Number(previousReading);
+    const curr = Number(currentReading);
+    return curr < prev;
+  })();
+
   const handleSave = async () => {
-    if (!selectedMeter) {
-      alert("No meter selected.");
+    if (!selectedConnectionNumber) {
+      alert("No connection selected.");
       return;
     }
 
@@ -136,15 +171,22 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
       return;
     }
 
+    if (isAbnormal && !exceptionId) {
+      alert("This is an abnormal reading. Please select an exception.");
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
-        meterId: Number(selectedMeter.id),
+        connectionId: Number(selectedConnectionNumber),
         currentReading: Number(currentReading),
         notes: notes || null,
+        type: "ACTUAL",
+        exceptionId: isAbnormal ? Number(exceptionId) : null,
       };
 
-      await axios.post(`${BASE_URL}/create-meter-reading`, payload, {
+      await axios.post(`${BASE_URL}/meter-readings/manual`, payload, {
         withCredentials: true,
       });
 
@@ -195,13 +237,13 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
           ))}
         </Stepper>
 
-        {/* Step 0: Search Customer */}
+        {/* STEP 0: SEARCH CUSTOMER */}
         {step === 0 && (
           <Box>
             <Grid container spacing={2}>
               <Grid item xs={12} sm={8}>
                 <TextField
-                  label="Search customer by name, account, phone or email"
+                  label="Search by name, account, phone or email"
                   value={search}
                   onChange={handleSearchChange}
                   fullWidth
@@ -210,16 +252,18 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
                   }}
                 />
               </Grid>
+
               <Grid item xs={12} sm={4}>
                 <Button
+                  fullWidth
                   variant="contained"
                   onClick={() => fetchCustomers(search)}
                   disabled={loadingCustomers}
-                  fullWidth
                 >
                   {loadingCustomers ? <CircularProgress size={20} /> : "Search"}
                 </Button>
               </Grid>
+
               <Grid item xs={12}>
                 <Paper variant="outlined" sx={{ p: 1, maxHeight: 260, overflowY: "auto" }}>
                   {loadingCustomers ? (
@@ -258,22 +302,24 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
           </Box>
         )}
 
-        {/* Step 1: Select Connection */}
+        {/* STEP 1: SELECT CONNECTION */}
         {step === 1 && selectedCustomer && (
           <Box>
             <Typography sx={{ mb: 1 }}>
               Customer: <strong>{selectedCustomer.customerName}</strong>
             </Typography>
+
             <FormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel>Choose connection</InputLabel>
+              <InputLabel>Select connection</InputLabel>
               <Select
                 value={selectedConnectionNumber}
+                label="Select connection"
                 onChange={(e) => handleSelectConnection(e.target.value)}
               >
                 {selectedCustomer.connections?.length ? (
                   selectedCustomer.connections.map((conn) => (
                     <MenuItem key={conn.connectionNumber} value={conn.connectionNumber}>
-                      {conn.connectionNumber} — {conn.meter?.serialNumber ?? "No meter"}
+                      {conn.connectionNumber} — Meter {conn.meter?.id ?? "N/A"}
                     </MenuItem>
                   ))
                 ) : (
@@ -284,16 +330,17 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
           </Box>
         )}
 
-        {/* Step 2: Enter & Review */}
-        {step === 2 && selectedMeter && (
+        {/* STEP 2: ENTER READING */}
+        {step === 2 && selectedConnection && (
           <Box>
             <TextField
-              label="Last Recorded Reading"
+              label="Previous Reading"
               fullWidth
               value={previousReading}
               InputProps={{ readOnly: true }}
               sx={{ mb: 2 }}
             />
+
             <TextField
               label="Current Reading"
               fullWidth
@@ -302,6 +349,23 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
               onChange={(e) => setCurrentReading(e.target.value)}
               sx={{ mb: 2 }}
             />
+
+            {isAbnormal && (
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Select Exception</InputLabel>
+                <Select
+                  value={exceptionId || ""}
+                  onChange={(e) => setExceptionId(e.target.value)}
+                >
+                  {exceptions.map((ex) => (
+                    <MenuItem key={ex.id} value={ex.id}>
+                      {ex.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+
             <TextField
               label="Notes (optional)"
               fullWidth
@@ -311,18 +375,19 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
               onChange={(e) => setNotes(e.target.value)}
               sx={{ mb: 2 }}
             />
+
             <Typography variant="body2" sx={{ mt: 1 }}>
               Units Used: <strong>{usage ?? "-"}</strong>
             </Typography>
 
             <Box sx={{ display: "flex", justifyContent: "space-between", mt: 3 }}>
-              <Button onClick={onClose} variant="outlined">
+              <Button variant="outlined" onClick={onClose}>
                 Close
               </Button>
               <Button
                 variant="contained"
-                onClick={handleSave}
                 disabled={!currentReading || saving}
+                onClick={handleSave}
               >
                 {saving ? <CircularProgress size={18} /> : "Save Reading"}
               </Button>
@@ -330,7 +395,6 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
           </Box>
         )}
 
-        {/* Snackbar */}
         <Snackbar
           open={snackbar.open}
           autoHideDuration={3000}

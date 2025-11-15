@@ -13,7 +13,7 @@ import {
   Autocomplete,
 } from "@mui/material";
 import { AddCircleOutline, RemoveCircleOutline } from "@mui/icons-material";
-import { debounce } from "lodash"; // Install lodash for debouncing
+import { debounce } from "lodash";
 import { useNavigate } from "react-router-dom";
 import { getTheme } from "../../store/theme";
 import { useAuthStore } from "../../store/authStore";
@@ -21,15 +21,23 @@ import { useAuthStore } from "../../store/authStore";
 const BASEURL = (import.meta as any).env?.VITE_BASE_URL || "";
 
 const CreateInvoice = () => {
+  type Connection = {
+    id: number;
+    connectionNumber: number;
+    scheme: { name: string };
+    zone?: { name: string };
+  };
+
   type Customer = {
     id: string;
     customerName: string;
     accountNumber: string;
     phoneNumber?: string;
+    connections: Connection[];
   };
 
   type BillType = {
-    id: string;
+    id: number;
     name: string;
   };
 
@@ -37,6 +45,7 @@ const CreateInvoice = () => {
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
   const [billTypes, setBillTypes] = useState<BillType[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedConnection, setSelectedConnection] = useState<number | null>(null);
   const [selectedBillType, setSelectedBillType] = useState("");
   const [billPeriod, setBillPeriod] = useState("");
   const [items, setItems] = useState([{ description: "", amount: "", quantity: 1 }]);
@@ -45,16 +54,16 @@ const CreateInvoice = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const { currentUser } = useAuthStore();
+  const navigate = useNavigate();
+  const theme = getTheme();
 
-    const navigate = useNavigate();
-    const theme = getTheme();
+  // Redirect if not logged in
+  useEffect(() => {
+    if (!currentUser) {
+      navigate("/login");
+    }
+  }, [currentUser, navigate]);
 
-
-      useEffect(() => {
-        if (!currentUser) {
-          navigate("/login");
-        }
-      }, [currentUser, navigate]);
   // Fetch customers and bill types
   useEffect(() => {
     const fetchData = async () => {
@@ -66,7 +75,7 @@ const CreateInvoice = () => {
 
         const fetchedCustomers = custRes.data?.data?.customers || [];
         setCustomers(fetchedCustomers);
-        setFilteredCustomers(fetchedCustomers); // Initially, show all customers
+        setFilteredCustomers(fetchedCustomers);
         setBillTypes(billRes.data?.data || []);
       } catch (err) {
         console.error(err);
@@ -76,7 +85,7 @@ const CreateInvoice = () => {
     fetchData();
   }, []);
 
-  // Debounced search function
+  // Debounced customer search
   const fetchCustomers = useCallback(
     debounce(async (query: string) => {
       if (query.trim() === "") {
@@ -93,13 +102,13 @@ const CreateInvoice = () => {
       } catch (err) {
         console.error(err);
         setMessage("Failed to search customers.");
-        setFilteredCustomers(customers); // Fallback to all customers
+        setFilteredCustomers(customers);
       }
     }, 300),
     [customers]
   );
 
-  // Handle search input change
+  // Handle search input
   const handleSearch = (event: React.ChangeEvent<{}>, value: string) => {
     setSearchQuery(value);
     fetchCustomers(value);
@@ -108,6 +117,7 @@ const CreateInvoice = () => {
   // Handle customer selection
   const handleCustomerSelect = (event: React.ChangeEvent<{}>, value: Customer | null) => {
     setSelectedCustomer(value);
+    setSelectedConnection(null); // Reset connection when new customer selected
   };
 
   // Handle dynamic items
@@ -139,14 +149,18 @@ const CreateInvoice = () => {
       setMessage("Please select a customer.");
       return;
     }
+    if (!selectedConnection) {
+      setMessage("Please select a connection.");
+      return;
+    }
 
     setLoading(true);
     setMessage("");
 
     try {
       const payload = {
-        customerId: selectedCustomer.id,
-        billTypeId: selectedBillType,
+        connectionId: selectedConnection,
+        billTypeId: Number(selectedBillType),
         billPeriod,
         items: items.map((i) => ({
           description: i.description,
@@ -154,6 +168,8 @@ const CreateInvoice = () => {
           quantity: parseInt(String(i.quantity), 10) || 1,
         })),
       };
+
+      console.log("📦 Invoice Payload:", payload);
 
       const res = await axios.post(`${BASEURL}/create-bill`, payload, {
         withCredentials: true,
@@ -163,19 +179,20 @@ const CreateInvoice = () => {
       setItems([{ description: "", amount: "", quantity: 1 }]);
       setSelectedCustomer(null);
       setSelectedBillType("");
+      setSelectedConnection(null);
       setBillPeriod("");
       setSearchQuery("");
-      setFilteredCustomers(customers); // Reset filtered customers
-    } catch (err) {
-      console.error(err);
-      setMessage("Error creating invoice.");
+      setFilteredCustomers(customers);
+    } catch (err: any) {
+      console.error("❌ Error creating invoice:", err.response?.data || err.message);
+      setMessage(err.response?.data?.message || "Error creating invoice.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Container maxWidth="md" sx={{ mt: 6 ,ml:10 }}>
+    <Container maxWidth="md" sx={{ mt: 6, ml: 10 }}>
       <Paper sx={{ p: 4, borderRadius: 3, boxShadow: 3 }}>
         <Typography variant="h5" gutterBottom>
           Create Invoice
@@ -183,7 +200,7 @@ const CreateInvoice = () => {
 
         <form onSubmit={handleSubmit}>
           <Grid container spacing={2}>
-            {/* Customer Search with Autocomplete */}
+            {/* Customer Search */}
             <Grid item xs={12} sm={6}>
               <Autocomplete
                 options={filteredCustomers}
@@ -209,6 +226,26 @@ const CreateInvoice = () => {
               />
             </Grid>
 
+            {/* Connection Dropdown */}
+            {selectedCustomer && selectedCustomer.connections && (
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  select
+                  fullWidth
+                  label="Select Connection"
+                  value={selectedConnection || ""}
+                  onChange={(e) => setSelectedConnection(Number(e.target.value))}
+                  required
+                >
+                  {selectedCustomer.connections.map((conn) => (
+                    <MenuItem key={conn.id} value={conn.id}>
+                      {`#${conn.connectionNumber} `}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+            )}
+
             {/* Bill Type */}
             <Grid item xs={12} sm={6}>
               <TextField
@@ -228,7 +265,7 @@ const CreateInvoice = () => {
             </Grid>
 
             {/* Billing Period */}
-            <Grid item xs={12}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 type="month"
@@ -300,14 +337,15 @@ const CreateInvoice = () => {
               ))}
 
               <Button
-                startIcon={<AddCircleOutline  />}
-                sx={{ mt: 2, color:theme.palette.primary.contrastText }}
+                startIcon={<AddCircleOutline />}
+                sx={{ mt: 2, color: theme.palette.primary.contrastText }}
                 onClick={addItem}
               >
                 Add Item
               </Button>
             </Grid>
 
+            {/* Total */}
             <Grid item xs={12}>
               <Divider sx={{ my: 2 }} />
               <Typography variant="subtitle1">
@@ -321,7 +359,7 @@ const CreateInvoice = () => {
                 type="submit"
                 variant="contained"
                 fullWidth
-                disabled={loading}
+                disabled={loading || !selectedConnection}
               >
                 {loading ? "Creating..." : "Create Invoice"}
               </Button>
@@ -330,7 +368,7 @@ const CreateInvoice = () => {
         </form>
 
         {message && (
-          <Typography  sx={{ mt: 2 }}>
+          <Typography sx={{ mt: 2 }} color="primary">
             {message}
           </Typography>
         )}
