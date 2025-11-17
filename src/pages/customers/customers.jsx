@@ -268,7 +268,7 @@ const CustomersScreen = () => {
       align: "center",
       renderCell: (params) => (
         <IconButton
-          color="primary" // Fixed color syntax
+          color="theme.palette.primary.contrastText" // Fixed color syntax
           onClick={(e) => {
             e.stopPropagation();
             handleSelectCustomer(params?.row?.id);

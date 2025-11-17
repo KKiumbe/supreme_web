@@ -119,24 +119,28 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
   };
 
   const handleSelectConnection = (connectionNumber) => {
-    setSelectedConnectionNumber(connectionNumber);
+  const conn = selectedCustomer?.connections?.find(
+    (c) => String(c.connectionNumber) === String(connectionNumber)
+  );
 
-    const conn = selectedCustomer?.connections?.find(
-      (c) => String(c.connectionNumber) === String(connectionNumber)
-    );
+  if (!conn) return;
 
-    if (!conn) return;
+  setSelectedConnection(conn);          // ⭐ STORE FULL CONNECTION OBJECT
+  setSelectedConnectionNumber(connectionNumber);
 
-    setSelectedConnection(conn);
 
-    const lastReading = conn.meter?.meterReadings?.[0] || null;
 
-    setPreviousReading(
-      String(lastReading?.currentReading ?? lastReading?.previousReading ?? "0")
-    );
+  const lastReading = conn.meter?.meterReadings?.[0] || null;
 
-    setCurrentReading("");
-    setExceptionId(null);
+  setPreviousReading(
+    String(lastReading?.currentReading ?? lastReading?.previousReading ?? "0")
+  );
+
+  setCurrentReading("");
+  setExceptionId(null);
+
+
+
 
     setStep(2);
 
@@ -179,16 +183,17 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
     setSaving(true);
     try {
       const payload = {
-        connectionId: Number(selectedConnectionNumber),
+        connectionId: Number(selectedConnection.id),
         currentReading: Number(currentReading),
         notes: notes || null,
         type: "ACTUAL",
         exceptionId: isAbnormal ? Number(exceptionId) : null,
       };
 
-      await axios.post(`${BASE_URL}/meter-readings/manual`, payload, {
-        withCredentials: true,
-      });
+  await axios.post(`${BASE_URL}/meter-readings/manual`, payload, {
+  withCredentials: true,
+});
+
 
       setSnackbar({
         open: true,

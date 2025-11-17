@@ -21,20 +21,20 @@ import ReceiptIcon from "@mui/icons-material/Receipt";
 import { getTheme } from "../../store/theme";
 
 
-const ReceiptDetail = () => {
-  const { id } = useParams();
+const ReceiptDetail = (id) => {
+  //const { id } = useParams();
   const navigate = useNavigate();
   const [receipt, setReceipt] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const theme = getTheme();
-  const BASEURL = import.meta.env.VITE_BASE_URL || "https://taqa.co.ke/api";
+  const BASEURL = import.meta.env.VITE_BASE_URL;
 
   useEffect(() => {
     const fetchReceipt = async () => {
       try {
-        const response = await axios.get(`${BASEURL}/receipts/${id}`, {
+        const response = await axios.get(`${BASEURL}/receipt/${id}`, {
           withCredentials: true,
         });
         setReceipt(response.data);
@@ -46,7 +46,7 @@ const ReceiptDetail = () => {
       }
     };
     fetchReceipt();
-  }, [id]);
+  }, [id, BASEURL]);
 
   const handleGoBack = () => {
     navigate(-1);

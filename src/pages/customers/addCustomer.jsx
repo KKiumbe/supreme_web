@@ -253,6 +253,7 @@ const handleSubmit = async () => {
         renderCell: (params) => (
           <Button
             variant="outlined"
+             color="theme.palette.primary.contrastText"
             size="small"
             onClick={() => handleSelectCustomer(params.row)}
             sx={{ color: theme.palette.primary.contrastText }}

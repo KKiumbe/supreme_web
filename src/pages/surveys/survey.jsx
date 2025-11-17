@@ -151,23 +151,7 @@ const Surveys = () => {
             <PhotoCamera sx={{ fontSize: 22, color: "grey.500" }} />
           ),
       },
-      {
-        field: "actions",
-        headerName: "Actions",
-        flex: 0.6,
-        sortable: false,
-        renderCell: (params) => (
-          <IconButton
-            color="primary"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleRowClick(params);
-            }}
-          >
-            <Visibility />
-          </IconButton>
-        ),
-      },
+      
     ],
     []
   );

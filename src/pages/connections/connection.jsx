@@ -67,6 +67,7 @@ import axios from "axios";
 import { debounce } from "lodash";
 import AssignMeterTaskDialog from "../../components/meterAssign/assignTask";
 
+
 const BASEURL = import.meta.env.VITE_BASE_URL || "http://localhost:3000/api";
 
 const flattenConnection = (conn) => ({
@@ -508,7 +509,7 @@ const ConnectionsScreen = () => {
             {params?.row?.status === "PENDING_METER" ? (
               <Tooltip title="Assign Meter Installation Task">
                 <IconButton
-                  color='theme.palette.primary.contrastText'
+                 color="theme.palette.primary.contrastText"
                   onClick={(e) => {
                     e.stopPropagation();
                     openTaskDialog(params.row);
@@ -521,7 +522,7 @@ const ConnectionsScreen = () => {
             ) : (
               <Tooltip title="View Details">
                 <IconButton
-                  color="primary"
+                  color="theme.palette.primary.contrastText"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleViewDetails(params.row);

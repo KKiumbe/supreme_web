@@ -149,7 +149,7 @@ const Sidebar = () => {
             isSubmenu: true,
             submenuKey: "Survey",
             children: [
-              { icon: <Ballot sx={{ fontSize: 20 }} />, label: "View Surveys", path: "/survey" },
+              { icon: <Ballot sx={{ fontSize: 20 }} />, label: "View Surveys", path: "/surveys" },
               { icon: <PostAdd sx={{ fontSize: 20 }} />, label: "Add Survey", path: "/add-survey" },
             ],
           },
@@ -174,7 +174,7 @@ const Sidebar = () => {
             isSubmenu: true,
             submenuKey: "meterReading",
             children: [
-              { icon: <Water sx={{ fontSize: 20 }} />, label: "Normal Readings", path: "/water-readings" },
+              { icon: <Water sx={{ fontSize: 20 }} />, label: "Normal Readings", path: "/meter-readings" },
               { icon: <FlashOn sx={{ fontSize: 20 }} />, label: "Abnormal Readings", path: "/abnormal-readings" },
             ],
           },

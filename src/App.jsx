@@ -241,7 +241,7 @@ const App = () => {
 
 
                      <Route
-                  path="/water-readings"
+                  path="/meter-readings"
                   element={
                     <ProtectedRoute>
                       <WaterReadingsList/>
