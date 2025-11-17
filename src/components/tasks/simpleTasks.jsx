@@ -156,6 +156,7 @@ if (RelatedSurveyId !== undefined) updates.RelatedSurveyId = RelatedSurveyId;
         withCredentials: true,
       });
 
+
       onTaskCreated?.(data);
       handleClose();
     } catch (err) {
@@ -218,22 +219,25 @@ if (RelatedSurveyId !== undefined) updates.RelatedSurveyId = RelatedSurveyId;
             </Grid>
 
             <Grid item xs={12}>
-              <TextField
-                select
-                fullWidth
-                label="Task Type"
-                value={formData.TypeId}
-                onChange={handleChange("TypeId")}
-                required
-                disabled={taskTitle.toLowerCase().includes("survey")}
-              >
-                <MenuItem value="">— Select Task Type —</MenuItem>
-                {taskTypes.map((type) => (
-                  <MenuItem key={type.id} value={type.id}>
-                    {type.name}
-                  </MenuItem>
-                ))}
-              </TextField>
+            <TextField
+  select
+  fullWidth
+  label="Task Type"
+  value={formData.TypeId}
+  onChange={(e) =>
+    setFormData((prev) => ({ ...prev, TypeId: e.target.value }))
+  }
+  required
+  
+>
+  <MenuItem value="">— Select Task Type —</MenuItem>
+  {taskTypes.map((type) => (
+    <MenuItem key={type.id} value={type.id}>
+      {type.name}
+    </MenuItem>
+  ))}
+</TextField>
+
             </Grid>
 
             <Grid item xs={12}>
