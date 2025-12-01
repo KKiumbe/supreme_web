@@ -39,9 +39,7 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
   const [previousReading, setPreviousReading] = useState("");
   const [currentReading, setCurrentReading] = useState("");
   const [notes, setNotes] = useState("");
-  const [exceptionId, setExceptionId] = useState(null);
 
-  const [exceptions, setExceptions] = useState([]);
 
   const [saving, setSaving] = useState(false);
 
@@ -51,7 +49,7 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
     severity: "info",
   });
 
-  // Reset modal on close
+  // Reset when modal closes
   useEffect(() => {
     if (!open) {
       setStep(0);
@@ -63,24 +61,26 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
       setPreviousReading("");
       setCurrentReading("");
       setNotes("");
-      setExceptionId(null);
+    
     } else {
       fetchCustomers();
-      fetchExceptions();
+      
     }
   }, [open]);
 
-  const fetchExceptions = async () => {
-    try {
-      const res = await axios.get(`${BASE_URL}/exceptions`, {
-        withCredentials: true,
-      });
-      setExceptions(res.data?.data || []);
-    } catch (err) {
-      console.error("fetch exceptions error:", err);
-    }
-  };
+  // 🔹 Fetch exception list
+  // const fetchExceptions = async () => {
+  //   try {
+  //     const res = await axios.get(`${BASE_URL}/get-exceptions`, {
+  //       withCredentials: true,
+  //     });
+  //     setExceptions(res.data?.data || []);
+  //   } catch (err) {
+  //     console.error("fetch exceptions error:", err);
+  //   }
+  // };
 
+  // 🔹 Fetch customers
   const fetchCustomers = useCallback(async (q = "") => {
     setLoadingCustomers(true);
     try {
@@ -88,6 +88,7 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
         withCredentials: true,
         params: q ? { search: q } : undefined,
       });
+
       setCustomers(res.data?.data?.customers || []);
     } catch (err) {
       console.error("fetchCustomers error:", err);
@@ -103,6 +104,7 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
     fetchCustomers(q);
   };
 
+  // 🔹 Select a customer
   const handleSelectCustomer = (customerId) => {
     const cust = customers.find((c) => c.id === customerId);
     if (!cust) return;
@@ -118,29 +120,25 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
     });
   };
 
+  // 🔹 Select a connection
   const handleSelectConnection = (connectionNumber) => {
-  const conn = selectedCustomer?.connections?.find(
-    (c) => String(c.connectionNumber) === String(connectionNumber)
-  );
+    const conn = selectedCustomer?.connections?.find(
+      (c) => String(c.connectionNumber) === String(connectionNumber)
+    );
 
-  if (!conn) return;
+    if (!conn) return;
 
-  setSelectedConnection(conn);          // ⭐ STORE FULL CONNECTION OBJECT
-  setSelectedConnectionNumber(connectionNumber);
+    setSelectedConnection(conn);
+    setSelectedConnectionNumber(connectionNumber);
 
+    const lastReading = conn.meter?.meterReadings?.[0] || null;
 
+    setPreviousReading(
+      String(lastReading?.currentReading ?? lastReading?.previousReading ?? "0")
+    );
 
-  const lastReading = conn.meter?.meterReadings?.[0] || null;
-
-  setPreviousReading(
-    String(lastReading?.currentReading ?? lastReading?.previousReading ?? "0")
-  );
-
-  setCurrentReading("");
-  setExceptionId(null);
-
-
-
+    setCurrentReading("");
+    
 
     setStep(2);
 
@@ -151,6 +149,7 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
     });
   };
 
+  // 🔹 Compute usage locally
   const usage = (() => {
     const prev = Number(previousReading || 0);
     const curr = Number(currentReading || 0);
@@ -158,12 +157,14 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
     return curr - prev;
   })();
 
+  // 🔹 Basic abnormal trigger on UI (backend will do final validation)
   const isAbnormal = (() => {
     const prev = Number(previousReading);
     const curr = Number(currentReading);
     return curr < prev;
   })();
 
+  // 🔹 Save reading
   const handleSave = async () => {
     if (!selectedConnectionNumber) {
       alert("No connection selected.");
@@ -175,25 +176,22 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
       return;
     }
 
-    if (isAbnormal && !exceptionId) {
-      alert("This is an abnormal reading. Please select an exception.");
-      return;
-    }
+ 
 
     setSaving(true);
+
     try {
       const payload = {
         connectionId: Number(selectedConnection.id),
         currentReading: Number(currentReading),
         notes: notes || null,
         type: "ACTUAL",
-        exceptionId: isAbnormal ? Number(exceptionId) : null,
+        //exceptionId: isAbnormal ? Number(exceptionId) : null,
       };
 
-  await axios.post(`${BASE_URL}/meter-readings/manual`, payload, {
-  withCredentials: true,
-});
-
+      await axios.post(`${BASE_URL}/meter-readings/manual`, payload, {
+        withCredentials: true,
+      });
 
       setSnackbar({
         open: true,
@@ -215,6 +213,7 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
     }
   };
 
+  // UI
   return (
     <Modal open={open} onClose={onClose}>
       <Box
@@ -230,9 +229,7 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
           maxHeight: "85vh",
         }}
       >
-        <Typography variant="h6" mb={2}>
-          Add Meter Reading
-        </Typography>
+        <Typography variant="h6" mb={2}>Add Meter Reading</Typography>
 
         <Stepper activeStep={step} sx={{ mb: 3 }}>
           {steps.map((label) => (
@@ -355,21 +352,8 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
               sx={{ mb: 2 }}
             />
 
-            {isAbnormal && (
-              <FormControl fullWidth sx={{ mb: 2 }}>
-                <InputLabel>Select Exception</InputLabel>
-                <Select
-                  value={exceptionId || ""}
-                  onChange={(e) => setExceptionId(e.target.value)}
-                >
-                  {exceptions.map((ex) => (
-                    <MenuItem key={ex.id} value={ex.id}>
-                      {ex.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            )}
+            {/* Show exception dropdown only when abnormal */}
+         
 
             <TextField
               label="Notes (optional)"

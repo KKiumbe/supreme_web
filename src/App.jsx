@@ -64,6 +64,7 @@ import Surveys from "./pages/surveys/survey";
 import ApprovedCustomersScreen from "./pages/customers/assignMeter/assignMeter";
 import CreateSurvey from "./pages/surveys/addsurvey";
 import CreateCustomerScreen from "./pages/customers/addCustomer";
+import AdjustmentsList from "./pages/billing/adjustment/adjustment";
 
 const App = () => {
   const { darkMode } = useThemeStore();
@@ -179,6 +180,15 @@ const App = () => {
                   element={
                     <ProtectedRoute>
                       <BillList/>
+                    </ProtectedRoute>
+                  }
+                />
+
+                   <Route
+                  path="/bill-adjustments"
+                  element={
+                    <ProtectedRoute>
+                      <AdjustmentsList/>
                     </ProtectedRoute>
                   }
                 />

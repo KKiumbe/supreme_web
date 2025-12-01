@@ -18,7 +18,7 @@ import { useAuthStore } from '../../store/authStore';
 // ModeOfPayment options for selection
 const ModeOfPayment = {
   CASH: 'CASH',
-  BANK: 'BANK',
+   BANK_TRANSFER: 'BANK_TRANSFER',
   MPESA: 'MPESA',
   AIRTELMONEY: 'AIRTELMONEY',
   // Add other modes as needed
@@ -137,7 +137,7 @@ const CreatePayment = () => {
       const payload = {
         customerId: selectedCustomer.id,
         totalAmount: paymentAmount,
-        modeOfPayment,
+        modeOfPayment: modeOfPayment,
         paidBy,
       };
 

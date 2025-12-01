@@ -85,7 +85,7 @@ const MeterReadingDetails = () => {
         } catch (normalErr) {
           // If normal reading fails with 404, try abnormal endpoint
           if (normalErr.response?.status === 404) {
-            const response = await axios.get(`${BASEURL}/meter-reading/abnormal/${id}`, {
+            const response = await axios.get(`${BASEURL}/get-abnormal-reading/${id}`, {
               params: { tenantId: currentUser?.tenantId },
               withCredentials: true,
             });

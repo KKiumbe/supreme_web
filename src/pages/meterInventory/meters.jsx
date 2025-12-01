@@ -22,6 +22,7 @@ import AddOrEditMeterModal from "../../components/meters/createUpdate";
 import debounce from "lodash/debounce";
 
 // Error Boundary Component
+import PropTypes from "prop-types";
 class ErrorBoundary extends Component {
   state = { hasError: false };
 
@@ -40,6 +41,10 @@ class ErrorBoundary extends Component {
     return this.props.children;
   }
 }
+
+ErrorBoundary.propTypes = {
+  children: PropTypes.node,
+};
 
 const MeterScreen = () => {
   const { currentUser } = useAuthStore();

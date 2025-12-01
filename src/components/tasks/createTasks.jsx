@@ -265,7 +265,7 @@ const AssignTaskDialog = ({ open, onClose, taskId, onAssigned, theme, connection
   const loadingAll = loading.users || loading.types || loading.schemes || loading.connections;
 
   return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sx">
+    <Dialog open={open} onClose={handleClose} >
       <DialogTitle>
         {isCreateMode
           ? stage === 1

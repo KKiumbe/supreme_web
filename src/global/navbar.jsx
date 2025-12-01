@@ -58,6 +58,14 @@ export default function Navbar() {
   const BASEURL = import.meta.env.VITE_BASE_URL;
   const theme = getTheme(darkMode ? "dark" : "light");
 
+
+  useEffect(() => {
+  if (!currentUser) {
+    navigate("/login");
+  }
+}, [currentUser]);
+
+
   // Mock notifications (replace with API call when ready)
   useEffect(() => {
     const mockNotifications = [];

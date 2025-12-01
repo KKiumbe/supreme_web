@@ -35,6 +35,7 @@ import {
   HowToReg,
   PersonAddAlt,
   PostAdd,
+  AutoFixHigh,
 } from "@mui/icons-material";
 
 import BusinessIcon from "@mui/icons-material/Business";
@@ -167,6 +168,7 @@ const Sidebar = () => {
         {renderSubmenu("Billing", [
           { icon: <Receipt sx={{ fontSize: 20 }} />, label: "View", path: "/invoices" },
           { icon: <Add sx={{ fontSize: 20 }} />, label: "Create", path: "/create-invoice" },
+          {icon: <AutoFixHigh sx={{ fontSize: 20 }} />, label: "Bill Adjustments", path: "/bill-adjustments" },
 
           {
             icon: <Water sx={{ fontSize: 20 }} />,

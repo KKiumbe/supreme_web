@@ -144,6 +144,7 @@ export default function MeterReadingDetails({ readingId, onClose }) {
         <Info label="Meter Serial" value={meter?.serialNumber} />
         <Info label="Connection Number" value={meter?.connection?.connectionNumber} />
         <Info label="Tariff" value={meter?.connection?.tariffCategory?.name} />
+     
       </Paper>
 
       {/* Customer */}
@@ -154,6 +155,9 @@ export default function MeterReadingDetails({ readingId, onClose }) {
         <Info label="Customer Name" value={meter?.connection?.customer?.customerName} />
         <Info label="Phone" value={meter?.connection?.customer?.phoneNumber} />
         <Info label="Account Number" value={meter?.connection?.customer?.accountNumber} />
+               <Info label="Scheme" value={meter?.connection?.scheme?.name} />
+          <Info label="Zone" value={meter?.connection?.zone?.name} />
+           <Info label="Route" value={meter?.connection?.route?.name} />
       </Paper>
 
       {/* Location */}

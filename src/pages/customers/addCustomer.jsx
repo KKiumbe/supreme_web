@@ -12,13 +12,15 @@ import {
   MenuItem,
   InputAdornment,
   IconButton,
+  Paper,
+  Stack,
+  Alert,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
-import { Search, Clear } from "@mui/icons-material";
+import { Search, Clear, UploadFile, Delete, CheckCircle } from "@mui/icons-material";
 import axios from "axios";
 import { useAuthStore } from "../../store/authStore";
 import { useNavigate } from "react-router-dom";
-import { getTheme } from "../../store/theme";
 import debounce from "lodash/debounce";
 
 const API_URL = import.meta.env.VITE_BASE_URL || "";
@@ -26,82 +28,81 @@ const API_URL = import.meta.env.VITE_BASE_URL || "";
 const CreateCustomerScreen = () => {
   const { currentUser } = useAuthStore();
   const navigate = useNavigate();
-  const theme = getTheme();
 
-  // State
+  // Grid
   const [approvedCustomers, setApprovedCustomers] = useState([]);
-  const [tariffCategories, setTariffCategories] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [error, setError] = useState("");
   const [page, setPage] = useState(0);
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
 
-  const [form, setForm] = useState({
-    customerName: "",
-    email: "",
-    phoneNumber: "",
-    customerKraPin: "",
-    customerDob: "",
-    customerDeposit: "",
-    customerIdNo: "",
-    schemeId: "",
-    zoneId: "",
-    routeId: "",
-    tariffCategoryId: "",
+  // Dialogs
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+
+  // Selected survey
+  const [selectedSurvey, setSelectedSurvey] = useState(null);
+
+  // Created customer ID
+  const [createdCustomerId, setCreatedCustomerId] = useState(null);
+
+  // Documents
+  const [documents, setDocuments] = useState({
+    nationalIdFront: null ,
+    nationalIdBack: null,
+    kraPin: null ,
+    passportPhoto: null
   });
 
-  // ✅ Redirect if not authenticated
+  // Form state
+  const [form, setForm] = useState({
+    customerName: "",
+    phoneNumber: "",
+    email: "",
+    customerIdNo: "",
+    customerDeposit: "",
+    tariffCategoryId: "", // ← This is a STRING (UUID)
+  });
+
+  // Tariff categories: { id: "uuid", name: "Domestic - Default" }
+  const [tariffs, setTariffs] = useState([]);
+
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
   useEffect(() => {
     if (!currentUser) navigate("/login");
   }, [currentUser, navigate]);
 
-  // ✅ Flatten API response into frontend-friendly structure
-  const flattenCustomer = (customer) => ({
-    id: customer.id,
-    tenantId: customer.tenantId,
-    name: customer.name || "-",
-    phoneNumber: customer.phoneNumber || "-",
-    email: customer.email || "-",
-    nationalId: customer.nationalId || "-",
-    schemeId: customer.schemeId || null,
-    schemeName: customer.scheme?.name || "-",
-    zoneId: customer.zoneId || null,
-    zoneName: customer.zone?.name || "-",
-    routeId: customer.routeId || null,
-    routeName: customer.route?.name || "-",
-    status: customer.status || "-",
-    createdAt: customer.createdAt || null,
-    proposedTarrifCategoryId: customer.surveys?.[0]?.proposedTarrifCategoryId || null,
+  const flattenCustomer = (c) => ({
+    id: c.id,
+    name: c.name || "-",
+    phoneNumber: c.phoneNumber || "-",
+    email: c.email || "-",
+    nationalId: c.nationalId || "-",
+    schemeId: c.schemeId,
+    zoneId: c.zoneId,
+    routeId: c.routeId,
+    schemeName: c.scheme?.name || (c.schemeId ? "Assigned" : "-"),
+    zoneName: c.zone?.name || (c.zoneId ? "Assigned" : "-"),
+    routeName: c.route?.name || (c.routeId ? "Assigned" : "-"),
+    proposedTariff: c.surveys?.[0]?.proposedTarrifCategoryId || null,
   });
 
-  // ✅ Fetch approved customers
   const fetchApprovedCustomers = useCallback(
     debounce(async (search = "") => {
       setLoading(true);
       try {
         const res = await axios.get(`${API_URL}/get-approved-customer`, {
           withCredentials: true,
-          params: {
-            page: page + 1,
-            limit,
-            search: search || undefined,
-          },
+          params: { page: page + 1, limit, search: search || undefined },
         });
-
-        // ✅ Your backend returns data[] directly, not data.applications[]
-        const validCustomers = (res.data.data || [])
-          .filter((cust) => cust && typeof cust === "object" && cust.id)
-          .map(flattenCustomer);
-
-        setApprovedCustomers(validCustomers);
-        setTotal(res.data.count || validCustomers.length);
+        const rows = (res.data.data || []).map(flattenCustomer);
+        setApprovedCustomers(rows);
+        setTotal(res.data.count ?? rows.length);
       } catch (err) {
-        console.error("Error fetching approved customers:", err);
-        setError("Failed to load approved customers.");
+        console.error(err);
       } finally {
         setLoading(false);
       }
@@ -109,305 +110,266 @@ const CreateCustomerScreen = () => {
     [page, limit]
   );
 
-  // ✅ Fetch tariff categories
-  const fetchTariffCategories = useCallback(async () => {
+  // FIXED: Extract unique tariff categories correctly
+  const fetchTariffCategories = async () => {
     try {
       const res = await axios.get(`${API_URL}/tarrifs/block`, { withCredentials: true });
-      const tariffData = res.data.data || [];
-      const uniqueCategories = Object.values(
-        tariffData.reduce((acc, t) => {
-          acc[t.categoryId] = { id: t.categoryId, name: t.category.name };
-          return acc;
-        }, {})
-      );
-      setTariffCategories(uniqueCategories);
-    } catch (err) {
-      console.error("Error fetching tariff categories:", err);
-      setError("Failed to load tariff categories.");
-    }
-  }, []);
+      const blocks = res.data.data || [];
 
-  // ✅ Initial load
+      const categoryMap = new Map();
+      blocks.forEach((block) => {
+        if (block.categoryId && block.category) {
+          categoryMap.set(block.categoryId, {
+            id: block.categoryId,
+            name: block.category.name,
+          });
+        }
+      });
+
+      const unique = Array.from(categoryMap.values());
+      console.log("Tariff categories loaded:", unique);
+      setTariffs(unique);
+    } catch (err) {
+      console.error("Failed to load tariff categories", err);
+      setTariffs([]);
+    }
+  };
+
   useEffect(() => {
     fetchApprovedCustomers(searchQuery);
     fetchTariffCategories();
-  }, [fetchApprovedCustomers, fetchTariffCategories, searchQuery]);
+  }, [fetchApprovedCustomers, searchQuery]);
 
-  // ✅ Handle search
-  const handleSearchChange = (e) => {
-    const value = e.target.value;
-    setSearchQuery(value);
-    setPage(0);
-    fetchApprovedCustomers(value);
-  };
-
-  const handleClearSearch = () => {
-    setSearchQuery("");
-    setPage(0);
-    fetchApprovedCustomers("");
-  };
-
-  // ✅ Handle form updates
-  const updateForm = (field) => (e) => {
-    setForm((prev) => ({ ...prev, [field]: e.target.value }));
-    setError("");
-  };
-
-  // ✅ Select a customer from DataGrid
-  const handleSelectCustomer = (customer) => {
-    const proposedTariffId = customer.proposedTarrifCategoryId;
-    const validTariffId = tariffCategories.find((t) => t.id === proposedTariffId)
-      ? proposedTariffId
-      : tariffCategories[0]?.id || "";
-    setSelectedCustomer(customer);
+  const handleSelect = (row) => {
+    setSelectedSurvey(row);
     setForm({
-      customerName: customer.name || "",
-      email: customer.email || "",
-      phoneNumber: customer.phoneNumber || "",
-      customerKraPin: "",
-      customerDob: "",
+      customerName: row.name || "",
+      phoneNumber: row.phoneNumber || "",
+      email: row.email || "",
+      customerIdNo: row.nationalId || "",
       customerDeposit: "",
-      customerIdNo: customer.nationalId || "",
-      schemeId: customer.schemeId || "",
-      zoneId: customer.zoneId || "",
-      routeId: customer.routeId || "",
-      tariffCategoryId: validTariffId,
+      tariffCategoryId: row.proposedTariff || "", // ← string, not null
     });
-    setDialogOpen(true);
+    setError("");
+    setCreateDialogOpen(true);
   };
 
-  // ✅ Validate customer payload
-
-
-  // ✅ Validate customer payload
-const validatePayload = (payload) => {
-  const errors = [];
-  if (!payload.customerName) errors.push("Customer Name is required.");
-  if (!payload.phoneNumber) errors.push("Phone Number is required.");
-  if (!payload.tariffCategoryId) errors.push("Tariff Category is required.");
-  return errors;
-};
-
-// ✅ Submit new customer
-const handleSubmit = async () => {
-  const payload = {
-    customerName: form.customerName.trim(),
-    email: form.email?.trim() || null,
-    phoneNumber: form.phoneNumber.trim(),
-    customerKraPin: form.customerKraPin?.trim() || null,
-    customerDob: form.customerDob || null,
-    customerDeposit: form.customerDeposit ? Number(form.customerDeposit) : null,
-    customerIdNo: form.customerIdNo?.trim() || null,
-    schemeId: form.schemeId ? Number(form.schemeId) : null,
-    zoneId: form.zoneId ? Number(form.zoneId) : null,
-    routeId: form.routeId ? Number(form.routeId) : null,
-    // ✅ keep as string, not number
-    tariffCategoryId: form.tariffCategoryId || null,
-    latitude: selectedCustomer?.latitude ? Number(selectedCustomer.latitude) : null,
-    longitude: selectedCustomer?.longitude ? Number(selectedCustomer.longitude) : null,
-  };
-
-  const validationErrors = validatePayload(payload);
-  if (validationErrors.length > 0) {
-    setError(validationErrors.join(" "));
-    return;
-  }
+const handleCreateCustomer = async () => {
+  if (!form.customerName.trim()) return setError("Name is required");
+  if (!form.phoneNumber.trim()) return setError("Phone is required");
+  if (!form.tariffCategoryId) return setError("Tariff Category is required");
 
   setLoading(true);
+  setError("");
+
+  const payload = {
+    customerName: form.customerName.trim(),
+    phoneNumber: form.phoneNumber.trim(),
+    email: form.email.trim() || null,
+    customerIdNo: form.customerIdNo.trim() || null,
+    customerDeposit: form.customerDeposit ? Number(form.customerDeposit) : null,
+    tariffCategoryId: form.tariffCategoryId, // ← UUID string
+    schemeId: selectedSurvey?.schemeId || null,
+    zoneId: selectedSurvey?.zoneId || null,
+    routeId: selectedSurvey?.routeId || null,
+  };
+
   try {
-    const res = await axios.post(`${API_URL}/customers`, payload, { withCredentials: true });
-    console.log("✅ Customer created:", res.data);
-    setDialogOpen(false);
-    setSelectedCustomer(null);
-    setForm({
-      customerName: "",
-      email: "",
-      phoneNumber: "",
-      customerKraPin: "",
-      customerDob: "",
-      customerDeposit: "",
-      customerIdNo: "",
-      schemeId: "",
-      zoneId: "",
-      routeId: "",
-      tariffCategoryId: "",
+    const res = await axios.post(`${API_URL}/customers`, payload, {
+      withCredentials: true,
     });
-    fetchApprovedCustomers(searchQuery);
-    alert("Customer created successfully!");
+
+    console.log("Full response:", res.data); // ← Check this in browser console
+
+    // CORRECT WAY TO READ CUSTOMER ID FROM YOUR BACKEND
+    const customerId = res.data?.data?.customer?.id 
+                   || res.data?.data?.connection?.customerId 
+                   || res.data?.data?.customerAccount?.connection?.customerId;
+
+    if (!customerId) {
+      throw new Error("Customer created but ID not found in response");
+    }
+
+    setCreatedCustomerId(String(customerId));
+    setCreateDialogOpen(false);
+    setUploadDialogOpen(true);
+    setSuccess("Customer created successfully! Now upload documents");
   } catch (err) {
-    console.error("Error creating customer:", err);
-    setError(err.response?.data?.message || "Failed to create customer.");
+    console.error("Create error:", err.response?.data || err);
+    setError(err.response?.data?.message || "Failed to create customer");
   } finally {
     setLoading(false);
   }
 };
+  const handleUploadDocuments = async () => {
+    const hasFiles = Object.values(documents).some(Boolean);
+    if (!hasFiles) return alert("Please attach at least one document");
 
+    const fd = new FormData();
+    fd.append("customerId", createdCustomerId);
+    Object.entries(documents).forEach(([k, f]) => f && fd.append(k, f));
 
-  // ✅ DataGrid Columns
-  const columns = useMemo(
-    () => [
-      {
-        field: "actions",
-        headerName: "Actions",
-        width: 120,
-        renderCell: (params) => (
-          <Button
-            variant="outlined"
-             color="theme.palette.primary.contrastText"
-            size="small"
-            onClick={() => handleSelectCustomer(params.row)}
-            sx={{ color: theme.palette.primary.contrastText }}
-          >
-            Select
-          </Button>
-        ),
-      },
-      { field: "name", headerName: "Customer Name", width: 180 },
-      { field: "phoneNumber", headerName: "Phone Number", width: 150 },
-      { field: "email", headerName: "Email", width: 200 },
-      { field: "schemeName", headerName: "Scheme", width: 130 },
-      { field: "zoneName", headerName: "Zone", width: 130 },
-      { field: "routeName", headerName: "Route", width: 130 },
-    ],
-    [theme]
-  );
+    setLoading(true);
+    try {
+      await axios.post(`${API_URL}/customer-documents`, fd, {
+        withCredentials: true,
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setSuccess("Documents uploaded!");
+      setTimeout(resetAll, 1500);
+    } catch (err) {
+      setError(err.response?.data?.message || "Upload failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetAll = () => {
+    setCreateDialogOpen(false);
+    setUploadDialogOpen(false);
+    setSelectedSurvey(null);
+    setCreatedCustomerId(null);
+    setDocuments({ nationalIdFront: null, nationalIdBack: null, kraPin: null, passportPhoto: null });
+    setForm({ customerName: "", phoneNumber: "", email: "", customerIdNo: "", customerDeposit: "", tariffCategoryId: "" });
+    setError("");
+    setSuccess("");
+    fetchApprovedCustomers(searchQuery);
+  };
+
+  const columns = useMemo(() => [
+    {
+      field: "actions",
+      headerName: "Action",
+      width: 150,
+      renderCell: (p) => (
+        <Button variant="contained" size="small" onClick={() => handleSelect(p.row)}>
+          Create Customer
+        </Button>
+      ),
+    },
+    { field: "name", headerName: "Name", width: 220 },
+    { field: "phoneNumber", headerName: "Phone", width: 150 },
+    { field: "email", headerName: "Email", width: 240 },
+    { field: "schemeName", headerName: "Scheme", width: 140 },
+    { field: "zoneName", headerName: "Zone", width: 140 },
+    { field: "routeName", headerName: "Route", width: 140 },
+  ], []);
 
   return (
-    <Box sx={{ height: "100vh", display: "flex", flexDirection: "column", p: 2 }}>
-      <Typography variant="h5" fontWeight="bold" mb={2}>
-        Select a Record to Add a Customer
+    <Box sx={{ height: "100vh", p: 3 }}>
+      <Typography variant="h5" fontWeight="bold" mb={3}>
+        Create Customer from Approved Surveys
       </Typography>
 
-      {/* 🔍 Search Bar */}
-      <Box mb={2} display="flex" alignItems="center">
+      <Box display="flex" alignItems="center" mb={2} gap={2}>
         <TextField
-          placeholder="Search by name, phone, email, or ID"
-          variant="outlined"
-          size="small"
+          placeholder="Search..."
           value={searchQuery}
-          onChange={handleSearchChange}
+          onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
+          size="small"
+          sx={{ width: 500 }}
           InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search />
-              </InputAdornment>
-            ),
-            endAdornment: searchQuery && (
-              <InputAdornment position="end">
-                <IconButton onClick={handleClearSearch} size="small">
-                  <Clear />
-                </IconButton>
-              </InputAdornment>
-            ),
+            startAdornment: <Search />,
+            endAdornment: searchQuery && <IconButton onClick={() => { setSearchQuery(""); setPage(0); }}><Clear /></IconButton>,
           }}
-          sx={{ width: "50%", mr: 2 }}
         />
-        <Typography variant="body2" color="text.secondary">
-          Showing {approvedCustomers.length} of {total} records
-        </Typography>
       </Box>
 
-      {/* DataGrid */}
-      <Box sx={{ flex: 1 }}>
-        {loading ? (
-          <Box display="flex" justifyContent="center" alignItems="center" height="100%">
-            <CircularProgress />
-          </Box>
-        ) : (
-          <DataGrid
-            rows={approvedCustomers}
-            columns={columns}
-            getRowId={(row) => row.id}
-            pageSizeOptions={[10, 25, 50]}
-            paginationModel={{ page, pageSize: limit }}
-            onPaginationModelChange={(model) => {
-              setPage(model.page);
-              setLimit(model.pageSize);
-            }}
-            rowCount={total}
-            paginationMode="server"
-            disableRowSelectionOnClick
-            sx={{ height: "calc(100vh - 250px)" }}
-            localeText={{ noRowsLabel: "No approved customers found" }}
-          />
-        )}
-      </Box>
+      <Paper sx={{ height: "70vh" }}>
+        <DataGrid
+          rows={approvedCustomers}
+          columns={columns}
+          loading={loading}
+          rowCount={total}
+          paginationMode="server"
+          paginationModel={{ page, pageSize: limit }}
+          onPaginationModelChange={(m) => { setPage(m.page); setLimit(m.pageSize); }}
+          pageSizeOptions={[10, 25, 50]}
+        />
+      </Paper>
 
-      {/* Dialog Form */}
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Add Customer: {selectedCustomer?.name}</DialogTitle>
+      {/* CREATE CUSTOMER DIALOG */}
+      <Dialog open={createDialogOpen} onClose={resetAll} maxWidth="sm" fullWidth>
+        <DialogTitle>Create Customer</DialogTitle>
         <DialogContent>
-          <TextField
-            label="Customer Name"
-            fullWidth
-            required
-            margin="dense"
-            value={form.customerName}
-            onChange={updateForm("customerName")}
-          />
-          <TextField
-            label="Phone Number"
-            fullWidth
-            required
-            margin="dense"
-            value={form.phoneNumber}
-            onChange={updateForm("phoneNumber")}
-          />
-          <TextField
-            label="Email"
-            type="email"
-            fullWidth
-            margin="dense"
-            value={form.email}
-            onChange={updateForm("email")}
-          />
-          <TextField
-            label="National ID"
-            fullWidth
-            margin="dense"
-            value={form.customerIdNo}
-            onChange={updateForm("customerIdNo")}
-          />
-          <TextField
-            label="Deposit"
-            type="number"
-            fullWidth
-            margin="dense"
-            value={form.customerDeposit}
-            onChange={updateForm("customerDeposit")}
-          />
-          <TextField
-            select
-            label="Tariff Category"
-            fullWidth
-            margin="dense"
-            value={form.tariffCategoryId}
-            onChange={updateForm("tariffCategoryId")}
-            required
-          >
-            <MenuItem value="">— Select Tariff Category —</MenuItem>
-            {tariffCategories.map((tariff) => (
-              <MenuItem key={tariff.id} value={tariff.id}>
-                {tariff.name}
-              </MenuItem>
-            ))}
-          </TextField>
-          {error && (
-            <Typography color="error" variant="body2" mt={2}>
-              {error}
-            </Typography>
-          )}
+          <Stack spacing={2} mt={2}>
+            <TextField label="Name *" fullWidth value={form.customerName} onChange={e => setForm(f => ({...f, customerName: e.target.value}))} />
+            <TextField label="Phone *" fullWidth value={form.phoneNumber} onChange={e => setForm(f => ({...f, phoneNumber: e.target.value}))} />
+            <TextField label="Email" fullWidth value={form.email} onChange={e => setForm(f => ({...f, email: e.target.value}))} />
+            <TextField label="ID No." fullWidth value={form.customerIdNo} onChange={e => setForm(f => ({...f, customerIdNo: e.target.value}))} />
+            <TextField label="Deposit" type="number" fullWidth value={form.customerDeposit} onChange={e => setForm(f => ({...f, customerDeposit: e.target.value}))} />
+
+            {/* FIXED TARIFF DROPDOWN */}
+            <TextField
+              select
+              required
+              label="Tariff Category *"
+              fullWidth
+              value={form.tariffCategoryId}
+              onChange={(e) => setForm(f => ({ ...f, tariffCategoryId: e.target.value }))}
+              error={!!error && !form.tariffCategoryId}
+              helperText={!!error && !form.tariffCategoryId && "Required"}
+            >
+              <MenuItem value="" disabled><em>Select Category</em></MenuItem>
+              {tariffs.map((cat) => (
+                <MenuItem key={cat.id} value={cat.id}>
+                  {cat.name}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            {error && <Alert severity="error">{error}</Alert>}
+          </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogOpen(false)} disabled={loading}>
-            Cancel
+          <Button onClick={resetAll}>Cancel</Button>
+          <Button variant="contained" onClick={handleCreateCustomer} disabled={loading}>
+            {loading ? <CircularProgress size={20} /> : "Create Customer"}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* UPLOAD DOCUMENTS DIALOG */}
+      <Dialog open={uploadDialogOpen} onClose={resetAll} maxWidth="sm" fullWidth>
+        <DialogTitle>Upload Documents — Customer ID: {createdCustomerId}</DialogTitle>
+        <DialogContent>
+          {success && <Alert severity="success">{success}</Alert>}
+          <Stack spacing={3} mt={2}>
+            {(["nationalIdFront", "nationalIdBack", "kraPin", "passportPhoto"]).map(field => (
+              <Box key={field}>
+                <Typography variant="subtitle2">
+                  {field === "nationalIdFront" && "National ID (Front)"}
+                  {field === "nationalIdBack" && "National ID (Back)"}
+                  {field === "kraPin" && "KRA PIN"}
+                  {field === "passportPhoto" && "Passport Photo"}
+                </Typography>
+                <Button variant="outlined" component="label" startIcon={<UploadFile />}>
+                  Choose
+                  <input type="file" hidden accept="image/*,application/pdf" onChange={e => {
+                    setDocuments(d => ({ ...d, [field]: e.target.files?.[0] || null }));
+                  }} />
+                </Button>
+                {documents[field] && (
+                  <Box sx={{ mt: 1, display: "flex", alignItems: "center", gap: 1 }}>
+                    <CheckCircle color="success" />
+                    <Typography variant="body2">{documents[field]?.name}</Typography>
+                    <IconButton size="small" onClick={() => setDocuments(d => ({ ...d, [field]: null }))}>
+                      <Delete />
+                    </IconButton>
+                  </Box>
+                )}
+              </Box>
+            ))}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={resetAll}>Skip</Button>
           <Button
             variant="contained"
-            onClick={handleSubmit}
-            disabled={loading || !form.tariffCategoryId}
+            onClick={handleUploadDocuments}
+            disabled={loading || !Object.values(documents).some(Boolean)}
           >
-            {loading ? <CircularProgress size={24} /> : "Create Customer"}
+            {loading ? <CircularProgress size={20} /> : "Upload"}
           </Button>
         </DialogActions>
       </Dialog>
