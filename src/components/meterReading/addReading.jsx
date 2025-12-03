@@ -118,12 +118,12 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
 
     const lastReading = conn.meter?.meterReadings?.[0] || null;
 
+    // 🔥 Previous reading comes EXACTLY from endpoint
     setPreviousReading(
       String(lastReading?.currentReading ?? lastReading?.previousReading ?? "0")
     );
 
     setCurrentReading("");
-
     setStep(2);
 
     setSnackbar({
@@ -141,7 +141,7 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
     return curr - prev;
   })();
 
-  // 🔹 Save reading
+  // 🔹 Save reading (VALIDATION DONE HERE ONLY)
   const handleSave = async () => {
     if (!selectedConnectionNumber) {
       alert("No connection selected.");
@@ -149,14 +149,19 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
     }
 
     if (currentReading === "" || isNaN(Number(currentReading))) {
-      alert("Enter a valid current reading.");
+      setSnackbar({
+        open: true,
+        message: "Please enter a valid current reading.",
+        severity: "error",
+      });
       return;
     }
 
-    if (Number(currentReading) < Number(previousReading)) {
+    // 🔥 VALIDATION: Only check HERE
+    if (Number(currentReading) <= Number(previousReading)) {
       setSnackbar({
         open: true,
-        message: "You cannot save a reading that is less than the previous reading.",
+        message: `Current reading must be greater than previous reading (${previousReading}).`,
         severity: "error",
       });
       return;
@@ -275,15 +280,11 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
                           mb: 1,
                           cursor: "pointer",
                           background:
-                            selectedCustomer?.id === c.id
-                              ? "action.selected"
-                              : "inherit",
+                            selectedCustomer?.id === c.id ? "action.selected" : "inherit",
                           "&:hover": { background: "action.hover" },
                         }}
                       >
-                        <Typography sx={{ fontWeight: 600 }}>
-                          {c.customerName}
-                        </Typography>
+                        <Typography sx={{ fontWeight: 600 }}>{c.customerName}</Typography>
                         <Typography variant="body2" color="text.secondary">
                           {c.accountNumber} • {c.phoneNumber}
                         </Typography>
@@ -312,12 +313,8 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
               >
                 {selectedCustomer.connections?.length ? (
                   selectedCustomer.connections.map((conn) => (
-                    <MenuItem
-                      key={conn.connectionNumber}
-                      value={conn.connectionNumber}
-                    >
-                      {conn.connectionNumber} — Meter{" "}
-                      {conn.meter?.id ?? "N/A"}
+                    <MenuItem key={conn.connectionNumber} value={conn.connectionNumber}>
+                      {conn.connectionNumber} — Meter {conn.meter?.id ?? "N/A"}
                     </MenuItem>
                   ))
                 ) : (
@@ -339,28 +336,13 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
               sx={{ mb: 2 }}
             />
 
+            {/* 🔥 User can type anything */}
             <TextField
               label="Current Reading"
               fullWidth
               type="number"
               value={currentReading}
-              onChange={(e) => {
-                const val = e.target.value;
-                const prev = Number(previousReading);
-                const curr = Number(val);
-
-                if (curr < prev) {
-                  setSnackbar({
-                    open: true,
-                    message:
-                      "Current reading cannot be less than previous reading.",
-                    severity: "error",
-                  });
-                  return;
-                }
-
-                setCurrentReading(val);
-              }}
+              onChange={(e) => setCurrentReading(e.target.value)}
               sx={{ mb: 2 }}
             />
 
@@ -378,26 +360,12 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
               Units Used: <strong>{usage ?? "-"}</strong>
             </Typography>
 
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                mt: 3,
-              }}
-            >
+            <Box sx={{ display: "flex", justifyContent: "space-between", mt: 3 }}>
               <Button variant="outlined" onClick={onClose}>
                 Close
               </Button>
 
-              <Button
-                variant="contained"
-                disabled={
-                  !currentReading ||
-                  saving ||
-                  Number(currentReading) < Number(previousReading)
-                }
-                onClick={handleSave}
-              >
+              <Button variant="contained" disabled={saving} onClick={handleSave}>
                 {saving ? <CircularProgress size={18} /> : "Save Reading"}
               </Button>
             </Box>
@@ -407,18 +375,11 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
         <Snackbar
           open={snackbar.open}
           autoHideDuration={3000}
-          onClose={() =>
-            setSnackbar({ ...snackbar, open: false })
-          }
-          anchorOrigin={{
-            vertical: "bottom",
-            horizontal: "center",
-          }}
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
         >
           <Alert
-            onClose={() =>
-              setSnackbar({ ...snackbar, open: false })
-            }
+            onClose={() => setSnackbar({ ...snackbar, open: false })}
             severity={snackbar.severity}
             variant="filled"
           >
