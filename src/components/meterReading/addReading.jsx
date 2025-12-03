@@ -40,7 +40,6 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
   const [currentReading, setCurrentReading] = useState("");
   const [notes, setNotes] = useState("");
 
-
   const [saving, setSaving] = useState(false);
 
   const [snackbar, setSnackbar] = useState({
@@ -61,24 +60,10 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
       setPreviousReading("");
       setCurrentReading("");
       setNotes("");
-    
     } else {
       fetchCustomers();
-      
     }
   }, [open]);
-
-  // 🔹 Fetch exception list
-  // const fetchExceptions = async () => {
-  //   try {
-  //     const res = await axios.get(`${BASE_URL}/get-exceptions`, {
-  //       withCredentials: true,
-  //     });
-  //     setExceptions(res.data?.data || []);
-  //   } catch (err) {
-  //     console.error("fetch exceptions error:", err);
-  //   }
-  // };
 
   // 🔹 Fetch customers
   const fetchCustomers = useCallback(async (q = "") => {
@@ -138,7 +123,6 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
     );
 
     setCurrentReading("");
-    
 
     setStep(2);
 
@@ -149,19 +133,12 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
     });
   };
 
-  // 🔹 Compute usage locally
+  // 🔹 Compute usage
   const usage = (() => {
     const prev = Number(previousReading || 0);
     const curr = Number(currentReading || 0);
     if (isNaN(prev) || isNaN(curr)) return null;
     return curr - prev;
-  })();
-
-  // 🔹 Basic abnormal trigger on UI (backend will do final validation)
-  const isAbnormal = (() => {
-    const prev = Number(previousReading);
-    const curr = Number(currentReading);
-    return curr < prev;
   })();
 
   // 🔹 Save reading
@@ -176,7 +153,14 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
       return;
     }
 
- 
+    if (Number(currentReading) < Number(previousReading)) {
+      setSnackbar({
+        open: true,
+        message: "You cannot save a reading that is less than the previous reading.",
+        severity: "error",
+      });
+      return;
+    }
 
     setSaving(true);
 
@@ -186,7 +170,6 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
         currentReading: Number(currentReading),
         notes: notes || null,
         type: "ACTUAL",
-        //exceptionId: isAbnormal ? Number(exceptionId) : null,
       };
 
       await axios.post(`${BASE_URL}/meter-readings/manual`, payload, {
@@ -229,7 +212,9 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
           maxHeight: "85vh",
         }}
       >
-        <Typography variant="h6" mb={2}>Add Meter Reading</Typography>
+        <Typography variant="h6" mb={2}>
+          Add Meter Reading
+        </Typography>
 
         <Stepper activeStep={step} sx={{ mb: 3 }}>
           {steps.map((label) => (
@@ -267,7 +252,10 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
               </Grid>
 
               <Grid item xs={12}>
-                <Paper variant="outlined" sx={{ p: 1, maxHeight: 260, overflowY: "auto" }}>
+                <Paper
+                  variant="outlined"
+                  sx={{ p: 1, maxHeight: 260, overflowY: "auto" }}
+                >
                   {loadingCustomers ? (
                     <Box display="flex" justifyContent="center" p={2}>
                       <CircularProgress />
@@ -287,11 +275,15 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
                           mb: 1,
                           cursor: "pointer",
                           background:
-                            selectedCustomer?.id === c.id ? "action.selected" : "inherit",
+                            selectedCustomer?.id === c.id
+                              ? "action.selected"
+                              : "inherit",
                           "&:hover": { background: "action.hover" },
                         }}
                       >
-                        <Typography sx={{ fontWeight: 600 }}>{c.customerName}</Typography>
+                        <Typography sx={{ fontWeight: 600 }}>
+                          {c.customerName}
+                        </Typography>
                         <Typography variant="body2" color="text.secondary">
                           {c.accountNumber} • {c.phoneNumber}
                         </Typography>
@@ -320,8 +312,12 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
               >
                 {selectedCustomer.connections?.length ? (
                   selectedCustomer.connections.map((conn) => (
-                    <MenuItem key={conn.connectionNumber} value={conn.connectionNumber}>
-                      {conn.connectionNumber} — Meter {conn.meter?.id ?? "N/A"}
+                    <MenuItem
+                      key={conn.connectionNumber}
+                      value={conn.connectionNumber}
+                    >
+                      {conn.connectionNumber} — Meter{" "}
+                      {conn.meter?.id ?? "N/A"}
                     </MenuItem>
                   ))
                 ) : (
@@ -348,12 +344,25 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
               fullWidth
               type="number"
               value={currentReading}
-              onChange={(e) => setCurrentReading(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                const prev = Number(previousReading);
+                const curr = Number(val);
+
+                if (curr < prev) {
+                  setSnackbar({
+                    open: true,
+                    message:
+                      "Current reading cannot be less than previous reading.",
+                    severity: "error",
+                  });
+                  return;
+                }
+
+                setCurrentReading(val);
+              }}
               sx={{ mb: 2 }}
             />
-
-            {/* Show exception dropdown only when abnormal */}
-         
 
             <TextField
               label="Notes (optional)"
@@ -369,13 +378,24 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
               Units Used: <strong>{usage ?? "-"}</strong>
             </Typography>
 
-            <Box sx={{ display: "flex", justifyContent: "space-between", mt: 3 }}>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                mt: 3,
+              }}
+            >
               <Button variant="outlined" onClick={onClose}>
                 Close
               </Button>
+
               <Button
                 variant="contained"
-                disabled={!currentReading || saving}
+                disabled={
+                  !currentReading ||
+                  saving ||
+                  Number(currentReading) < Number(previousReading)
+                }
                 onClick={handleSave}
               >
                 {saving ? <CircularProgress size={18} /> : "Save Reading"}
@@ -387,11 +407,18 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
         <Snackbar
           open={snackbar.open}
           autoHideDuration={3000}
-          onClose={() => setSnackbar({ ...snackbar, open: false })}
-          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+          onClose={() =>
+            setSnackbar({ ...snackbar, open: false })
+          }
+          anchorOrigin={{
+            vertical: "bottom",
+            horizontal: "center",
+          }}
         >
           <Alert
-            onClose={() => setSnackbar({ ...snackbar, open: false })}
+            onClose={() =>
+              setSnackbar({ ...snackbar, open: false })
+            }
             severity={snackbar.severity}
             variant="filled"
           >
