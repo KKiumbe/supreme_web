@@ -17,7 +17,7 @@ import PropTypes from "prop-types";
 
 const API_URL = import.meta.env.VITE_BASE_URL || "";
 
-const SimpleAssignTaskDialog = ({
+const AssignSurveyTaskDialog = ({
   open,
   onClose,
   taskTitle = "",
@@ -152,7 +152,7 @@ if (RelatedSurveyId !== undefined) updates.RelatedSurveyId = RelatedSurveyId;
 
       console.log("🟢 Task payload before submit:", payload);
 
-      const { data } = await axios.post(`${API_URL}/create-task`, payload, {
+      const { data } = await axios.post(`${API_URL}/create-survey-task`, payload, {
         withCredentials: true,
       });
 
@@ -314,7 +314,7 @@ if (RelatedSurveyId !== undefined) updates.RelatedSurveyId = RelatedSurveyId;
   );
 };
 
-SimpleAssignTaskDialog.propTypes = {
+AssignSurveyTaskDialog.propTypes = {
   open: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
   taskTitle: PropTypes.string,
@@ -331,4 +331,4 @@ SimpleAssignTaskDialog.propTypes = {
   theme: PropTypes.object,
 };
 
-export default SimpleAssignTaskDialog;
+export default AssignSurveyTaskDialog;

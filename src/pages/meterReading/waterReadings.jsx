@@ -13,7 +13,6 @@ import { DataGrid } from "@mui/x-data-grid";
 import {
   Add as AddIcon,
   Search as SearchIcon,
-  Edit as EditIcon,
   Visibility as VisibilityIcon,
 } from "@mui/icons-material";
 import axios from "axios";
@@ -59,17 +58,20 @@ export default function MeterReadingsList() {
         ...(search && { search }),
       });
 
-      const res = await axios.get(`${BASEURL}/get-meter-readings?${params}`, {
-        withCredentials: true,
-      });
+      const res = await axios.get(
+        `${BASEURL}/get-meter-readings?${params}`,
+        { withCredentials: true }
+      );
 
       const normalized = (res.data.data || []).map((item) => ({
         id: item.id,
+        type: item.type,
         meterId: item.meterId,
         serialNumber: item.meter?.serialNumber,
         connectionNumber: item.meter?.connection?.connectionNumber,
         previousReading: item.previousReading,
         currentReading: item.currentReading,
+        consumption: item.consumption,
         readingDate: item.readingDate,
         customerBalance: item.meter?.connection?.customerAccounts?.[0]?.balance,
         customerName: item.customer?.customerName,
@@ -79,10 +81,16 @@ export default function MeterReadingsList() {
       }));
 
       setReadings(normalized);
-      setPagination(res.data.pagination || { page: 1, limit: 20, total: 0 });
+
+      // Fix: use backend pagination fields
+      setPagination({
+        page: res.data.currentPage,
+        limit: pagination.limit,
+        total: res.data.total,
+      });
 
     } catch (err) {
-      console.error(err);
+      console.error("Fetch error:", err);
     } finally {
       setLoading(false);
     }
@@ -104,57 +112,24 @@ export default function MeterReadingsList() {
       renderCell: (params) => (
         <Tooltip title="View Details">
           <IconButton
-             color="theme.palette.primary.contrastText"
             size="small"
-            onClick={() => handleSelectReading(params?.row?.id)}
-
+            onClick={() => handleSelectReading(params.row.id)}
           >
             <VisibilityIcon fontSize="small" />
           </IconButton>
         </Tooltip>
       ),
     },
-    {
-      field: "meterId",
-      headerName: "Meter ID",
-      width: 110,
-    },
-    {
-      field: "connectionNumber",
-      headerName: "Connection No.",
-      width: 130,
-    },
-    {
-      field: "previousReading",
-      headerName: "Prev",
-      width: 110,
-    },
-    {
-      field: "currentReading",
-      headerName: "Current",
-      width: 110,
-    },
-    {
-      field: "readingDate",
-      headerName: "Reading Date",
-      width: 150,
-      
-    },
-    {
-      field: "customerName",
-      headerName: "Customer",
-      width: 180,
-    },
-    {
-      field: "phoneNumber",
-      headerName: "Phone",
-      width: 140,
-    },
-    {
-      field: "customerBalance",
-      headerName: "Balance",
-      width: 150,
-    },
+    { field: "meterId", headerName: "Meter ID", width: 110 },
+    { field: "type", headerName: "Type", width: 130 },
+    { field: "connectionNumber", headerName: "Connection No.", width: 130 },
+    { field: "previousReading", headerName: "Prev", width: 110 },
+    { field: "currentReading", headerName: "Current", width: 110 },
+    { field: "consumption", headerName: "Consumption", width: 110 },
+    { field: "readingDate", headerName: "Reading Date", width: 150 },
+    { field: "customerName", headerName: "Customer", width: 180 },
+    { field: "phoneNumber", headerName: "Phone", width: 140 },
+    { field: "customerBalance", headerName: "Balance", width: 150 },
   ];
 
   return (
@@ -198,18 +173,26 @@ export default function MeterReadingsList() {
               pageSize: pagination.limit,
             }}
             rowCount={pagination.total}
-            onPaginationModelChange={(m) =>
+            onPaginationModelChange={(model) =>
               setPagination({
                 ...pagination,
-                page: m.page + 1,
-                limit: m.pageSize,
+                page: model.page + 1,
+                limit: model.pageSize,
               })
             }
+            getRowClassName={(params) =>
+              params.row.type === "ESTIMATE" ? "estimated-row" : ""
+            }
+            sx={{
+              "& .estimated-row": {
+                color: "#f7e02b !important",
+              },
+            }}
           />
         </Paper>
       </Box>
 
-      {/* Right Sliding Details Panel */}
+      {/* Sliding Details Panel */}
       <Box
         sx={{
           position: "fixed",

@@ -209,7 +209,7 @@ const downloadBill = async (billId) => {
           </Box>
           <Box display="flex" justifyContent="space-between">
             <Typography variant="body2" color="text.secondary">
-              Closing Balance:
+              Closing Balance(At Bill Creation):
             </Typography>
             <Typography variant="body2">KES {closingBalance.toLocaleString()}</Typography>
           </Box>

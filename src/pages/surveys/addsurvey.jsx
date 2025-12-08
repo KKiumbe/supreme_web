@@ -13,7 +13,7 @@ import {
 import axios from "axios";
 import { useAuthStore } from "../../store/authStore";
 import { useNavigate } from "react-router-dom";
-import SimpleAssignTaskDialog from "../../components/tasks/simpleTasks";
+import AssignSurveyTaskDialog from "../../components/tasks/surveyTask";
 
 const API_URL = import.meta.env.VITE_BASE_URL || "";
 
@@ -464,7 +464,7 @@ const CreateSurvey = ({ theme }) => {
         )}
 
         {stage === 2 && (
-          <SimpleAssignTaskDialog
+          <AssignSurveyTaskDialog
             open={taskDialogOpen}
             onClose={() => {
               setTaskDialogOpen(false);

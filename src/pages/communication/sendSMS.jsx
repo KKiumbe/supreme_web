@@ -1,374 +1,208 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from "react";
 import {
-  Tabs, Tab, Box, TextField, Button, Typography, Autocomplete,
-  MenuItem, Select, InputLabel, FormControl, Container, CircularProgress,
-  Snackbar, Alert,
-} from '@mui/material';
-import { getTheme } from '../../store/theme';
-import axios from 'axios';
-import TitleComponent from '../../components/title';
-import { useAuthStore } from '../../store/authStore';
+  Box,
+  Typography,
+  Button,
+  TextField,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
+  Grid,
+  CircularProgress,
+  Alert,
+  Container,
+  Paper,
+  Stack,
+} from "@mui/material";
+import axios from "axios";
 
-function SmsScreen() {
-  const { currentUser } = useAuthStore();
-  const [tabValue, setTabValue] = useState(0);
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [message, setMessage] = useState('');
-  const [landlordID, setLandlordID] = useState('');
-  const [buildingID, setBuildingID] = useState('');
-  const [landlords, setLandlords] = useState([]);
-  const [buildings, setBuildings] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+const BASEURL = import.meta.env.VITE_BASE_URL;
+
+export default function SmsScreen() {
+  const [schemes, setSchemes] = useState([]);
+  const [zones, setZones] = useState([]);
+  const [routes, setRoutes] = useState([]);
+
+  const [selectedScheme, setSelectedScheme] = useState("");
+  const [selectedZone, setSelectedZone] = useState("");
+  const [selectedRoute, setSelectedRoute] = useState("");
+  const [sendToAll, setSendToAll] = useState(true);
+
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [response, setResponse] = useState(null);
 
-  const theme = getTheme();
-  const BASE_URL = import.meta.env.VITE_BASE_URL;
-
-  // Fetch landlords and buildings
   useEffect(() => {
-    const fetchData = async () => {
-      if (!currentUser) return;
-      setLoading(true);
+    const fetchSchemes = async () => {
       try {
-        const [landlordsRes, buildingsRes] = await Promise.all([
-          axios.get(`${BASE_URL}/landlords`, { withCredentials: true }),
-          axios.get(`${BASE_URL}/buildings`, { params: { limit: 100 }, withCredentials: true }),
-        ]);
-        setLandlords(landlordsRes.data.landlords || []);
-        setBuildings(buildingsRes.data.buildings || []);
+        const res = await axios.get(`${BASEURL}/schemes`, { withCredentials: true });
+        setSchemes(res.data.data || []);
       } catch (err) {
-        setSnackbar({ open: true, message: 'Failed to fetch landlords or buildings', severity: 'error' });
-      } finally {
-        setLoading(false);
+        console.error(err);
       }
     };
-    fetchData();
-  }, [currentUser]);
+    fetchSchemes();
+  }, []);
 
-  const resetFields = () => {
-    setPhoneNumber('');
-    setMessage('');
-    setLandlordID('');
-    setBuildingID('');
-    setSearchQuery('');
-    setSearchResults([]);
-  };
-
-  const handleTabChange = (event, newValue) => {
-    setTabValue(newValue);
-    resetFields();
-  };
-
-  const handleSearchChange = (event, value) => {
-    setSearchQuery(value);
-    if (/^\d+$/.test(value) || value.length < 2) {
-      setSearchResults([]);
-      return;
+  useEffect(() => {
+    if (selectedScheme) {
+      const scheme = schemes.find((s) => s.id === selectedScheme);
+      setZones(scheme?.zones || []);
+      setSelectedZone("");
+      setRoutes([]);
+      setSelectedRoute("");
     }
-    fetchSearchResults();
-  };
+  }, [selectedScheme]);
 
-  const fetchSearchResults = async () => {
-    setIsSearching(true);
-    try {
-      const { data } = await axios.get(`${BASE_URL}/search-customer-by-name`, {
-        params: { name: searchQuery },
-        withCredentials: true,
-      });
-      setSearchResults(data.customers || data);
-    } catch (error) {
-      console.error('Error fetching search results:', error);
-      setSearchResults([]);
-      setSnackbar({ open: true, message: 'Failed to fetch customers', severity: 'error' });
-    } finally {
-      setIsSearching(false);
+  useEffect(() => {
+    if (selectedZone) {
+      const zone = zones.find((z) => z.id === selectedZone);
+      setRoutes(zone?.routes || []);
+      setSelectedRoute("");
     }
-  };
+  }, [selectedZone]);
 
-  const handleSend = async (type) => {
+  const handleSendSMS = async () => {
     if (!message) {
-      setSnackbar({ open: true, message: 'Please enter a message', severity: 'error' });
+      setResponse("Please enter a message.");
       return;
-    }
-
-    let url, body;
-    if (type === 'single' || type === 'new') {
-      if (!phoneNumber) {
-        setSnackbar({ open: true, message: 'Please enter a phone number', severity: 'error' });
-        return;
-      }
-      url = `${BASE_URL}/send-sms`;
-      body = { mobile: phoneNumber, message };
-    } else if (type === 'all') {
-      url = `${BASE_URL}/send-to-all`;
-      body = { message };
-    } else if (type === 'group') {
-      if (!landlordID && !buildingID) {
-        setSnackbar({ open: true, message: 'Please select a landlord or building', severity: 'error' });
-        return;
-      }
-      url = `${BASE_URL}/send-to-group`;
-      body = { message };
-      if (landlordID) body.landlordID = landlordID;
-      if (buildingID) body.buildingID = buildingID;
     }
 
     setLoading(true);
+    setResponse(null);
+
     try {
-      const response = await axios.post(url, body, {
-        withCredentials: true,
-      });
-      setSnackbar({
-        open: true,
-        message: response.data.message || `${type.charAt(0).toUpperCase() + type.slice(1)} SMS sent successfully!`,
-        severity: 'success',
-      });
-      resetFields();
-    } catch (error) {
-      console.error('Error sending SMS:', error);
-      setSnackbar({
-        open: true,
-        message: error.response?.data?.error || 'Failed to send SMS. Please try again.',
-        severity: 'error',
-      });
+      let url = "";
+      if (sendToAll) {
+        url = `${BASEURL}/send-sms-to-all`;
+      } else if (selectedScheme && !selectedZone && !selectedRoute) {
+        url = `${BASEURL}/send-sms-by-scheme/${selectedScheme}`;
+      } else if (selectedZone && !selectedRoute) {
+        url = `${BASEURL}/send-sms-by-zone/${selectedZone}`;
+      } else if (selectedRoute) {
+        url = `${BASEURL}/send-sms-by-route/${selectedRoute}`;
+      } else {
+        setResponse("Please select scheme/zone/route or choose 'All Customers'");
+        setLoading(false);
+        return;
+      }
+
+      await axios.post(url, { message }, { withCredentials: true });
+      setResponse("SMS sent successfully!");
+    } catch (err) {
+      console.error(err);
+      setResponse("Failed to send SMS.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Container
-      sx={{
-        ml: { xs: 10, sm: 20 },
-        width: '100%',
-      }}
-    >
-      <Typography
-        variant="h4"
-        sx={{ color: theme.palette.primary.contrastText, mb: 2 }}
-      >
-        <TitleComponent title="SMS Center" />
-      </Typography>
+    <Container maxWidth="md" sx={{ mt: 6,ml:20, minWidth: 600 }}>
+      <Paper elevation={3} sx={{ p: { xs: 2, sm: 4 } }}>
+        <Typography variant="h5" mb={3} textAlign="center">
+          Filter to Send Bulk SMS
+        </Typography>
 
-      <Box
-        sx={{
-          maxWidth: '100%',
-          ml: { xs: 0, sm: 2 },
-          mt: 4,
-          p: 3,
-          borderRadius: 2,
-        }}
-      >
-      <Tabs
-  value={tabValue}
-  onChange={handleTabChange}
-  variant="scrollable"
-  scrollButtons="auto"
-  aria-label="sms tabs"
-  sx={{
-    mb: 3,
-    border: `1px solid ${theme.palette.primary.light}`,
-    borderRadius: 2,
-    '& .MuiTab-root': { color: theme.palette.primary.contrastText },
-    '& .Mui-selected': { color: theme.palette.primary.contrastText },
-  }}
->
-  <Tab label="Single SMS" />
-  <Tab label="New Customer SMS" />
-  <Tab label="All Customers" />
-  <Tab label="Group SMS" />
-</Tabs>
-
-        <Box>
-          {tabValue === 0 && (
-            <>
-              <Autocomplete
-                freeSolo
-                options={searchResults}
-                getOptionLabel={(option) => `${option.firstName} ${option.lastName} (${option.phoneNumber})`}
-                onInputChange={handleSearchChange}
-                onChange={(event, value) => setPhoneNumber(value ? value.phoneNumber : '')}
-                loading={isSearching}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Search Customer by Name"
-                    fullWidth
-                    margin="normal"
-                    sx={{ bgcolor: theme.palette.primary.light }}
-                    InputProps={{
-                      ...params.InputProps,
-                      endAdornment: (
-                        <>
-                          {isSearching ? <CircularProgress color="primary" size={20} /> : null}
-                          {params.InputProps.endAdornment}
-                        </>
-                      ),
-                    }}
-                  />
-                )}
-              />
-              <TextField
-                label="Phone Number"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                fullWidth
-                margin="normal"
-               
-              />
-              <TextField
-                label="Message"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                fullWidth
-                multiline
-                rows={4}
-                margin="normal"
-              
-              />
-              <Button
-                variant="contained"
-                onClick={() => handleSend('single')}
-                sx={{ mt: 2, bgcolor: theme.palette.greenAccent.main }}
-                disabled={loading}
-              >
-                {loading ? <CircularProgress size={24} /> : 'Send SMS'}
-              </Button>
-            </>
-          )}
-          {tabValue === 1 && (
-            <>
-              <TextField
-                label="Phone Number"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                fullWidth
-                margin="normal"
-                required
-              
-              />
-              <TextField
-                label="Message"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                fullWidth
-                multiline
-                rows={4}
-                margin="normal"
-                required
-              
-              />
-              <Button
-                variant="contained"
-                onClick={() => handleSend('new')}
-                sx={{ mt: 2, bgcolor: theme.palette.greenAccent.main }}
-                disabled={loading}
-              >
-                {loading ? <CircularProgress size={24} /> : 'Send SMS'}
-              </Button>
-            </>
-          )}
-          {tabValue === 2 && (
-            <>
-              <TextField
-                label="Message"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                fullWidth
-                multiline
-                rows={4}
-                margin="normal"
-                sx={{ bgcolor: theme.palette.primary.light }}
-              />
-              <Button
-                variant="contained"
-                onClick={() => handleSend('all')}
-                sx={{ mt: 2, bgcolor: theme.palette.greenAccent.main }}
-                disabled={loading}
-              >
-                {loading ? <CircularProgress size={24} /> : 'Send to All'}
-              </Button>
-            </>
-          )}
-          {tabValue === 3 && (
-            <>
-              <FormControl fullWidth margin="normal">
-                <InputLabel >
-                  Select Landlord (Optional)
-                </InputLabel>
+        <Stack spacing={3}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel>Scheme</InputLabel>
                 <Select
-                  value={landlordID}
-                  onChange={(e) => setLandlordID(e.target.value)}
-                  label="Select Landlord (Optional)"
-                  
+                  value={selectedScheme}
+                  onChange={(e) => {
+                    setSelectedScheme(e.target.value);
+                    setSendToAll(false);
+                  }}
+                  label="Scheme"
                 >
-                  <MenuItem value=""><em>None</em></MenuItem>
-                  {landlords.map((landlord) => (
-                    <MenuItem key={landlord.id} value={landlord.id}>
-                      {landlord.name || `${landlord.firstName} ${landlord.lastName}`}
+                  <MenuItem value="">Select Scheme</MenuItem>
+                  {schemes.map((s) => (
+                    <MenuItem key={s.id} value={s.id}>
+                      {s.name}
                     </MenuItem>
                   ))}
                 </Select>
               </FormControl>
-              <FormControl fullWidth margin="normal">
-                <InputLabel >
-                  Select Building (Optional)
-                </InputLabel>
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth disabled={!selectedScheme}>
+                <InputLabel>Zone</InputLabel>
                 <Select
-                  value={buildingID}
-                  onChange={(e) => setBuildingID(e.target.value)}
-                  label="Select Building (Optional)"
-                 
+                  value={selectedZone}
+                  onChange={(e) => setSelectedZone(e.target.value)}
+                  label="Zone"
                 >
-                  <MenuItem value=""><em>None</em></MenuItem>
-                  {buildings.map((building) => (
-                    <MenuItem key={building.id} value={building.id}>
-                      {building.buildingName}
+                  <MenuItem value="">Select Zone</MenuItem>
+                  {zones.map((z) => (
+                    <MenuItem key={z.id} value={z.id}>
+                      {z.name}
                     </MenuItem>
                   ))}
                 </Select>
               </FormControl>
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth disabled={!selectedZone}>
+                <InputLabel>Route</InputLabel>
+                <Select
+                  value={selectedRoute}
+                  onChange={(e) => setSelectedRoute(e.target.value)}
+                  label="Route"
+                >
+                  <MenuItem value="">Select Route</MenuItem>
+                  {routes.map((r) => (
+                    <MenuItem key={r.id} value={r.id}>
+                      {r.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
               <TextField
                 label="Message"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                fullWidth
                 multiline
                 rows={4}
-                margin="normal"
-                
+                fullWidth
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Dear {{customerName}}, your latest bill is {{billAmount}} KES."
               />
-              <Button
-                variant="contained"
-                onClick={() => handleSend('group')}
-                sx={{ mt: 2, bgcolor: theme.palette.greenAccent.main }}
-                disabled={loading || (!landlordID && !buildingID)}
-              >
-                {loading ? <CircularProgress size={24} /> : 'Send to Group'}
-              </Button>
-            </>
-          )}
-        </Box>
-      </Box>
+            </Grid>
+          </Grid>
 
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-      >
-        <Alert
-          onClose={() => setSnackbar({ ...snackbar, open: false })}
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+          {response && <Alert severity="info">{response}</Alert>}
+
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2} justifyContent="flex-start">
+            <Button
+              variant="contained"
+              onClick={handleSendSMS}
+              disabled={loading}
+              startIcon={loading && <CircularProgress size={20} />}
+            >
+              Send SMS
+            </Button>
+
+            <Button
+              variant={sendToAll ? "contained" : "outlined"}
+              onClick={() => {
+                setSendToAll(true);
+                setSelectedScheme("");
+                setSelectedZone("");
+                setSelectedRoute("");
+              }}
+            >
+              Send to All Customers
+            </Button>
+          </Stack>
+        </Stack>
+      </Paper>
     </Container>
   );
 }
-
-export default SmsScreen;

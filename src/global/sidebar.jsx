@@ -223,9 +223,9 @@ const Sidebar = () => {
 
         {renderSubmenu("tasks", [
           { icon: <Assignment sx={{ fontSize: 20 }} />, label: "Task Board", path: "/tasks" },
-          { icon: <Add sx={{ fontSize: 20 }} />, label: "Create Task", path: "/tasks/create" },
+          //{ icon: <Add sx={{ fontSize: 20 }} />, label: "Create Task", path: "/tasks/create" },
           { icon: <ReceiptLong sx={{ fontSize: 20 }} />, label: "Task Types", path: "/tasks/types" },
-          { icon: <AttachMoney sx={{ fontSize: 20 }} />, label: "Attachments", path: "/tasks/attachments" },
+          //{ icon: <AttachMoney sx={{ fontSize: 20 }} />, label: "Attachments", path: "/tasks/attachments" },
         ])}
 
         {/* COMMUNICATION */}
@@ -241,7 +241,7 @@ const Sidebar = () => {
           { icon: <Chat sx={{ fontSize: 20 }} />, label: "Sent SMS", path: "/sent-sms" },
           { icon: <Send sx={{ fontSize: 20 }} />, label: "Send SMS", path: "/send-sms" },
           { icon: <Receipt sx={{ fontSize: 20 }} />, label: "Send Bills", path: "/send-bills" },
-          { icon: <MonetizationOn sx={{ fontSize: 20 }} />, label: "Debt Mgmt", path: "/debt-management" },
+          
         ])}
 
         {/* REPORTS */}

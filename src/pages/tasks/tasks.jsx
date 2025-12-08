@@ -8,7 +8,6 @@ import {
   TextField,
   MenuItem,
   IconButton,
- 
   useMediaQuery,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
@@ -26,40 +25,50 @@ const API_URL = import.meta.env.VITE_BASE_URL;
 const TaskBoard = () => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(0); // DataGrid pages start at 0
+  const [limit, setLimit] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+
   const [filter, setFilter] = useState({ status: "", search: "" });
+
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState(null);
+
   const theme = getTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   // Flatten task data
   const flattenTask = (task) => ({
     ...task,
-    typeName: task.Type?.name || "-", // Flatten Type.name
+    typeName: task.Type?.name || "-",
     assigneeName: task.Assignee
       ? `${task.Assignee.firstName} ${task.Assignee.lastName}`
-      : "Unassigned", // Flatten Assignee
+      : "Unassigned",
     createdByName: task.CreatedByUser
       ? `${task.CreatedByUser.firstName} ${task.CreatedByUser.lastName}`
-      : "Unknown", // Flatten CreatedByUser
-
-      
+      : "Unknown",
   });
 
-  // Fetch tasks
+  // Fetch tasks with pagination
   const fetchTasks = async () => {
     setLoading(true);
     try {
       const response = await axios.get(`${API_URL}/get-tasks`, {
         withCredentials: true,
-        params: filter.status ? { status: filter.status } : {},
+        params: {
+          page: page + 1, // backend expects 1-based page
+          limit,
+          status: filter.status || undefined,
+        },
       });
-      // Flatten tasks before setting state
-      const flattenedTasks = (response.data || []).map(flattenTask);
-      setTasks(flattenedTasks);
+
+      const paginated = response.data;
+
+      setTasks(paginated.data.map(flattenTask));
+      setTotalItems(paginated.pagination.totalItems);
     } catch (error) {
       console.error("Error fetching tasks:", error);
     } finally {
@@ -67,7 +76,7 @@ const TaskBoard = () => {
     }
   };
 
-  // Fetch task details (keep original nested structure for TaskDetails)
+  // Fetch task details
   const fetchTaskDetails = async (taskId) => {
     setDetailsLoading(true);
     setDetailsError(null);
@@ -89,9 +98,9 @@ const TaskBoard = () => {
 
   useEffect(() => {
     fetchTasks();
-  }, [filter.status]);
+  }, [page, limit, filter.status]);
 
-  // Status and priority colors
+  // Status and priority chip colors
   const getStatusColor = (status) =>
     ({
       PENDING: "warning",
@@ -109,7 +118,6 @@ const TaskBoard = () => {
       CRITICAL: "secondary",
     }[priority] || "default");
 
-  // Filter and search handlers
   const handleSearch = (e) => {
     setFilter((prev) => ({ ...prev, search: e.target.value }));
   };
@@ -118,7 +126,6 @@ const TaskBoard = () => {
     task.title.toLowerCase().includes(filter.search.toLowerCase())
   );
 
-  // Dialog handlers
   const openAssignDialog = (taskId = null) => {
     setSelectedTaskId(taskId);
     setAssignDialogOpen(true);
@@ -134,7 +141,6 @@ const TaskBoard = () => {
     fetchTasks();
   };
 
-  // Handle task selection
   const handleSelectTask = (taskId) => {
     if (selectedTaskId === taskId) {
       setSelectedTaskId(null);
@@ -145,55 +151,41 @@ const TaskBoard = () => {
     }
   };
 
-  // Handle close details
   const handleCloseDetails = () => {
     setSelectedTaskId(null);
     setSelectedTask(null);
     setDetailsError(null);
   };
 
-  // DataGrid columns
+  // Columns
   const columns = [
-     {
+    {
       field: "actions",
-      headerName: "Actions",
-      width: 20,
+      headerName: "View",
+      width: 60,
       align: "center",
-
-        renderCell: (params) => (
-                <IconButton
-                  color="primary"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSelectTask(params.row.id);
-                  }}
-                >
-                  <Visibility />
-                </IconButton>
-              ),
-     
-  
-     
+      renderCell: (params) => (
+        <IconButton
+          color="primary"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSelectTask(params.row.id);
+          }}
+        >
+          <Visibility />
+        </IconButton>
+      ),
     },
-    {
-      field: "title",
-      headerName: "Title",
-      width: 200,
-     
-    },
-    {
-      field: "typeName",
-      headerName: "Type",
-      width: 150,
-    },
+    { field: "title", headerName: "Title", width: 200 },
+    { field: "typeName", headerName: "Type", width: 150 },
     {
       field: "priority",
       headerName: "Priority",
-      width: 100,
+      width: 120,
       renderCell: (params) => (
         <Chip
-          label={params?.row?.priority}
-          color={getPriorityColor(params.row.priority)}
+          label={params.row.priority}
+          color={getPriorityColor(params?.row?.priority)}
           size="small"
         />
       ),
@@ -201,39 +193,33 @@ const TaskBoard = () => {
     {
       field: "status",
       headerName: "Status",
-      width: 100,
+      width: 120,
       renderCell: (params) => (
         <Chip
           label={params?.row?.status}
-          color={getStatusColor(params.row.status)}
+          color={getStatusColor(params?.row?.status)}
           size="small"
         />
       ),
     },
-    {
-      field: "assigneeName",
-      headerName: "Assignee",
-      width: 150,
-    },
-    {
-      field: "createdByName",
-      headerName: "Created By",
-      width: 150,
-    },
+    { field: "assigneeName", headerName: "Assignee", width: 180 },
+    { field: "createdByName", headerName: "Created By", width: 180 },
     {
       field: "dueDate",
       headerName: "Due Date",
-      width: 120,
+      width: 150,
       valueGetter: (params) =>
-        params?.row?.dueDate ? dayjs(params?.row?.dueDate).format("MMM D, YYYY") : "-",
+        params?.row?.dueDate
+          ? dayjs(params?.row?.dueDate).format("MMM D, YYYY")
+          : "-",
     },
     {
       field: "createdAt",
       headerName: "Created At",
-      width: 120,
-      valueGetter: (params) => dayjs(params?.row?.createdAt).format("MMM D, YYYY"),
+      width: 150,
+      valueGetter: (params) =>
+        dayjs(params?.row?.createdAt).format("MMM D, YYYY"),
     },
-   
   ];
 
   return (
@@ -247,13 +233,11 @@ const TaskBoard = () => {
         maxWidth: "100vw",
       }}
     >
-      {/* Left Side: Task List */}
+      {/* Left Side */}
       <Box
         sx={{
           flex: isMobile ? "1" : selectedTask ? "0 0 50%" : "1",
           transition: "flex 0.3s ease",
-          overflow: "auto",
-          mb: isMobile && selectedTask ? 2 : 0,
         }}
       >
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
@@ -296,13 +280,12 @@ const TaskBoard = () => {
             <MenuItem value="">All</MenuItem>
             {["PENDING", "ASSIGNED", "IN_PROGRESS", "COMPLETED", "FAILED"].map((status) => (
               <MenuItem key={status} value={status}>
-                {status.charAt(0) + status.slice(1).toLowerCase()}
+                {status}
               </MenuItem>
             ))}
           </TextField>
         </Box>
 
-        {/* Data Grid */}
         <Paper sx={{ p: 1, height: "calc(100% - 120px)" }}>
           {loading ? (
             <Box display="flex" justifyContent="center" alignItems="center" p={5}>
@@ -312,12 +295,19 @@ const TaskBoard = () => {
             <DataGrid
               rows={filteredTasks}
               columns={columns}
-              pageSize={10}
+              pagination
+              paginationMode="server"
+              rowCount={totalItems}
+              page={page}
+              pageSize={limit}
+              onPageChange={(newPage) => setPage(newPage)}
+              onPageSizeChange={(newLimit) => {
+                setLimit(newLimit);
+                setPage(0); // reset to page 0
+              }}
               rowsPerPageOptions={[10, 25, 50]}
-              onRowClick={(params) => handleSelectTask(params.row.id)}
-              disableSelectionOnClick
-              sx={{ height: "100%" }}
               getRowId={(row) => row.id}
+              sx={{ height: "100%" }}
             />
           )}
         </Paper>
@@ -329,7 +319,6 @@ const TaskBoard = () => {
           flex: isMobile ? "1" : selectedTask ? "0 0 500px" : "0 0 0",
           transition: "flex 0.3s ease",
           overflow: "auto",
-          //borderLeft: !isMobile && selectedTask ? `1px solid ${theme.palette.divider}` : "none",
           display: selectedTask || isMobile ? "block" : "none",
         }}
       >
@@ -340,11 +329,7 @@ const TaskBoard = () => {
         ) : detailsError ? (
           <Box sx={{ p: 3 }}>
             <Typography color="error">{detailsError}</Typography>
-            <Button
-              variant="outlined"
-              onClick={handleCloseDetails}
-              sx={{ mt: 2 }}
-            >
+            <Button variant="outlined" onClick={handleCloseDetails} sx={{ mt: 2 }}>
               Close
             </Button>
           </Box>
@@ -357,7 +342,6 @@ const TaskBoard = () => {
         )}
       </Box>
 
-      {/* Assign Task Dialog */}
       <AssignTaskDialog
         open={assignDialogOpen}
         onClose={closeAssignDialog}

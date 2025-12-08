@@ -10,36 +10,25 @@ import {
   Autocomplete,
   MenuItem,
 } from '@mui/material';
-import { debounce } from 'lodash'; // Install lodash for debouncing
+import { debounce } from 'lodash';
 import { useNavigate } from 'react-router-dom';
 import { getTheme } from '../../store/theme';
 import { useAuthStore } from '../../store/authStore';
 
-// ModeOfPayment options for selection
 const ModeOfPayment = {
   CASH: 'CASH',
-   BANK_TRANSFER: 'BANK_TRANSFER',
+  BANK_TRANSFER: 'BANK_TRANSFER',
   MPESA: 'MPESA',
   AIRTELMONEY: 'AIRTELMONEY',
-  // Add other modes as needed
 };
 
 const BASEURL = import.meta.env?.VITE_BASE_URL || '';
 
 const CreatePayment = () => {
-  // Type definitions
-  /**
-   * @typedef {Object} Customer
-   * @property {string} id
-   * @property {string} customerName
-   * @property {string} accountNumber
-   * @property {string} [phoneNumber]
-   */
-
-  // State
   const [customers, setCustomers] = useState([]);
   const [filteredCustomers, setFilteredCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [selectedConnection, setSelectedConnection] = useState(null);
   const [totalAmount, setTotalAmount] = useState('');
   const [modeOfPayment, setModeOfPayment] = useState('');
   const [paidBy, setPaidBy] = useState('');
@@ -49,26 +38,22 @@ const CreatePayment = () => {
 
   const navigate = useNavigate();
   const theme = getTheme();
+  const { currentUser } = useAuthStore();
 
-    const { currentUser } = useAuthStore();
-  
+  useEffect(() => {
+    if (!currentUser) {
+      navigate('/login');
+    }
+  }, [currentUser, navigate]);
 
-  
-  
-        useEffect(() => {
-          if (!currentUser) {
-            navigate("/login");
-          }
-        }, [currentUser, navigate]);
-
-  // Fetch customers
+  // Fetch all customers initially
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
         const res = await axios.get(`${BASEURL}/customers`, { withCredentials: true });
         const fetchedCustomers = res.data?.data?.customers || [];
         setCustomers(fetchedCustomers);
-        setFilteredCustomers(fetchedCustomers); // Initially, show all customers
+        setFilteredCustomers(fetchedCustomers);
       } catch (err) {
         console.error(err);
         setMessage('Failed to load customers.');
@@ -77,10 +62,8 @@ const CreatePayment = () => {
     fetchCustomers();
   }, []);
 
-
-
-  // Debounced search function
-  const fetchCustomers = useCallback(
+  // Debounced search
+  const fetchCustomersSearch = useCallback(
     debounce(async (query) => {
       if (query.trim() === '') {
         setFilteredCustomers(customers);
@@ -96,34 +79,47 @@ const CreatePayment = () => {
       } catch (err) {
         console.error(err);
         setMessage('Failed to search customers.');
-        setFilteredCustomers(customers); // Fallback to all customers
+        setFilteredCustomers(customers);
       }
     }, 300),
     [customers]
   );
 
-  // Handle search input change
   const handleSearch = (event, value) => {
     setSearchQuery(value);
-    fetchCustomers(value);
+    fetchCustomersSearch(value);
   };
 
   // Handle customer selection
   const handleCustomerSelect = (event, value) => {
     setSelectedCustomer(value);
+    setSelectedConnection(null);
+
+    if (value?.connections?.length === 1) {
+      // Auto-select single connection
+      setSelectedConnection(value.connections[0]);
+    }
   };
 
   // Submit payment
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (!selectedCustomer) {
       setMessage('Please select a customer.');
       return;
     }
+
+    if (!selectedConnection) {
+      setMessage('Please select a connection for this customer.');
+      return;
+    }
+
     if (!totalAmount || !modeOfPayment || !paidBy) {
       setMessage('Please fill in all required fields.');
       return;
     }
+
     const paymentAmount = parseFloat(totalAmount);
     if (isNaN(paymentAmount) || paymentAmount <= 0) {
       setMessage('Invalid payment amount. Must be a positive number.');
@@ -135,9 +131,9 @@ const CreatePayment = () => {
 
     try {
       const payload = {
-        customerId: selectedCustomer.id,
+        connectionId: selectedConnection.id, // IMPORTANT
         totalAmount: paymentAmount,
-        modeOfPayment: modeOfPayment,
+        modeOfPayment,
         paidBy,
       };
 
@@ -147,11 +143,12 @@ const CreatePayment = () => {
 
       setMessage(res.data?.message || 'Payment created successfully!');
       setSelectedCustomer(null);
+      setSelectedConnection(null);
       setTotalAmount('');
       setModeOfPayment('');
       setPaidBy('');
       setSearchQuery('');
-      setFilteredCustomers(customers); // Reset filtered customers
+      setFilteredCustomers(customers);
     } catch (err) {
       console.error(err);
       const errorMessage =
@@ -173,7 +170,8 @@ const CreatePayment = () => {
 
         <form onSubmit={handleSubmit}>
           <Grid container spacing={2}>
-            {/* Customer Search with Autocomplete */}
+
+            {/* CUSTOMER SEARCH */}
             <Grid item xs={12} sm={6}>
               <Autocomplete
                 options={filteredCustomers}
@@ -190,7 +188,6 @@ const CreatePayment = () => {
                     {...params}
                     fullWidth
                     label="Search Customer (Name, Phone, Account)"
-                    placeholder="Enter name, phone, or account number"
                     required
                   />
                 )}
@@ -199,7 +196,46 @@ const CreatePayment = () => {
               />
             </Grid>
 
-            {/* Mode of Payment */}
+            {/* CONNECTION SELECTION */}
+            {selectedCustomer && selectedCustomer.connections?.length > 1 && (
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  select
+                  fullWidth
+                  label="Select Connection"
+                  value={selectedConnection?.id || ''}
+                  onChange={(e) => {
+                    const conn = selectedCustomer.connections.find(
+                      (c) => c.id === Number(e.target.value)
+                    );
+                    setSelectedConnection(conn);
+                  }}
+                  required
+                >
+                  {selectedCustomer.connections.map((conn) => (
+                    <MenuItem key={conn.id} value={conn.id}>
+                      {`Conn #${conn.connectionNumber} — ${conn.tariffCategory?.name}`}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+            )}
+
+            {/* READONLY CONNECTION DISPLAY (when only 1) */}
+            {selectedCustomer && selectedCustomer.connections?.length === 1 && (
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Connection"
+                  value={`Conn #${selectedCustomer.connections[0].connectionNumber} — ${
+                    selectedCustomer.connections[0].tariffCategory?.name
+                  }`}
+                  disabled
+                />
+              </Grid>
+            )}
+
+            {/* MODE OF PAYMENT */}
             <Grid item xs={12} sm={6}>
               <TextField
                 select
@@ -217,7 +253,7 @@ const CreatePayment = () => {
               </TextField>
             </Grid>
 
-            {/* Total Amount */}
+            {/* TOTAL AMOUNT */}
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
@@ -230,7 +266,7 @@ const CreatePayment = () => {
               />
             </Grid>
 
-            {/* Paid By */}
+            {/* PAID BY */}
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
@@ -241,18 +277,13 @@ const CreatePayment = () => {
               />
             </Grid>
 
-            {/* Submit */}
+            {/* SUBMIT */}
             <Grid item xs={12}>
-              <Button
-                type="submit"
-                variant="contained"
-                fullWidth
-                disabled={loading}
-                sx={{ mt: 2 }}
-              >
+              <Button type="submit" variant="contained" fullWidth disabled={loading} sx={{ mt: 2 }}>
                 {loading ? 'Processing...' : 'Create Payment'}
               </Button>
             </Grid>
+
           </Grid>
         </form>
 

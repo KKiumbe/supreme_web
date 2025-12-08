@@ -29,7 +29,7 @@ import ReceiptDetail from "./pages/receipts/receiptDetails";
 import SentSMSPage from "./pages/communication/sentSMS";
 import SmsScreen from "./pages/communication/sendSMS";
 import SendBillsScreen from "./pages/communication/sendBills";
-import DebtManager from "./pages/communication/debtManager";
+
 import ReportScreen from "./pages/reports/reports";
 import ComingSoonPage from "./pages/comingSoon/comingSoon";
 import CustomerEditScreen from "./pages/customers/editCustomers";
@@ -65,6 +65,7 @@ import ApprovedCustomersScreen from "./pages/customers/assignMeter/assignMeter";
 import CreateSurvey from "./pages/surveys/addsurvey";
 import CreateCustomerScreen from "./pages/customers/addCustomer";
 import AdjustmentsList from "./pages/billing/adjustment/adjustment";
+import TaskTypesScreen from "./pages/tasks/tasksTypes";
 
 const App = () => {
   const { darkMode } = useThemeStore();
@@ -330,14 +331,7 @@ const App = () => {
                     </ProtectedRoute>
                   }
                 />
-                <Route
-                  path="/debt-management"
-                  element={
-                    <ProtectedRoute>
-                      <DebtManager />
-                    </ProtectedRoute>
-                  }
-                />
+            
                 <Route
                   path="/view-reports"
                   element={
@@ -487,6 +481,15 @@ const App = () => {
                   element={
                     <ProtectedRoute>
                       <TaskBoard />
+                    </ProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="tasks/types"
+                  element={
+                    <ProtectedRoute>
+                      <TaskTypesScreen />
                     </ProtectedRoute>
                   }
                 />

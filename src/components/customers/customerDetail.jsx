@@ -8,6 +8,7 @@ import {
   Alert,
   useMediaQuery,
   IconButton,
+  TextField,
 } from "@mui/material";
 import { Close } from "@mui/icons-material";
 import axios from "axios";
@@ -22,6 +23,7 @@ const CustomerDetails = ({ customerId, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "error" });
+  const [smsMessage, setSmsMessage] = useState("");
 
   const theme = getTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -61,9 +63,7 @@ const CustomerDetails = ({ customerId, onClose }) => {
   };
 
   useEffect(() => {
-    if (customerId) {
-      fetchCustomerDetails();
-    }
+    if (customerId) fetchCustomerDetails();
   }, [customerId]);
 
   // Status colors
@@ -77,6 +77,37 @@ const CustomerDetails = ({ customerId, onClose }) => {
       CONVERTED: "secondary",
       PENDING_CONNECTION: "warning",
     }[status] || "default");
+
+  // --- Send SMS ---
+  const handleSendSms = async () => {
+    if (!smsMessage.trim()) {
+      setSnackbar({ open: true, message: "Please enter a message", severity: "warning" });
+      return;
+    }
+    try {
+      const res = await axios.post(`${API_URL}/send-sms-to-customer/${customerId}`, {  message: smsMessage }, { withCredentials: true });
+      if (res.data.success) {
+        setSnackbar({ open: true, message: "SMS sent successfully", severity: "success" });
+        setSmsMessage("");
+      } else {
+        setSnackbar({ open: true, message: "Failed to send SMS", severity: "error" });
+      }
+    } catch (err) {
+      setSnackbar({ open: true, message: "Error sending SMS: " + err.message, severity: "error" });
+    }
+  };
+  const handleSendBill = async () => {
+
+    const res = await axios.post(`${API_URL}/send-bills-to-connection/${customerId}`, {  message: smsMessage }, { withCredentials: true });
+    if (res.data.success) {
+      setSnackbar({ open: true, message: "SMS sent successfully", severity: "success" });
+      setSmsMessage("");
+    } else {
+      setSnackbar({ open: true, message: "Failed to send SMS", severity: "error" });
+    }
+    
+  }
+  // -----------------
 
   if (loading && !customer) {
     return (
@@ -93,16 +124,20 @@ const CustomerDetails = ({ customerId, onClose }) => {
         <Button variant="outlined" onClick={fetchCustomerDetails} sx={{ mt: 2, mr: 1 }}>
           Retry
         </Button>
-        <Button variant="outlined" onClick={onClose}    sx={{
-          mt: 2,
-          borderColor: (theme) => theme.palette.primary.main,
-          color: (theme) => theme.palette.primary.contrastText,
-          "&:hover": {
-            borderColor: (theme) => theme.palette.primary.dark,
-            backgroundColor: (theme) => theme.palette.primary.main,
+        <Button
+          variant="outlined"
+          onClick={onClose}
+          sx={{
+            mt: 2,
+            borderColor: (theme) => theme.palette.primary.main,
             color: (theme) => theme.palette.primary.contrastText,
-          },
-        }}>
+            "&:hover": {
+              borderColor: (theme) => theme.palette.primary.dark,
+              backgroundColor: (theme) => theme.palette.primary.main,
+              color: (theme) => theme.palette.primary.contrastText,
+            },
+          }}
+        >
           Close
         </Button>
         <Snackbar
@@ -144,7 +179,9 @@ const CustomerDetails = ({ customerId, onClose }) => {
         </Box>
 
         <Box mb={2}>
-          <Typography variant="subtitle1" fontWeight="bold">Personal Information</Typography>
+          <Typography variant="subtitle1" fontWeight="bold">
+            Personal Information
+          </Typography>
           <Typography><strong>Name:</strong> {customer.customerName || "-"}</Typography>
           <Typography><strong>Phone:</strong> {customer.phoneNumber || "-"}</Typography>
           <Typography><strong>Email:</strong> {customer.email || "-"}</Typography>
@@ -171,9 +208,7 @@ const CustomerDetails = ({ customerId, onClose }) => {
           {(customer.connections || []).length ? (
             customer.connections.map((conn, index) => (
               <Box key={conn.id} mb={2}>
-                <Typography variant="body2" fontWeight="bold">
-                  Connection {index + 1}
-                </Typography>
+                <Typography variant="body2" fontWeight="bold">Connection {index + 1}</Typography>
                 <Typography><strong>Connection Number:</strong> {conn.connectionNumber || "-"}</Typography>
                 <Typography component="div">
                   <strong>Status:</strong>{" "}
@@ -192,9 +227,7 @@ const CustomerDetails = ({ customerId, onClose }) => {
                       <Typography key={reading.id}>
                         <strong>Latest Reading:</strong>{" "}
                         {reading.currentReading || "-"} (
-                        {reading.readingDate
-                          ? dayjs(reading.readingDate).format("MMM D, YYYY")
-                          : "-"}
+                        {reading.readingDate ? dayjs(reading.readingDate).format("MMM D, YYYY") : "-"}
                         )
                       </Typography>
                     ))}
@@ -217,30 +250,41 @@ const CustomerDetails = ({ customerId, onClose }) => {
           <Typography><strong>Updated At:</strong> {customer.updatedAt || "-"}</Typography>
         </Box>
 
-        <Button variant="outlined" onClick={fetchCustomerDetails}    sx={{
-          mt: 2,
-          borderColor: (theme) => theme.palette.primary.main,
-          color: (theme) => theme.palette.primary.contrastText,
-          "&:hover": {
-            borderColor: (theme) => theme.palette.primary.dark,
-            backgroundColor: (theme) => theme.palette.primary.main,
-            color: (theme) => theme.palette.primary.contrastText,
-          },
-        }}>
-          Refresh
-        </Button>
-        <Button variant="outlined" onClick={onClose}   sx={{
-          mt: 2,
-          borderColor: (theme) => theme.palette.primary.main,
-          color: (theme) => theme.palette.primary.contrastText,
-          "&:hover": {
-            borderColor: (theme) => theme.palette.primary.dark,
-            backgroundColor: (theme) => theme.palette.primary.main,
-            color: (theme) => theme.palette.primary.contrastText,
-          },
-        }}>
-          Close
-        </Button>
+        {/* Send SMS Section */}
+
+
+        <Box mt={2}>
+
+             <Button variant="contained" color="primary" onClick={handleSendBill}>
+            Send Bill
+          </Button>
+          <TextField
+            label="SMS Message"
+            fullWidth
+            multiline
+            rows={2}
+            value={smsMessage}
+            onChange={(e) => setSmsMessage(e.target.value)}
+            variant="outlined"
+            sx={{ mb: 1 }}
+
+            
+          />
+
+          
+          <Button variant="contained" color="primary" onClick={handleSendSms}>
+            Send SMS
+          </Button>
+
+         
+        </Box>
+
+        <Box mt={2}>
+          <Button variant="outlined" onClick={fetchCustomerDetails} sx={{ mr: 1 }}>
+            Refresh
+          </Button>
+          <Button variant="outlined" onClick={onClose}>Close</Button>
+        </Box>
       </Box>
 
       <Snackbar

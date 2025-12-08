@@ -178,8 +178,8 @@ const BillList = () => {
     return bills.map((bill) => ({
       id: bill.id,
       billNumber: bill.billNumber || "-",
-      customerName: bill.customer?.customerName || "-",
-      phoneNumber: bill.customer?.phoneNumber || "-",
+      customerName: bill?.connection?.customer?.customerName || "-",
+      phoneNumber: bill.connection?.customer?.phoneNumber || "-",
       billAmount: bill.billAmount ? `KES ${bill.billAmount}` : "-",
       amountPaid: bill.amountPaid ? `KES ${bill.amountPaid}` : "-",
       closingBalance: bill.closingBalance ? `KES ${bill.closingBalance}` : "-",
@@ -214,7 +214,7 @@ const BillList = () => {
     { field: "phoneNumber", headerName: "Phone Number", width: 140 },
     { field: "billAmount", headerName: "Bill Amount", width: 120 },
     { field: "amountPaid", headerName: "Amount Paid", width: 120 },
-    { field: "closingBalance", headerName: "Closing Balance", width: 120 },
+    { field: "closingBalance", headerName: "Closing Balance(At invoiced)", width: 120 },
     {
       field: "status",
       headerName: "Status",

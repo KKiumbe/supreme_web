@@ -18,7 +18,7 @@ import dayjs from "dayjs";
 
 const API_URL = import.meta.env.VITE_BASE_URL;
 
-const AssignTaskDialog = ({ open, onClose, taskId, onAssigned, theme, connectionId, customerId }) => {
+const AssignTaskDialog = ({ open, onClose, taskId, onAssigned, theme }) => {
   const [users, setUsers] = useState([]);
   const [taskTypes, setTaskTypes] = useState([]);
   const [schemes, setSchemes] = useState([]);
@@ -180,18 +180,29 @@ const AssignTaskDialog = ({ open, onClose, taskId, onAssigned, theme, connection
     try {
       if (isCreateMode) {
         // Create task
-        const payload = {
-          TypeId: formData.TypeId,
-          title: formData.title,
-          description: formData.description,
-          priority: formData.priority,
-          dueDate: formData.dueDate || null,
-          scheduledAt: formData.dueDate || null,
-          AssignedTo: formData.AssignedTo,
-          ...(formData.RelatedConnectionId && { RelatedConnectionId: formData.RelatedConnectionId }),
-          ...(formData.zoneId && !formData.RelatedConnectionId && !formData.routeId && { zoneId: formData.zoneId }),
-          ...(formData.routeId && !formData.RelatedConnectionId && { routeId: formData.routeId }),
-        };
+const payload = {
+  TypeId: Number(formData.TypeId),
+  title: formData.title,
+  description: formData.description,
+  priority: formData.priority,
+  dueDate: formData.dueDate || null,
+  scheduledAt: formData.dueDate || null,
+  AssignedTo: Number(formData.AssignedTo),
+
+  RelatedConnectionId:
+    formData.RelatedConnectionId ? Number(formData.RelatedConnectionId) : null,
+
+  RelatedZoneId:
+    formData.zoneId && formData.zoneId !== "" ? Number(formData.zoneId) : null,
+
+  RelatedRouteId:
+    formData.routeId && formData.routeId !== "" ? Number(formData.routeId) : null,
+
+  RelatedSchemeId:
+    formData.schemeId && formData.schemeId !== "" ? Number(formData.schemeId) : null,
+};
+
+
         const { data } = await axios.post(`${API_URL}/create-task`, payload, {
           withCredentials: true,
         });
@@ -648,6 +659,7 @@ AssignTaskDialog.propTypes = {
       }),
     }),
   }),
+  // customerId: PropTypes.any, // Removed unused prop
 };
 
 export default AssignTaskDialog;
