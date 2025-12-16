@@ -25,7 +25,7 @@ export default function MeterReadingDetails({ readingId, onClose, onResolve }) {
   const [editModal, setEditModal] = useState(false);
   const [averageReading, setAverageReading] = useState(null);
 
-  // Image states
+  // Image state
   const [previewOpen, setPreviewOpen] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -34,6 +34,7 @@ export default function MeterReadingDetails({ readingId, onClose, onResolve }) {
 
   const fetchReading = async () => {
     try {
+      setLoading(true);
       const res = await axios.get(
         `${BASE_URL}/get-abnormal-reading/${readingId}`,
         { withCredentials: true }
@@ -50,11 +51,6 @@ export default function MeterReadingDetails({ readingId, onClose, onResolve }) {
   useEffect(() => {
     fetchReading();
   }, [readingId]);
-
-  useEffect(() => {
-    setImageLoaded(false);
-    setImageError(false);
-  }, [reading?.imageUrl]);
 
   if (loading) {
     return (
@@ -81,6 +77,7 @@ export default function MeterReadingDetails({ readingId, onClose, onResolve }) {
     imageUrl,
     meter,
     readBy,
+    Exception,
   } = reading;
 
   return (
@@ -94,22 +91,22 @@ export default function MeterReadingDetails({ readingId, onClose, onResolve }) {
           width: 420,
           height: "90vh",
           overflowY: "auto",
-          backgroundColor: theme?.palette?.background.paper,
+          bgcolor: theme?.palette?.background.paper,
           borderRadius: 2,
           boxShadow: 4,
           p: 2,
           zIndex: 9999,
         }}
       >
-        {/* Close */}
+        {/* CLOSE */}
         <IconButton
           onClick={onClose}
-          sx={{ position: "absolute", top: 4, left: 4 }}
+          sx={{ position: "absolute", top: 6, left: 6 }}
         >
           <CloseIcon />
         </IconButton>
 
-        <Typography variant="h6" mt={3} fontWeight={600}>
+        <Typography variant="h6" mt={3} fontWeight={700}>
           Abnormal Meter Reading
         </Typography>
 
@@ -120,37 +117,21 @@ export default function MeterReadingDetails({ readingId, onClose, onResolve }) {
           <Typography fontWeight={600}>Summary</Typography>
           <Divider sx={{ my: 1 }} />
 
-          <Info
-            label="Moving Average"
-            value={averageReading}
-            valueSx={{ color: "success.main", fontWeight: 700 }}
-          />
+          <Info label="Moving Average" value={averageReading} valueSx={{ color: "success.main", fontWeight: 700 }} />
           <Info label="Previous" value={previousReading} />
           <Info label="Current" value={currentReading} />
-          <Info
-            label="Consumption"
-            value={consumption}
-            valueSx={{ color: "warning.main", fontWeight: 700 }}
-          />
-          <Info
-            label="Date"
-            value={new Date(readingDate).toLocaleString()}
-          />
+          <Info label="Consumption" value={consumption} valueSx={{ color: "warning.main", fontWeight: 700 }} />
+          <Info label="Date" value={new Date(readingDate).toLocaleString()} />
         </Paper>
 
         {/* EXCEPTION */}
-        {reading.Exception && (
+        {Exception && (
           <Paper sx={{ p: 2, mb: 2 }}>
             <Typography fontWeight={600} color="warning.dark">
               Exception
             </Typography>
             <Divider sx={{ my: 1 }} />
-            <Chip
-              label={reading.Exception}
-              color="warning"
-              variant="outlined"
-              sx={{ fontWeight: 600 }}
-            />
+            <Chip label={Exception} color="warning" variant="outlined" sx={{ fontWeight: 600 }} />
             {notes && <Info label="Notes" value={notes} />}
           </Paper>
         )}
@@ -178,77 +159,68 @@ export default function MeterReadingDetails({ readingId, onClose, onResolve }) {
           <Typography fontWeight={600}>Meter</Typography>
           <Divider sx={{ my: 1 }} />
           <Info label="Serial" value={meter?.serialNumber} />
-          <Info
-            label="Connection"
-            value={meter?.connection?.connectionNumber}
-          />
+          <Info label="Connection" value={meter?.connection?.connectionNumber} />
         </Paper>
 
         {/* CUSTOMER */}
         <Paper sx={{ p: 2, mb: 2 }}>
           <Typography fontWeight={600}>Customer</Typography>
           <Divider sx={{ my: 1 }} />
-          <Info
-            label="Name"
-            value={meter?.connection?.customer?.customerName}
-          />
-          <Info
-            label="Phone"
-            value={meter?.connection?.customer?.phoneNumber}
-          />
-          <Info
-            label="Account"
-            value={meter?.connection?.customer?.accountNumber}
-          />
+          <Info label="Name" value={meter?.connection?.customer?.customerName} />
+          <Info label="Phone" value={meter?.connection?.customer?.phoneNumber} />
+          <Info label="Account" value={meter?.connection?.customer?.accountNumber} />
         </Paper>
 
-        {/* IMAGE WITH ICON PLACEHOLDER */}
+        {/* IMAGE */}
         <Paper sx={{ p: 2, mb: 2 }}>
           <Typography fontWeight={600}>Meter Image</Typography>
           <Divider sx={{ my: 1 }} />
 
           <Box
             sx={{
-              width: 110,
-              height: 110,
+              width: 64,
+              height: 64,
               borderRadius: 2,
               border: "1px solid",
               borderColor: "divider",
+              bgcolor: "background.default",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               position: "relative",
+              overflow: "hidden",
               cursor: imageLoaded ? "pointer" : "default",
-              bgcolor: "background.default",
             }}
             onClick={() => imageLoaded && setPreviewOpen(true)}
           >
             {!imageLoaded && !imageError && (
-              <>
-                <ImageIcon sx={{ fontSize: 40, color: "text.secondary" }} />
-                <CircularProgress
-                  size={26}
-                  sx={{ position: "absolute", bottom: 8, right: 8 }}
-                />
-              </>
+              <Box
+                sx={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <ImageIcon sx={{ fontSize: 36, color: "text.secondary" }} />
+                <CircularProgress size={18} sx={{ mt: 0.5 }} />
+              </Box>
             )}
 
             {imageUrl && !imageError && (
-              <Box
-                component="img"
+              <img
                 src={imageUrl}
                 alt="Meter"
+                loading="lazy"
                 onLoad={() => setImageLoaded(true)}
                 onError={() => setImageError(true)}
-                sx={{
+                style={{
                   width: "100%",
                   height: "100%",
-                  borderRadius: 2,
                   objectFit: "cover",
-                  position: "absolute",
-                  inset: 0,
-                  opacity: imageLoaded ? 1 : 0,
-                  transition: "opacity 0.3s ease-in-out",
+                  display: imageLoaded ? "block" : "none",
                 }}
               />
             )}
@@ -293,7 +265,7 @@ export default function MeterReadingDetails({ readingId, onClose, onResolve }) {
         />
       </Box>
 
-      {/* FULLSCREEN PREVIEW */}
+      {/* FULLSCREEN IMAGE */}
       {imageUrl && previewOpen && (
         <Box
           onClick={() => setPreviewOpen(false)}
@@ -308,15 +280,13 @@ export default function MeterReadingDetails({ readingId, onClose, onResolve }) {
             cursor: "zoom-out",
           }}
         >
-          <Box
-            component="img"
+          <img
             src={imageUrl}
             alt="Meter Full"
-            sx={{
+            style={{
               maxWidth: "90%",
               maxHeight: "90%",
-              borderRadius: 2,
-              boxShadow: 6,
+              borderRadius: 8,
             }}
           />
         </Box>
