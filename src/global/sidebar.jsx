@@ -140,9 +140,12 @@ const Sidebar = () => {
 
         {renderSubmenu("Accounts", [
           { icon: <Search sx={{ fontSize: 20 }} />, label: "Account Inquiry", path: "/customers" },
+           { icon: <HomeWorkIcon sx={{ fontSize: 20 }} />, label: "Connections", path: "/connections" },
           { icon: <HowToReg sx={{ fontSize: 20 }} />, label: "Approvals", path: "/new-customers" },
           { icon: <PersonAddAlt sx={{ fontSize: 20 }} />, label: "Create Customer", path: "/add-customer" },
           { icon: <AccountTree sx={{ fontSize: 20 }} />, label: "Schemes & Zones", path: "/schemes/zones" },
+
+
 
           {
             icon: <Poll sx={{ fontSize: 20 }} />,
@@ -209,7 +212,7 @@ const Sidebar = () => {
 
         {renderSubmenu("meterManager", [
           { icon: <Business sx={{ fontSize: 20 }} />, label: "Meter Inventory", path: "/meter-inventory" },
-          { icon: <HomeWorkIcon sx={{ fontSize: 20 }} />, label: "Connections", path: "/connections" },
+         
         ])}
 
         {/* TASKS */}

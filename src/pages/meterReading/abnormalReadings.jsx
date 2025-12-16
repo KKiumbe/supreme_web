@@ -18,9 +18,11 @@ import {
 import axios from "axios";
 import { useAuthStore, useThemeStore } from "../../store/authStore";
 import { useNavigate } from "react-router-dom";
+import ImageIcon from "@mui/icons-material/Image";
+import CircularProgress from "@mui/material/CircularProgress";
+
 import EditAbnormalReadingModal from "../../components/meterReading/abnornal/edit";
 import MeterReadingDetails from "../../components/meterReading/abnornal/viewAbnormalReading";
-
 
 const BASEURL = import.meta.env.VITE_BASE_URL;
 
@@ -41,44 +43,21 @@ export default function AbnormalMeterReadingsList() {
 
   // Modals
   const [editModal, setEditModal] = useState({ open: false, reading: null });
-  const [detailsModal, setDetailsModal] = useState({ open: false, readingId: null });
+  const [detailsModal, setDetailsModal] = useState({
+    open: false,
+    readingId: null,
+  });
 
-const openEditModal = async (row) => {
-  try {
-    const res = await axios.get(
-      `${BASEURL}/get-abnormal-reading/${row.id}`, 
-      { withCredentials: true }
-    );
-
-    const fullReading = res.data.data;   // contains consumption average
-    setAverageReading(fullReading.average);
-
-    setEditModal({
-      open: true,
-      reading: fullReading,
-    });
-
-  } catch (err) {
-    console.error("Failed to load reading details:", err);
-    alert("Could not load full meter reading details.");
-  }
-};
-
-
-  const closeEditModal = () =>
-    setEditModal({ open: false, reading: null });
-
-  const openDetails = (id) =>
-    setDetailsModal({ open: true, readingId: id });
-  const closeDetails = () =>
-    setDetailsModal({ open: false, readingId: null });
-
-  // Redirect if unauthenticated
+  // -----------------------------
+  // AUTH GUARD
+  // -----------------------------
   useEffect(() => {
     if (!currentUser) navigate("/login");
   }, [currentUser, navigate]);
 
-  // Fetch abnormal readings
+  // -----------------------------
+  // FETCH LIST
+  // -----------------------------
   const fetchReadings = useCallback(async () => {
     setLoading(true);
 
@@ -97,16 +76,27 @@ const openEditModal = async (row) => {
       const normalized = (res.data.data || []).map((item) => ({
         id: item.id,
         meterId: item.meterId,
-        serialNumber: item.meter?.serialNumber || "-",
-        model: item.meter?.model || "-",
-        connectionNumber: item.meter?.connection?.connectionNumber || "-",
-        accountNumber: item.meter?.connection?.customer?.accountNumber || "-",
-        customerName: item.meter?.connection?.customer?.customerName || "-",
-        phoneNumber: item.meter?.connection?.customer?.phoneNumber || "-",
-        previousReading: item.previousReading || "-",
-        currentReading: item.currentReading || "-",
+
+        connectionNumber:
+          item.meter?.connection?.connectionNumber ?? "-",
+
+        serialNumber: item.meter?.serialNumber ?? "-",
+        model: item.meter?.model ?? "-",
+
+        customerName:
+          item.meter?.connection?.customer?.customerName ?? "-",
+
+        phoneNumber:
+          item.meter?.connection?.customer?.phoneNumber ?? "-",
+
+        previousReading: item.previousReading ?? "-",
+        currentReading: item.currentReading ?? "-",
+
         readingDate: item.readingDate,
         notes: item.notes,
+
+        exception: item.Exception ?? null,     // ✅ IMPORTANT
+        imageUrl: item.imageUrl ?? null,       // ✅ IMPORTANT
       }));
 
       setReadings(normalized);
@@ -124,25 +114,114 @@ const openEditModal = async (row) => {
 
   useEffect(() => {
     fetchReadings();
-  
   }, [fetchReadings]);
 
+  // -----------------------------
+  // MODAL HANDLERS
+  // -----------------------------
+  const openDetails = (id) =>
+    setDetailsModal({ open: true, readingId: id });
 
-  //   const consumptionAverage = async () => {
-  //   try {
-  //     const res = await axios.get(`${BASEURL}/get-abnormal-reading/${readingId}`, {
-  //       withCredentials: true,
-  //     });
-      
-  //     setAverageReading(res.data.data.average);
-  //   } catch (err) {
-  //     console.error("Failed to fetch reading:", err);
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
+  const closeDetails = () =>
+    setDetailsModal({ open: false, readingId: null });
+
+  const openEditModal = async (row) => {
+    try {
+      const res = await axios.get(
+        `${BASEURL}/get-abnormal-reading/${row.id}`,
+        { withCredentials: true }
+      );
+
+      const fullReading = res.data.data;
+      setAverageReading(fullReading.average);
+
+      setEditModal({
+        open: true,
+        reading: fullReading,
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Could not load full meter reading details.");
+    }
+  };
+
+  const closeEditModal = () =>
+    setEditModal({ open: false, reading: null });
 
 
+  function ImageThumbnail({ src, onClick }) {
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+
+  if (!src) {
+    return <Typography variant="caption">-</Typography>;
+  }
+
+  return (
+    <Box
+      onClick={onClick}
+      sx={{
+        width: 42,
+        height: 42,
+        borderRadius: 1,
+        border: "1px solid",
+        borderColor: "divider",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        position: "relative",
+        cursor: "pointer",
+        bgcolor: "background.default",
+      }}
+    >
+      {/* Placeholder icon */}
+      {!loaded && !error && (
+        <ImageIcon sx={{ fontSize: 20, color: "text.secondary" }} />
+      )}
+
+      {/* Loader */}
+      {!loaded && !error && (
+        <CircularProgress
+          size={14}
+          sx={{ position: "absolute", bottom: 2, right: 2 }}
+        />
+      )}
+
+      {/* Image */}
+      {!error && (
+        <Box
+          component="img"
+          src={src}
+          alt="meter"
+          onLoad={() => setLoaded(true)}
+          onError={() => setError(true)}
+          sx={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            borderRadius: 1,
+            opacity: loaded ? 1 : 0,
+            transition: "opacity 0.2s ease-in-out",
+          }}
+        />
+      )}
+
+      {/* Error */}
+      {error && (
+        <Typography variant="caption" color="error">
+          !
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
+
+  // -----------------------------
+  // COLUMNS
+  // -----------------------------
   const columns = [
     {
       field: "view",
@@ -150,7 +229,10 @@ const openEditModal = async (row) => {
       width: 60,
       renderCell: (params) => (
         <Tooltip title="View Details">
-          <IconButton size="small" onClick={() => openDetails(params.row.id)}>
+          <IconButton
+            size="small"
+            onClick={() => openDetails(params.row.id)}
+          >
             <Visibility fontSize="small" />
           </IconButton>
         </Tooltip>
@@ -171,12 +253,27 @@ const openEditModal = async (row) => {
         </Tooltip>
       ),
     },
+     {
+  field: "image",
+  headerName: "Image",
+  width: 90,
+  sortable: false,
+  filterable: false,
+  renderCell: (params) => (
+    <ImageThumbnail
+      src={params.row.imageUrl}
+      onClick={() => openDetails(params.row.id)}
+    />
+  ),
+},
+
+    
     {
       field: "connectionNumber",
       headerName: "Connection #",
       width: 120,
     },
-      {
+    {
       field: "customerName",
       headerName: "Customer",
       flex: 1,
@@ -192,12 +289,27 @@ const openEditModal = async (row) => {
       width: 110,
     },
     {
+      field: "exception",
+      headerName: "Exception",
+      width: 160,
+      renderCell: (params) =>
+        params.value ? (
+          <Chip
+            label={params.value}
+            size="small"
+            color="warning"
+            variant="outlined"
+          />
+        ) : (
+          "-"
+        ),
+    },
+    {
       field: "readingDate",
       headerName: "Date",
-      width: 140,
+      width: 150,
       
     },
-  
     {
       field: "phoneNumber",
       headerName: "Phone",
@@ -218,8 +330,12 @@ const openEditModal = async (row) => {
       headerName: "Model",
       width: 120,
     },
+   
   ];
 
+  // -----------------------------
+  // RENDER
+  // -----------------------------
   return (
     <Box p={3}>
       <Typography variant="h6" mb={2}>
@@ -229,7 +345,7 @@ const openEditModal = async (row) => {
       <Grid container justifyContent="flex-end" mb={2}>
         <TextField
           size="small"
-          placeholder="Search meter/customer..."
+          placeholder="Search meter / customer..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           InputProps={{
@@ -246,30 +362,30 @@ const openEditModal = async (row) => {
           loading={loading}
           pagination
           paginationMode="server"
-          getRowId={(row) => row.id}
+          pageSizeOptions={[10, 20, 50]}
           rowCount={pagination.total}
+          getRowId={(row) => row.id}
         />
       </Paper>
 
-      {/* UPDATE MODAL */}
-    <EditAbnormalReadingModal
-  open={editModal.open}
-  onClose={closeEditModal}
-  reading={editModal.reading}
-  average={averageReading}
-  onSuccess={() => {
-    closeEditModal();   // close modal
-    fetchReadings();    // auto refresh list
-  }}
-/>
+      {/* EDIT MODAL */}
+      <EditAbnormalReadingModal
+        open={editModal.open}
+        onClose={closeEditModal}
+        reading={editModal.reading}
+        average={averageReading}
+        onSuccess={() => {
+          closeEditModal();
+          fetchReadings();
+        }}
+      />
 
-
-      {/* VIEW DETAILS MODAL */}
+      {/* DETAILS PANEL (IMAGE PREVIEW + EXCEPTION) */}
       {detailsModal.open && (
         <MeterReadingDetails
           readingId={detailsModal.readingId}
           onClose={closeDetails}
-          onResolve={(reading) => openEditModal(reading)}  
+          onResolve={(reading) => openEditModal(reading)}
         />
       )}
     </Box>

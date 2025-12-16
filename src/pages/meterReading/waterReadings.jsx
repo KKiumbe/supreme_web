@@ -18,6 +18,8 @@ import {
 import axios from "axios";
 import { useAuthStore } from "../../store/authStore";
 import { useNavigate } from "react-router-dom";
+import ImageIcon from "@mui/icons-material/Image";
+import CircularProgress from "@mui/material/CircularProgress";
 
 import AddReadingStepperModal from "../../components/meterReading/addReading";
 import EditAbnormalReadingModal from "../../components/meterReading/updateAbnormal";
@@ -63,7 +65,7 @@ export default function MeterReadingsList() {
         { withCredentials: true }
       );
 
-      const normalized = (res.data.data || []).map((item) => ({
+      const normalized = (res?.data?.data || []).map((item) => ({
         id: item.id,
         type: item.type,
         meterId: item.meterId,
@@ -72,12 +74,12 @@ export default function MeterReadingsList() {
         previousReading: item.previousReading,
         currentReading: item.currentReading,
         consumption: item.consumption,
-        readingDate: item.readingDate,
+        readingDate: item?.readingDate,
         customerBalance: item.meter?.connection?.customerAccounts?.[0]?.balance,
-        customerName: item.customer?.customerName,
-        phoneNumber: item.customer?.phoneNumber,
-        imageUrl: item.imageUrl,
-        ExceptionId: item.ExceptionId,
+        customerName: item?.customer?.customerName,
+        phoneNumber: item?.customer?.phoneNumber,
+        imageUrl: item?.imageUrl,
+        ExceptionId: item?.ExceptionId,
       }));
 
       setReadings(normalized);
@@ -104,6 +106,88 @@ export default function MeterReadingsList() {
     setSelectedReadingId(id);
   };
 
+
+  function ReadingImageThumbnail({ src, onClick }) {
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+
+  if (!src) {
+    return (
+      <Box
+        sx={{
+          width: 42,
+          height: 42,
+          borderRadius: 1,
+          border: "1px solid",
+          borderColor: "divider",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "text.disabled",
+        }}
+      >
+        <ImageIcon fontSize="small" />
+      </Box>
+    );
+  }
+
+  return (
+    <Box
+      onClick={onClick}
+      sx={{
+        width: 42,
+        height: 42,
+        borderRadius: 1,
+        border: "1px solid",
+        borderColor: "divider",
+        position: "relative",
+        cursor: "pointer",
+        overflow: "hidden",
+      }}
+    >
+      {!loaded && !error && (
+        <CircularProgress
+          size={14}
+          sx={{ position: "absolute", top: "50%", left: "50%", mt: -1, ml: -1 }}
+        />
+      )}
+
+      {!error && (
+        <Box
+          component="img"
+          src={src}
+          alt="Meter"
+          onLoad={() => setLoaded(true)}
+          onError={() => setError(true)}
+          sx={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            opacity: loaded ? 1 : 0,
+            transition: "opacity 0.2s ease",
+          }}
+        />
+      )}
+
+      {error && (
+        <Box
+          sx={{
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "error.main",
+          }}
+        >
+          !
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+
   const columns = [
     {
       field: "view",
@@ -121,12 +205,31 @@ export default function MeterReadingsList() {
       ),
     },
     { field: "meterId", headerName: "Meter ID", width: 110 },
+    {
+  field: "image",
+  headerName: "Image",
+  width: 80,
+  sortable: false,
+  filterable: false,
+  renderCell: (params) => (
+    <ReadingImageThumbnail
+      src={params.row.imageUrl}
+      onClick={() => handleSelectReading(params.row.id)}
+    />
+  ),
+},
+
     { field: "type", headerName: "Type", width: 130 },
     { field: "connectionNumber", headerName: "Connection No.", width: 130 },
     { field: "previousReading", headerName: "Prev", width: 110 },
     { field: "currentReading", headerName: "Current", width: 110 },
     { field: "consumption", headerName: "Consumption", width: 110 },
-    { field: "readingDate", headerName: "Reading Date", width: 150 },
+      {
+      field: "readingDate",
+      headerName: "Date",
+      width: 150,
+     
+    },
     { field: "customerName", headerName: "Customer", width: 180 },
     { field: "phoneNumber", headerName: "Phone", width: 140 },
     { field: "customerBalance", headerName: "Balance", width: 150 },

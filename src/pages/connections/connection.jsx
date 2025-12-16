@@ -652,7 +652,7 @@ const ConnectionsScreen = () => {
           mb={2}
         >
           <Typography variant="h4" fontWeight="bold">
-            Connections Management
+            Connections Manager
           </Typography>
           <Box>
             <Button
