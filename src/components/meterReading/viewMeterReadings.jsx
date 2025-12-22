@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -8,9 +8,12 @@ import {
   Chip,
   Avatar,
   IconButton,
+  Button,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import ImageIcon from "@mui/icons-material/Image";
+import LocationOnIcon from "@mui/icons-material/LocationOn";
+import MapIcon from "@mui/icons-material/Map";
 import axios from "axios";
 import PropTypes from "prop-types";
 
@@ -40,6 +43,16 @@ export default function MeterReadingDetails({ readingId, onClose }) {
 
     fetchData();
   }, [readingId]);
+
+  // Prepare variables for useMemo so it is always called
+  const lat = reading?.latitude ? Number(reading.latitude) : null;
+  const lng = reading?.longitude ? Number(reading.longitude) : null;
+  const hasLocation = lat && lng;
+
+  const googleMapsUrl = useMemo(() => {
+    if (!hasLocation) return null;
+    return `https://www.google.com/maps?q=${lat},${lng}&z=18`;
+  }, [lat, lng, hasLocation]);
 
   if (loading) {
     return (
@@ -75,7 +88,6 @@ export default function MeterReadingDetails({ readingId, onClose }) {
 
   return (
     <>
-      {/* SIDE PANEL */}
       <Box p={2} sx={{ position: "relative" }}>
         {/* Close */}
         <IconButton
@@ -175,17 +187,58 @@ export default function MeterReadingDetails({ readingId, onClose }) {
           />
         </Paper>
 
-        {/* LOCATION */}
-        {(latitude || longitude) && (
-          <Paper sx={{ p: 2, mb: 2 }}>
-            <Typography fontWeight={600}>Location</Typography>
-            <Divider sx={{ my: 1 }} />
-            <Info label="Latitude" value={latitude} />
-            <Info label="Longitude" value={longitude} />
-          </Paper>
-        )}
+        {/* LOCATION + MAP */}
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Typography fontWeight={600} display="flex" alignItems="center" gap={1}>
+            <LocationOnIcon fontSize="small" />
+            Location
+          </Typography>
+          <Divider sx={{ my: 1 }} />
 
-        {/* IMAGE ICON */}
+          {hasLocation ? (
+            <>
+              <Info label="Latitude" value={lat} />
+              <Info label="Longitude" value={lng} />
+
+              <Box mt={1} mb={1}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<MapIcon />}
+                  onClick={() => window.open(googleMapsUrl, "_blank")}
+                >
+                  Open in Google Maps
+                </Button>
+              </Box>
+
+              {/* MAP PREVIEW */}
+              <Box
+                sx={{
+                  mt: 1,
+                  borderRadius: 1,
+                  overflow: "hidden",
+                  border: "1px solid",
+                  borderColor: "divider",
+                }}
+              >
+                <iframe
+                  title="Meter Location"
+                  width="100%"
+                  height="220"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  src={`https://www.google.com/maps?q=${lat},${lng}&z=18&output=embed`}
+                />
+              </Box>
+            </>
+          ) : (
+            <Typography color="text.secondary">
+              Location not captured
+            </Typography>
+          )}
+        </Paper>
+
+        {/* IMAGE */}
         <Paper sx={{ p: 2 }}>
           <Typography fontWeight={600} mb={1}>
             Meter Image

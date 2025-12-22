@@ -7,11 +7,7 @@ import { CssBaseline, Box } from "@mui/material";
 
 import HomeScreen from "./pages/home/home";
 import CustomersScreen from "./pages/customers/customers";
-import BuildingsScreen from "./pages/property/property";
-import AddPropertyScreen from "./pages/property/addProperty";
-import AddUnitScreen from "./pages/property/addUnit";
-import BuildingDetailsScreen from "./pages/property/propertyDetails";
-import EditBuildingScreen from "./pages/property/editBuilding";
+
 import BillList from "./pages/billing/Invoices"
 import CreateInvoice from "./pages/billing/createInvoice";
 
@@ -22,8 +18,7 @@ import PaymentDetails from "./pages/payments/PaymentDetail";
 import CreatePayment from "./pages/payments/addPayment";
 import WaterReadingsList from "./pages/meterReading/waterReadings";
 import MeterReadingDetails from "./pages/meterReading/meterReadingDetails";
-import LandlordsScreen from "./pages/property/landlords";
-import LandlordDetailsScreen from "./pages/property/landlordDetails";
+
 import Receipts from "./pages/receipts/receipts";
 import ReceiptDetail from "./pages/receipts/receiptDetails";
 import SentSMSPage from "./pages/communication/sentSMS";
@@ -126,56 +121,7 @@ const App = () => {
                 />
 
 
-                  <Route
-                  path="/properties"
-                  element={
-                    <ProtectedRoute>
-                      <BuildingsScreen />
-                    </ProtectedRoute>
-                  }
-                /> 
-
-                   <Route
-                  path="/add-property"
-                  element={
-                    <ProtectedRoute>
-                      <AddPropertyScreen />
-                    </ProtectedRoute>
-                  }
-                /> 
-              
-                <Route
-                  path="/add-unit/:buildingId"
-                  element={
-                    <ProtectedRoute>
-                      <AddUnitScreen />
-                    </ProtectedRoute>
-                  }
-                  />
-
-
-
-
-
-
-                   <Route
-                  path="/building-details/:id"
-                  element={
-                    <ProtectedRoute>
-                      <BuildingDetailsScreen />
-                    </ProtectedRoute>
-                  }
-                />
-
-
-                <Route
-                  path="/edit-building/:buildingId"
-                  element={
-                    <ProtectedRoute>
-                      <EditBuildingScreen/>
-                    </ProtectedRoute>
-                  }
-                />
+   
                 <Route
                   path="/invoices"
                   element={
@@ -269,24 +215,8 @@ const App = () => {
                   }/>
 
 
-                   <Route
-                  path="/landlords"
-                  element={
-                    <ProtectedRoute>
-                      <LandlordsScreen />
-                    </ProtectedRoute>
-                  }  
-                /> 
 
-
-                  <Route
-                  path="/landlord/:id"
-                  element={
-                    <ProtectedRoute>
-                      <LandlordDetailsScreen />
-                    </ProtectedRoute>
-                  }
-                />
+               
                 
 
                 

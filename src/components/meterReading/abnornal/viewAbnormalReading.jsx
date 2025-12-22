@@ -78,7 +78,17 @@ export default function MeterReadingDetails({ readingId, onClose, onResolve }) {
     meter,
     readBy,
     Exception,
+    latitude,
+    longitude,
   } = reading;
+
+  const lat = latitude ? Number(latitude) : null;
+  const lng = longitude ? Number(longitude) : null;
+  const hasLocation = !!(lat && lng);
+
+  const googleMapsUrl = hasLocation
+    ? `https://www.google.com/maps?q=${lat},${lng}&z=18`
+    : null;
 
   return (
     <>
@@ -117,10 +127,18 @@ export default function MeterReadingDetails({ readingId, onClose, onResolve }) {
           <Typography fontWeight={600}>Summary</Typography>
           <Divider sx={{ my: 1 }} />
 
-          <Info label="Moving Average" value={averageReading} valueSx={{ color: "success.main", fontWeight: 700 }} />
+          <Info
+            label="Moving Average"
+            value={averageReading}
+            valueSx={{ color: "success.main", fontWeight: 700 }}
+          />
           <Info label="Previous" value={previousReading} />
           <Info label="Current" value={currentReading} />
-          <Info label="Consumption" value={consumption} valueSx={{ color: "warning.main", fontWeight: 700 }} />
+          <Info
+            label="Consumption"
+            value={consumption}
+            valueSx={{ color: "warning.main", fontWeight: 700 }}
+          />
           <Info label="Date" value={new Date(readingDate).toLocaleString()} />
         </Paper>
 
@@ -131,7 +149,12 @@ export default function MeterReadingDetails({ readingId, onClose, onResolve }) {
               Exception
             </Typography>
             <Divider sx={{ my: 1 }} />
-            <Chip label={Exception} color="warning" variant="outlined" sx={{ fontWeight: 600 }} />
+            <Chip
+              label={Exception}
+              color="warning"
+              variant="outlined"
+              sx={{ fontWeight: 600 }}
+            />
             {notes && <Info label="Notes" value={notes} />}
           </Paper>
         )}
@@ -166,9 +189,64 @@ export default function MeterReadingDetails({ readingId, onClose, onResolve }) {
         <Paper sx={{ p: 2, mb: 2 }}>
           <Typography fontWeight={600}>Customer</Typography>
           <Divider sx={{ my: 1 }} />
-          <Info label="Name" value={meter?.connection?.customer?.customerName} />
-          <Info label="Phone" value={meter?.connection?.customer?.phoneNumber} />
-          <Info label="Account" value={meter?.connection?.customer?.accountNumber} />
+          <Info
+            label="Name"
+            value={meter?.connection?.customer?.customerName}
+          />
+          <Info
+            label="Phone"
+            value={meter?.connection?.customer?.phoneNumber}
+          />
+          <Info
+            label="Account"
+            value={meter?.connection?.customer?.accountNumber}
+          />
+        </Paper>
+
+        {/* LOCATION */}
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Typography fontWeight={600}>Location</Typography>
+          <Divider sx={{ my: 1 }} />
+
+          {hasLocation ? (
+            <>
+              <Info label="Latitude" value={lat} />
+              <Info label="Longitude" value={lng} />
+
+              <Button
+                size="small"
+                variant="outlined"
+                sx={{ mt: 1, mb: 1 }}
+                onClick={() => window.open(googleMapsUrl, "_blank")}
+              >
+                Open in Google Maps
+              </Button>
+
+              <Box
+                sx={{
+                  mt: 1,
+                  height: 200,
+                  borderRadius: 1,
+                  overflow: "hidden",
+                  border: "1px solid",
+                  borderColor: "divider",
+                }}
+              >
+                <iframe
+                  title="Meter Location"
+                  width="100%"
+                  height="100%"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  src={`https://www.google.com/maps?q=${lat},${lng}&z=18&output=embed`}
+                />
+              </Box>
+            </>
+          ) : (
+            <Typography color="text.secondary">
+              Location not captured
+            </Typography>
+          )}
         </Paper>
 
         {/* IMAGE */}
