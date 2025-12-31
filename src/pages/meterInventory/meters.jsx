@@ -17,12 +17,17 @@ import {
 } from "@mui/icons-material";
 import { DataGrid } from "@mui/x-data-grid";
 import axios from "axios";
+import debounce from "lodash/debounce";
+import PropTypes from "prop-types";
+
 import { useAuthStore } from "../../store/authStore";
 import AddOrEditMeterModal from "../../components/meters/createUpdate";
-import debounce from "lodash/debounce";
 
-// Error Boundary Component
-import PropTypes from "prop-types";
+const BASEURL = import.meta.env.VITE_BASE_URL || "";
+
+/* -----------------------------
+   Error Boundary
+----------------------------- */
 class ErrorBoundary extends Component {
   state = { hasError: false };
 
@@ -34,7 +39,7 @@ class ErrorBoundary extends Component {
     if (this.state.hasError) {
       return (
         <Typography color="error" sx={{ p: 2 }}>
-          Failed to render table. Please refresh or contact support.
+          Failed to render meters. Please refresh the page.
         </Typography>
       );
     }
@@ -46,26 +51,32 @@ ErrorBoundary.propTypes = {
   children: PropTypes.node,
 };
 
+/* -----------------------------
+   Screen
+----------------------------- */
 const MeterScreen = () => {
   const { currentUser } = useAuthStore();
-  const BASEURL = import.meta.env.VITE_BASE_URL || "";
 
-  // State
   const [meters, setMeters] = useState([]);
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(0); // DataGrid is 0-based
   const [limit, setLimit] = useState(20);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
+
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedMeter, setSelectedMeter] = useState(null);
 
-  // Format date for EAT (UTC+3)
-  const formatDate = (dateString) => {
-    if (!dateString) return "-";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-KE", {
+  /* -----------------------------
+     Date formatter (EAT)
+  ----------------------------- */
+  const formatDate = (value) => {
+    if (!value) return "-";
+    return new Date(value).toLocaleDateString("en-KE", {
       timeZone: "Africa/Nairobi",
       year: "numeric",
       month: "short",
@@ -73,22 +84,29 @@ const MeterScreen = () => {
     });
   };
 
-  // Fetch meters from API
+  /* -----------------------------
+     Fetch meters
+  ----------------------------- */
   const fetchMeters = useCallback(async () => {
     if (!currentUser) return;
+
     setLoading(true);
     setError("");
+
     try {
       const res = await axios.get(`${BASEURL}/meters`, {
-        params: { page: page + 1, limit, search: search || undefined },
+        params: {
+          page: page + 1, // API is 1-based
+          limit,
+          ...(search ? { search } : {}),
+        },
         withCredentials: true,
       });
-      const validMeters = (res.data.data?.meters ?? []).filter(
-        (meter) => meter && typeof meter === "object" && meter.id && meter.serialNumber
-      );
-      console.log("Fetched meters:", validMeters); // Debug log
-      setMeters(validMeters);
-      setTotal(res.data.data?.pagination?.total ?? 0);
+
+      const payload = res.data?.data;
+
+      setMeters(payload?.meters ?? []);
+      setTotal(payload?.pagination?.total ?? 0);
     } catch (err) {
       console.error("Failed to fetch meters:", err);
       setError(err.response?.data?.message || "Failed to load meters.");
@@ -97,115 +115,103 @@ const MeterScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, search, BASEURL, currentUser]);
+  }, [currentUser, page, limit, search]);
 
-  // Debounced search handler
-  const debouncedSearch = useCallback(
-    debounce((value) => {
-      setSearch(value);
-      setPage(0);
-    }, 500),
+  /* -----------------------------
+     Debounced search
+  ----------------------------- */
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((value) => {
+        setPage(0);
+        setSearch(value);
+      }, 500),
     []
   );
 
-  // Handle search input change
   const handleSearchChange = (e) => {
-    debouncedSearch(e.target.value);
+    const value = e.target.value;
+    setSearchInput(value);
+    debouncedSearch(value.trim());
   };
 
-  // Initial fetch
+  /* -----------------------------
+     Initial + reactive fetch
+  ----------------------------- */
   useEffect(() => {
     fetchMeters();
   }, [fetchMeters]);
 
-  // DataGrid Columns
+  /* -----------------------------
+     Columns
+  ----------------------------- */
   const columns = useMemo(
     () => [
       {
         field: "actions",
         headerName: "Actions",
-        width: 100,
+        width: 90,
+        sortable: false,
         renderCell: (params) => (
           <Tooltip title="Edit Meter">
             <IconButton
-              color='theme.palette.primary.contrastText'
+              size="small"
               onClick={() => {
                 setSelectedMeter(params.row);
                 setModalOpen(true);
               }}
-              disabled={!params.row}
             >
               <EditIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         ),
       },
-      {
-        field: "serialNumber",
-        headerName: "Serial #",
-        width: 150,
-        //valueGetter: (params) => (params.row ? params.row.serialNumber || "-" : "-"),
-      },
-      {
-        field: "model",
-        headerName: "Model",
-        width: 120,
-        //valueGetter: (params) => (params.row ? params.row.model || "-" : "-"),
-      },
-       {
-        field: "status",
-        headerName: "Status",
-        width: 150,
-        //valueGetter: (params) => (params.row ? params.row.status || "-" : "-"),
-      },
-      {
-        field: "meterSize",
-        headerName: "Size",
-        width: 100,
-        //valueGetter: (params) => (params.row ? params.row.meterSize || "-" : "-"),
-      },
+      { field: "serialNumber", headerName: "Serial Number", width: 160 },
+      { field: "model", headerName: "Model", width: 130 },
+      { field: "status", headerName: "Status", width: 140 },
+      { field: "meterSize", headerName: "Size", width: 100 },
       {
         field: "installationDate",
         headerName: "Installed",
-        width: 120,
-       // valueGetter: (params) => (params.row ? formatDate(params?.row?.installationDate) : "-"),
+        width: 130,
+        
       },
       {
         field: "lastInspectedAt",
         headerName: "Last Inspected",
-        width: 130,
-        valueGetter: (params) => (params?.row ? formatDate(params?.row?.lastInspectedAt) : "-"),
+        width: 140,
+       
       },
       {
         field: "createdAt",
         headerName: "Created",
         width: 130,
-        valueGetter: (params) => (params?.row ? formatDate(params?.row?.createdAt) : "-"),
+        
       },
-     
       {
         field: "connection",
         headerName: "Connection",
-        width: 160,
+        width: 150,
         valueGetter: (params) =>
-          params?.row && params?.row?.connection?.connectionNumber
-            ? `#${params?.row?.connection?.connectionNumber}`
+          params.row?.connection?.connectionNumber
+            ? `#${params.row.connection.connectionNumber}`
             : "-",
       },
       {
         field: "customer",
         headerName: "Customer",
-        width: 180,
-        valueGetter: (params) =>
-          params?.row && params?.row?.connection?.customer?.customerName || "-",
+        width: 200,
+        
       },
-      
     ],
     []
   );
 
   if (!currentUser) return null;
 
+  /* -----------------------------
+     Render
+  ----------------------------- */
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h5" fontWeight="bold" mb={2}>
@@ -214,15 +220,16 @@ const MeterScreen = () => {
 
       {/* Search & Actions */}
       <Grid container spacing={2} alignItems="center" mb={2}>
-        <Grid item xs={12} md={3}>
+        <Grid item xs={12} md={4}>
           <TextField
             fullWidth
             size="small"
-            placeholder="Search by Serial Number..."
+            value={searchInput}
+            placeholder="Search by serial number or model"
             onChange={handleSearchChange}
-            variant="outlined"
           />
         </Grid>
+
         <Grid item>
           <Tooltip title="Refresh">
             <IconButton onClick={fetchMeters}>
@@ -230,6 +237,7 @@ const MeterScreen = () => {
             </IconButton>
           </Tooltip>
         </Grid>
+
         <Grid item>
           <Button
             variant="contained"
@@ -244,14 +252,13 @@ const MeterScreen = () => {
         </Grid>
       </Grid>
 
-      {/* Error Message */}
       {error && (
         <Typography color="error" mb={2}>
           {error}
         </Typography>
       )}
 
-      {/* Meters Table */}
+      {/* Table */}
       <Paper sx={{ height: 520, width: "100%" }}>
         <ErrorBoundary>
           {loading ? (
@@ -262,15 +269,15 @@ const MeterScreen = () => {
             <DataGrid
               rows={meters}
               columns={columns}
-              getRowId={(row) => row.id || `fallback-${Math.random()}`}
-              pageSizeOptions={[10, 20, 50]}
+              getRowId={(row) => row.id}
+              rowCount={total}
+              paginationMode="server"
               paginationModel={{ page, pageSize: limit }}
               onPaginationModelChange={(model) => {
                 setPage(model.page);
                 setLimit(model.pageSize);
               }}
-              rowCount={total}
-              paginationMode="server"
+              pageSizeOptions={[10, 20, 50]}
               disableRowSelectionOnClick
               localeText={{ noRowsLabel: "No meters found" }}
             />
@@ -278,7 +285,7 @@ const MeterScreen = () => {
         </ErrorBoundary>
       </Paper>
 
-      {/* Modal (Create / Update) */}
+      {/* Modal */}
       <AddOrEditMeterModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}

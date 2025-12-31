@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -33,7 +33,15 @@ const AssignMeterTaskDialog = ({
   const [users, setUsers] = useState([]);
   const [taskTypes, setTaskTypes] = useState([]);
   const [meters, setMeters] = useState([]);
-  const [loading, setLoading] = useState({ users: false, meters: false, types: false });
+  const [totalMeters, setTotalMeters] = useState(0);
+
+  const [meterSearch, setMeterSearch] = useState("");
+
+  const [loading, setLoading] = useState({
+    users: false,
+    meters: false,
+    types: false,
+  });
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
@@ -43,7 +51,6 @@ const AssignMeterTaskDialog = ({
     description: "Assign a meter to this customer connection for installation.",
     priority: "MEDIUM",
     dueDate: "",
-    scheduledAt: "",
     AssignedTo: assigneeId,
     RelatedConnectionId: connectionId,
     RelatedSchemeId: schemeId || null,
@@ -54,55 +61,64 @@ const AssignMeterTaskDialog = ({
     meterId: "",
   });
 
-  // ✅ Fetch users, meters, and task types
+  /* --------------------------------------------------
+     Fetch data when dialog opens
+  -------------------------------------------------- */
   useEffect(() => {
     if (!open) return;
 
     const fetchUsers = async () => {
       setLoading((p) => ({ ...p, users: true }));
       try {
-        const { data } = await axios.get(`${API_URL}/users`, { withCredentials: true });
+        const { data } = await axios.get(`${API_URL}/users`, {
+          withCredentials: true,
+        });
         setUsers(Array.isArray(data?.data) ? data.data : []);
-      } catch (err) {
-        console.error("Error fetching users:", err);
+      } catch {
         setError("Failed to load users.");
       } finally {
         setLoading((p) => ({ ...p, users: false }));
       }
     };
 
-  const fetchMeters = async () => {
-  setLoading((p) => ({ ...p, meters: true }));
-  try {
-    const { data } = await axios.get(`${API_URL}/meters/available`, { withCredentials: true });
+    const fetchMeters = async () => {
+      setLoading((p) => ({ ...p, meters: true }));
+      try {
+        const { data: response } = await axios.get(`${API_URL}/meters/available`, {
+          withCredentials: true,
+        });
 
-    // ✅ The backend returns { success, message, data: [...] }
-    setMeters(Array.isArray(data?.data) ? data.data : []);
-  } catch (err) {
-    console.error("Error fetching meters:", err);
-    setError("Failed to load available meters.");
-  } finally {
-    setLoading((p) => ({ ...p, meters: false }));
-  }
-};
-
+        // Handle your API response shape
+        const meterList = response?.data?.meters || response?.data || [];
+        setMeters(Array.isArray(meterList) ? meterList : []);
+        setTotalMeters(response?.data?.pagination?.total || meterList.length);
+      } catch {
+        setError("Failed to load available meters.");
+      } finally {
+        setLoading((p) => ({ ...p, meters: false }));
+      }
+    };
 
     const fetchTaskTypes = async () => {
       setLoading((p) => ({ ...p, types: true }));
       try {
-        const { data } = await axios.get(`${API_URL}/get-tasks-types`, { withCredentials: true });
-        setTaskTypes(Array.isArray(data) ? data : []);
+        const { data } = await axios.get(`${API_URL}/get-tasks-types`, {
+          withCredentials: true,
+        });
 
-        const meterType = data.find(
-          (type) =>
-            type.code?.toLowerCase() === "meter_assignment" ||
-            type.name?.toLowerCase().includes("meter")
+        const typesArray = Array.isArray(data) ? data : data?.data || [];
+        setTaskTypes(typesArray);
+
+        const meterType = typesArray.find(
+          (t) =>
+            t.code?.toLowerCase() === "meter_assignment" ||
+            t.name?.toLowerCase().includes("meter")
         );
+
         if (meterType) {
           setFormData((prev) => ({ ...prev, TypeId: meterType.id }));
         }
-      } catch (err) {
-        console.error("Error fetching task types:", err);
+      } catch {
         setError("Failed to load task types.");
       } finally {
         setLoading((p) => ({ ...p, types: false }));
@@ -114,6 +130,35 @@ const AssignMeterTaskDialog = ({
     fetchTaskTypes();
   }, [open]);
 
+  /* --------------------------------------------------
+     Client-side filtering
+  -------------------------------------------------- */
+  const filteredMeters = useMemo(() => {
+    if (!meterSearch.trim()) return meters;
+
+    const q = meterSearch.toLowerCase().trim();
+
+    return meters.filter((m) =>
+      (m.serialNumber || "").toLowerCase().includes(q) ||
+      (m.model || "").toLowerCase().includes(q) ||
+      (m.meterSize || "").toString().includes(q)
+    );
+  }, [meters, meterSearch]);
+
+  /* --------------------------------------------------
+     Helper text for search field
+  -------------------------------------------------- */
+  const meterHelperText = loading.meters
+    ? "Loading available meters..."
+    : meterSearch.trim() && filteredMeters.length === 0
+    ? "No matching meters found"
+    : totalMeters > 0
+    ? `${totalMeters} available meter${totalMeters === 1 ? "" : "s"}`
+    : "No meters currently available";
+
+  /* --------------------------------------------------
+     Handlers
+  -------------------------------------------------- */
   const handleChange = (field) => (e) => {
     setFormData((prev) => ({ ...prev, [field]: e.target.value }));
     setError("");
@@ -129,44 +174,42 @@ const AssignMeterTaskDialog = ({
 
     setCreating(true);
     try {
-     const payload = {
-  connectionId: formData.RelatedConnectionId, // ✅ renamed
-  meterId: formData.meterId,
-  assignedTo: formData.AssignedTo, // ✅ renamed
-  dueDate: formData.dueDate || null,
-  notes: formData.description, // optional mapping
-  applicationId: formData.NewCustomerId || null, // ✅ if this matches CustomerApplication
-  tariffCategoryId: formData.tariffCategoryId || null, // optional
-  // You can keep others if backend ignores unknown keys
-};
-      console.log("🟢 Assign Meter Task Payload:", payload);
+      const payload = {
+        connectionId: formData.RelatedConnectionId,
+        meterId: formData.meterId,
+        assignedTo: formData.AssignedTo,
+        dueDate: formData.dueDate || null,
+        notes: formData.description,
+        applicationId: formData.NewCustomerId || null,
+      };
 
-      const { data } = await axios.post(`${API_URL}/assign-meter-connection-task`, payload, {
-        withCredentials: true,
-      });
+      const { data } = await axios.post(
+        `${API_URL}/assign-meter-connection-task`,
+        payload,
+        { withCredentials: true }
+      );
 
       onTaskCreated?.(data);
       handleClose();
     } catch (err) {
-      console.error("Error creating assign meter task:", err);
-      setError(err.response?.data?.error || "Failed to create meter task.");
+      setError(err.response?.data?.error || "Failed to create meter assignment task.");
     } finally {
       setCreating(false);
     }
   };
 
   const handleClose = () => {
-    setFormData((prev) => ({
-      ...prev,
-      meterId: "",
-      AssignedTo: assigneeId,
-    }));
+    setFormData((p) => ({ ...p, meterId: "", AssignedTo: assigneeId }));
+    setMeterSearch("");
     setError("");
     onClose();
   };
 
   const loadingAll = loading.users || loading.meters || loading.types;
 
+  /* --------------------------------------------------
+     Render
+  -------------------------------------------------- */
   return (
     <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
       <DialogTitle
@@ -180,18 +223,39 @@ const AssignMeterTaskDialog = ({
 
       <DialogContent dividers>
         {loadingAll ? (
-          <Box display="flex" justifyContent="center" py={3}>
+          <Box display="flex" justifyContent="center" py={4}>
             <CircularProgress />
           </Box>
         ) : (
-          <Grid container spacing={2}>
+          <Grid container spacing={2.5}>
             <Grid item xs={12}>
-              <Typography variant="body2" color="textSecondary" mb={2}>
-                Fill in details to assign a meter installation task.
+              <Typography variant="body2" color="text.secondary">
+                Assign an available meter to this connection.
               </Typography>
             </Grid>
 
-            {/* Meter Selector */}
+            {/* Meter Search */}
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Search Meter"
+                placeholder="Serial number, model..."
+                value={meterSearch}
+                onChange={(e) => setMeterSearch(e.target.value)}
+                helperText={meterHelperText}
+                FormHelperTextProps={{
+                  sx: {
+                    color:
+                      filteredMeters.length === 0 && meterSearch.trim()
+                        ? "error.main"
+                        : "text.secondary",
+                  },
+                }}
+              />
+            </Grid>
+
+            {/* Meter Select */}
             <Grid item xs={12}>
               <TextField
                 select
@@ -200,18 +264,39 @@ const AssignMeterTaskDialog = ({
                 value={formData.meterId}
                 onChange={handleChange("meterId")}
                 required
+                disabled={loading.meters || meters.length === 0}
+                SelectProps={{
+                  MenuProps: {
+                    PaperProps: { sx: { maxHeight: 340 } },
+                  },
+                }}
               >
-                <MenuItem value="">— Select Meter —</MenuItem>
-                {meters.map((meter) => (
-                  <MenuItem key={meter.id} value={meter.id}>
-                    {`${meter.serialNumber} — ${meter.status}`}
+                <MenuItem value="" disabled>
+                  — Select an available meter —
+                </MenuItem>
+
+                {loading.meters ? (
+                  <MenuItem disabled>
+                    <CircularProgress size={20} sx={{ mr: 2 }} /> Loading...
                   </MenuItem>
-                ))}
+                ) : filteredMeters.length === 0 ? (
+                  <MenuItem disabled>
+                    {meterSearch.trim() ? "No matching meters" : "No available meters"}
+                  </MenuItem>
+                ) : (
+                  filteredMeters.map((meter) => (
+                    <MenuItem key={meter.id} value={meter.id}>
+                      {meter.serialNumber}
+                      {meter.model && ` — ${meter.model}`}
+                      {meter.meterSize && ` (${meter.meterSize})`}
+                    </MenuItem>
+                  ))
+                )}
               </TextField>
             </Grid>
 
             {/* Priority */}
-            <Grid item xs={12}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 select
                 fullWidth
@@ -219,16 +304,16 @@ const AssignMeterTaskDialog = ({
                 value={formData.priority}
                 onChange={handleChange("priority")}
               >
-                {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((priority) => (
-                  <MenuItem key={priority} value={priority}>
-                    {priority}
+                {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((p) => (
+                  <MenuItem key={p} value={p}>
+                    {p}
                   </MenuItem>
                 ))}
               </TextField>
             </Grid>
 
             {/* Due Date */}
-            <Grid item xs={12}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Due Date"
@@ -249,13 +334,12 @@ const AssignMeterTaskDialog = ({
                 onChange={handleChange("AssignedTo")}
                 required
               >
-                <MenuItem value="">— Select User —</MenuItem>
-                {users.map((user) => (
-                  <MenuItem key={user.id} value={user.id}>
-                    {`${user.firstName} ${user.lastName}`}
-                    {user.roles?.length
-                      ? ` — ${user.roles.map((r) => r.role).join(", ")}`
-                      : ""}
+                <MenuItem value="" disabled>
+                  — Select User —
+                </MenuItem>
+                {users.map((u) => (
+                  <MenuItem key={u.id} value={u.id}>
+                    {u.firstName} {u.lastName}
                   </MenuItem>
                 ))}
               </TextField>
@@ -273,18 +357,18 @@ const AssignMeterTaskDialog = ({
       </DialogContent>
 
       <DialogActions>
-        <Button
-          onClick={handleClose}
-          disabled={creating}
-          sx={{ color: theme?.palette?.secondary?.main }}
-        >
+        <Button onClick={handleClose} disabled={creating}>
           Cancel
         </Button>
         <Button
           variant="contained"
           onClick={handleSubmit}
-          disabled={creating || !formData.meterId || !formData.AssignedTo}
-          sx={{ color: theme?.palette?.primary?.contrastText }}
+          disabled={
+            creating ||
+            !formData.meterId ||
+            !formData.AssignedTo ||
+            !formData.TypeId
+          }
         >
           {creating ? "Creating..." : "Create Task"}
         </Button>

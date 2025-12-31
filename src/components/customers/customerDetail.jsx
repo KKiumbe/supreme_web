@@ -9,6 +9,7 @@ import {
   useMediaQuery,
   IconButton,
   TextField,
+  Divider,
 } from "@mui/material";
 import { Close } from "@mui/icons-material";
 import axios from "axios";
@@ -25,6 +26,14 @@ const CustomerDetails = ({ customerId, onClose }) => {
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "error" });
   const [smsMessage, setSmsMessage] = useState("");
 
+  // Commitment state
+  const [showCommitmentForm, setShowCommitmentForm] = useState(false);
+  const [commitmentAmount, setCommitmentAmount] = useState("");
+  const [commitmentStartDate, setCommitmentStartDate] = useState(
+    dayjs().format("YYYY-MM-DD")
+  );
+  const [submittingCommitment, setSubmittingCommitment] = useState(false);
+
   const theme = getTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -39,6 +48,11 @@ const CustomerDetails = ({ customerId, onClose }) => {
     updatedAt: data.updatedAt ? dayjs(data.updatedAt).format("MMM D, YYYY") : "-",
     customerDob: data.customerDob ? dayjs(data.customerDob).format("MMM D, YYYY") : "-",
   });
+
+  const getPrimaryAccount = () => {
+    const conn = customer?.connections?.[0];
+    return conn?.customerAccounts?.[0] || null;
+  };
 
   // Fetch customer details
   const fetchCustomerDetails = async () => {
@@ -78,14 +92,74 @@ const CustomerDetails = ({ customerId, onClose }) => {
       PENDING_CONNECTION: "warning",
     }[status] || "default");
 
-  // --- Send SMS ---
+  const handleRaiseCommitment = async () => {
+    const account = getPrimaryAccount();
+
+    if (!account) {
+      setSnackbar({
+        open: true,
+        message: "Customer account not found",
+        severity: "error",
+      });
+      return;
+    }
+
+    if (!commitmentAmount || Number(commitmentAmount) <= 0) {
+      setSnackbar({
+        open: true,
+        message: "Enter a valid commitment amount",
+        severity: "warning",
+      });
+      return;
+    }
+
+    setSubmittingCommitment(true);
+    try {
+      const res = await axios.post(
+        `${API_URL}/customers/commitments`,
+        {
+          customerAccountId: account.id,
+          commitmentAmount: Number(commitmentAmount),
+          commitmentStartDate,
+        },
+        { withCredentials: true }
+      );
+
+      if (res.data?.success) {
+        setSnackbar({
+          open: true,
+          message: "Commitment raised successfully",
+          severity: "success",
+        });
+        setShowCommitmentForm(false);
+        setCommitmentAmount("");
+        fetchCustomerDetails();
+      } else {
+        throw new Error(res.data?.message);
+      }
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.message || "Failed to raise commitment",
+        severity: "error",
+      });
+    } finally {
+      setSubmittingCommitment(false);
+    }
+  };
+
+  // Send SMS
   const handleSendSms = async () => {
     if (!smsMessage.trim()) {
       setSnackbar({ open: true, message: "Please enter a message", severity: "warning" });
       return;
     }
     try {
-      const res = await axios.post(`${API_URL}/send-sms-to-customer/${customerId}`, {  message: smsMessage }, { withCredentials: true });
+      const res = await axios.post(
+        `${API_URL}/send-sms-to-customer/${customerId}`,
+        { message: smsMessage },
+        { withCredentials: true }
+      );
       if (res.data.success) {
         setSnackbar({ open: true, message: "SMS sent successfully", severity: "success" });
         setSmsMessage("");
@@ -96,18 +170,69 @@ const CustomerDetails = ({ customerId, onClose }) => {
       setSnackbar({ open: true, message: "Error sending SMS: " + err.message, severity: "error" });
     }
   };
-  const handleSendBill = async () => {
 
-    const res = await axios.post(`${API_URL}/send-bills-to-connection/${customerId}`, {  message: smsMessage }, { withCredentials: true });
-    if (res.data.success) {
-      setSnackbar({ open: true, message: "SMS sent successfully", severity: "success" });
-      setSmsMessage("");
-    } else {
-      setSnackbar({ open: true, message: "Failed to send SMS", severity: "error" });
+  // Send Bill (SMS)
+  const handleSendBill = async () => {
+    try {
+      const res = await axios.post(
+        `${API_URL}/send-bills-to-connection/${customerId}`,
+        { message: smsMessage },
+        { withCredentials: true }
+      );
+      if (res.data.success) {
+        setSnackbar({ open: true, message: "Bill sent successfully", severity: "success" });
+        setSmsMessage("");
+      } else {
+        setSnackbar({ open: true, message: "Failed to send bill", severity: "error" });
+      }
+    } catch (err) {
+      setSnackbar({ open: true, message: "Error sending bill: " + err.message, severity: "error" });
     }
-    
-  }
-  // -----------------
+  };
+
+  // Download/View Connection Statement PDF
+  const handleViewStatement = async (connectionId) => {
+    try {
+      setLoading(true);
+
+      const response = await axios.get(
+        `${API_URL}/reports/connection/statement/${connectionId}`,
+        {
+          withCredentials: true,
+          responseType: "blob",
+        }
+      );
+
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+
+      // Auto-download
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `Statement_${connectionId}_${customer?.accountNumber || "customer"}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Clean up
+      setTimeout(() => window.URL.revokeObjectURL(url), 100);
+
+      setSnackbar({
+        open: true,
+        message: "Statement downloaded successfully",
+        severity: "success",
+      });
+    } catch (err) {
+      console.error(err);
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.message || "Failed to download statement",
+        severity: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (loading && !customer) {
     return (
@@ -159,6 +284,8 @@ const CustomerDetails = ({ customerId, onClose }) => {
     );
   }
 
+  const account = getPrimaryAccount();
+
   return (
     <>
       <Box
@@ -205,24 +332,39 @@ const CustomerDetails = ({ customerId, onClose }) => {
 
         <Box mb={2}>
           <Typography variant="subtitle1" fontWeight="bold">Connection Information</Typography>
+          
           {(customer.connections || []).length ? (
             customer.connections.map((conn, index) => (
-              <Box key={conn.id} mb={2}>
-                <Typography variant="body2" fontWeight="bold">Connection {index + 1}</Typography>
-                <Typography><strong>Connection Number:</strong> {conn.connectionNumber || "-"}</Typography>
-                <Typography component="div">
+              <Box 
+                key={conn.id} 
+                mb={2} 
+                p={2} 
+                border={1} 
+                borderColor="divider" 
+                borderRadius={1}
+                bgcolor="background.paper"
+              >
+                <Typography variant="body1" fontWeight="bold">
+                  Connection {index + 1} – {conn.connectionNumber}
+                </Typography>
+
+                <Typography component="div" mt={0.5}>
                   <strong>Status:</strong>{" "}
                   <Chip label={conn.status} color={getStatusColor(conn.status)} size="small" />
                 </Typography>
-                <Typography><strong>Scheme:</strong> {conn.scheme?.name || customer.schemeName}</Typography>
-                <Typography><strong>Zone:</strong> {conn.zone?.name || customer.zoneName}</Typography>
-                <Typography><strong>Route:</strong> {conn.route?.name || customer.routeName}</Typography>
-                <Typography><strong>Tariff:</strong> {conn.tariffCategory?.name || customer.tariffName}</Typography>
+
+                <Typography mt={0.5}>
+                  <strong>Scheme:</strong> {conn.scheme?.name || customer.schemeName || "-"}
+                </Typography>
+                <Typography>
+                  <strong>Tariff:</strong> {conn.tariffCategory?.name || customer.tariffName || "-"}
+                </Typography>
+
                 {conn.meter && (
                   <>
-                    <Typography><strong>Meter Serial:</strong> {conn.meter.serialNumber || "-"}</Typography>
-                    <Typography><strong>Meter Model:</strong> {conn.meter.model || "-"}</Typography>
-                    <Typography><strong>Meter Status:</strong> {conn.meter.status || "-"}</Typography>
+                    <Typography mt={0.5}>
+                      <strong>Meter Serial:</strong> {conn.meter.serialNumber || "-"}
+                    </Typography>
                     {(conn.meter.meterReadings || []).slice(0, 1).map((reading) => (
                       <Typography key={reading.id}>
                         <strong>Latest Reading:</strong>{" "}
@@ -233,6 +375,18 @@ const CustomerDetails = ({ customerId, onClose }) => {
                     ))}
                   </>
                 )}
+
+                {/* Statement button */}
+                <Button
+                  variant="outlined"
+                  size="small"
+                  color="theme.palette.primary.contrastText"
+                  sx={{ mt: 1.5 }}
+                  onClick={() => handleViewStatement(conn.id)}
+                  disabled={loading}
+                >
+                 Download Statement
+                </Button>
               </Box>
             ))
           ) : (
@@ -250,40 +404,141 @@ const CustomerDetails = ({ customerId, onClose }) => {
           <Typography><strong>Updated At:</strong> {customer.updatedAt || "-"}</Typography>
         </Box>
 
-        {/* Send SMS Section */}
+        {/* Commitment Section */}
+        <Typography fontWeight="bold" mb={1}>Payment Commitment</Typography>
 
+        {!account ? (
+          <Typography>No account found</Typography>
+        ) : (
+          <>
+            <Chip
+              label={account.commitmentActive ? "ACTIVE" : "INACTIVE"}
+              color={account.commitmentActive ? "success" : "default"}
+              size="small"
+              sx={{ mb: 1 }}
+            />
 
+            {account.commitmentActive ? (
+              <>
+                <Typography>
+                  Amount: KES {Number(account.commitmentAmount || 0).toFixed(2)}
+                </Typography>
+                <Typography>
+                  Start Date:{" "}
+                  {account.commitmentStartDate
+                    ? dayjs(account.commitmentStartDate).format("MMM D, YYYY")
+                    : "-"}
+                </Typography>
+              </>
+            ) : (
+              <>
+                {!showCommitmentForm ? (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="theme.palette.primary.contrastText"
+                    sx={{ mt: 1,  }}
+                    onClick={() => setShowCommitmentForm(true)}
+                  >
+                    Raise Commitment
+                  </Button>
+                ) : (
+                  <Box mt={2}>
+                    <TextField
+                      label="Commitment Amount (KES)"
+                      type="number"
+                      fullWidth
+                      value={commitmentAmount}
+                      onChange={(e) => setCommitmentAmount(e.target.value)}
+                      sx={{ mb: 2 }}
+                    />
+                    <TextField
+                      label="Start Date"
+                      type="date"
+                      fullWidth
+                      value={commitmentStartDate}
+                      onChange={(e) => setCommitmentStartDate(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                      sx={{ mb: 2 }}
+                    />
+                    <Box display="flex" gap={1}>
+                      <Button
+                        variant="contained"
+                        onClick={handleRaiseCommitment}
+                        disabled={submittingCommitment}
+                      >
+                        {submittingCommitment ? "Saving…" : "Confirm Commitment"}
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        onClick={() => setShowCommitmentForm(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </Box>
+                  </Box>
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        <Divider sx={{ my: 3 }} />
+
+        {/* SMS & Bill Section */}
         <Box mt={2}>
+          <Typography variant="subtitle1" fontWeight="bold" mb={1}>
+            Communication
+          </Typography>
 
-             <Button variant="contained" color="primary" onClick={handleSendBill}>
-            Send Bill
-          </Button>
           <TextField
             label="SMS Message"
             fullWidth
             multiline
-            rows={2}
+            rows={3}
             value={smsMessage}
             onChange={(e) => setSmsMessage(e.target.value)}
             variant="outlined"
-            sx={{ mb: 1 }}
-
-            
+            sx={{ mb: 2 }}
           />
 
-          
-          <Button variant="contained" color="primary" onClick={handleSendSms}>
-            Send SMS
-          </Button>
+          <Box display="flex" gap={2} flexWrap="wrap">
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleSendBill}
+              //disabled={!smsMessage.trim() || loading}
+            >
+              Send Bill
+            </Button>
 
-         
+            <Button
+              variant="contained"
+              color="secondary"
+              onClick={handleSendSms}
+              disabled={!smsMessage.trim() || loading}
+            >
+              Send SMS
+            </Button>
+          </Box>
         </Box>
 
-        <Box mt={2}>
-          <Button variant="outlined" onClick={fetchCustomerDetails} sx={{ mr: 1 }}>
+        <Box mt={3} display="flex" gap={2}>
+          <Button
+            variant="outlined"
+            onClick={fetchCustomerDetails}
+            disabled={loading}
+            sx={{ color: theme.palette.primary.contrastText }}
+          >
             Refresh
           </Button>
-          <Button variant="outlined" onClick={onClose}>Close</Button>
+          <Button
+            variant="outlined"
+            onClick={onClose}
+            sx={{ color: theme.palette.primary.contrastText }}
+          >
+            Close
+          </Button>
         </Box>
       </Box>
 
@@ -292,7 +547,9 @@ const CustomerDetails = ({ customerId, onClose }) => {
         autoHideDuration={6000}
         onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
       >
-        <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}>
+          {snackbar.message}
+        </Alert>
       </Snackbar>
     </>
   );

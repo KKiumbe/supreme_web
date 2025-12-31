@@ -23,7 +23,8 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import CustomerDetails from "../../components/customers/customerDetail";
-
+import EditCustomerModal from "../../components/customers/edit";
+import EditIcon from '@mui/icons-material/Edit';
 // Debounce hook
 const useDebounce = (value, delay = 500) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -67,7 +68,7 @@ const CustomersScreen = () => {
   const [routeId, setRouteId] = useState("");
   const [tariffCategoryId, setTariffCategoryId] = useState("");
   const [status, setStatus] = useState("");
-
+  const [editCustomerId, setEditCustomerId] = useState(null);
   const debouncedSearch = useDebounce(search);
 
   // Fetch dropdowns
@@ -138,6 +139,9 @@ const CustomersScreen = () => {
         page: pagination.page.toString(),
         limit: pagination.limit.toString(),
         ...(debouncedSearch && { search: debouncedSearch }),
+        ...(Number.isFinite(Number(debouncedSearch)) && {
+        connectionNumber: debouncedSearch,
+      }),
         ...(schemeId && { schemeId }),
         ...(zoneId && { zoneId }),
         ...(routeId && { routeId }),
@@ -206,6 +210,19 @@ const CustomersScreen = () => {
     setSelectedCustomerId(null);
   };
 
+  const handleOpenEdit = (customerId) => {
+  setEditCustomerId(customerId);
+};
+
+const handleCloseEdit = () => {
+  setEditCustomerId(null);
+};
+
+// Optional: refresh list after update
+const handleCustomerUpdated = () => {
+  fetchCustomers(); // your existing fetch function
+};
+
   // Normalize data
   const normalizedCustomers = useMemo(() => {
     return rawCustomers.map((c) => {
@@ -261,23 +278,55 @@ const CustomersScreen = () => {
   }, [rawCustomers]);
 
   const columns = [
+    // {
+    //   field: "actions",
+    //   headerName: "Actions",
+    //   width: 100,
+    //   align: "center",
+    //   renderCell: (params) => (
+    //     <IconButton
+    //       color="theme.palette.primary.contrastText" // Fixed color syntax
+    //       onClick={(e) => {
+    //         e.stopPropagation();
+    //         handleSelectCustomer(params?.row?.id);
+    //       }}
+    //     >
+    //       <Visibility />
+    //     </IconButton>
+    //   ),
+    // },
+
     {
-      field: "actions",
-      headerName: "Actions",
-      width: 100,
-      align: "center",
-      renderCell: (params) => (
-        <IconButton
-          color="theme.palette.primary.contrastText" // Fixed color syntax
-          onClick={(e) => {
-            e.stopPropagation();
-            handleSelectCustomer(params?.row?.id);
-          }}
-        >
-          <Visibility />
-        </IconButton>
-      ),
-    },
+
+    field: "actions",
+  headerName: "Action",
+  width: 140,
+  align: "center",
+  renderCell: (params) => (
+    <Box sx={{ display: 'flex', gap: 1 }}>
+      <IconButton
+        color="theme.palette.primary.contrastText"
+        size="small"
+        onClick={(e) => {
+          e.stopPropagation();
+          handleSelectCustomer(params.row.id);
+        }}
+      >
+        <Visibility />
+      </IconButton>
+
+      <IconButton
+        color="theme.palette.primary.contrastText"
+        size="small"
+        onClick={(e) => {
+          e.stopPropagation();
+          handleOpenEdit(params.row.id);
+        }}
+      >
+        <EditIcon />
+      </IconButton>
+    </Box>
+  )},
     { field: "accountNumber", headerName: "Account #", width: 130 },
     {
       field: "status",
@@ -534,6 +583,16 @@ const CustomersScreen = () => {
           </Box>
         )}
       </Box>
+
+      {editCustomerId && (
+  <EditCustomerModal
+    open={!!editCustomerId}
+    onClose={handleCloseEdit}
+    customerId={editCustomerId}
+    
+    onCustomerUpdated={handleCustomerUpdated}
+  />
+)}
     </Box>
   );
 };

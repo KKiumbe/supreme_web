@@ -25,7 +25,7 @@ const AssignTaskDialog = ({ open, onClose, taskId, onAssigned, theme }) => {
   const [connections, setConnections] = useState([]);
   const [loading, setLoading] = useState({ users: false, types: false, schemes: false, connections: false });
   const [assigning, setAssigning] = useState(false);
-  const [stage, setStage] = useState(1); // Stage 1: Task Details, Stage 2: Zone/Route, Stage 3: Connection/Confirm
+  const [stage, setStage] = useState(1); // 1: Details, 2: Zone/Route/Scheme, 3: Connection/Confirm
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -44,7 +44,11 @@ const AssignTaskDialog = ({ open, onClose, taskId, onAssigned, theme }) => {
 
   const isCreateMode = taskId === null;
 
-  // Fetch users and task types (Stage 1)
+  // Optional: still detect disconnection for better UX labels only
+  const selectedTaskType = taskTypes.find((t) => t.id === Number(formData.TypeId));
+  const isDisconnectionTask = selectedTaskType?.code === "CONN_DISC";
+
+  // Fetch users + task types
   useEffect(() => {
     if (!open || stage !== 1) return;
 
@@ -78,7 +82,7 @@ const AssignTaskDialog = ({ open, onClose, taskId, onAssigned, theme }) => {
     fetchTaskTypes();
   }, [open, stage]);
 
-  // Fetch schemes (Stage 2)
+  // Fetch schemes
   useEffect(() => {
     if (!open || stage !== 2) return;
 
@@ -98,7 +102,7 @@ const AssignTaskDialog = ({ open, onClose, taskId, onAssigned, theme }) => {
     fetchSchemes();
   }, [open, stage]);
 
-  // Fetch connections (Stage 3)
+  // Fetch connections
   useEffect(() => {
     if (!open || stage !== 3) return;
 
@@ -129,21 +133,18 @@ const AssignTaskDialog = ({ open, onClose, taskId, onAssigned, theme }) => {
     fetchConnections();
   }, [open, stage, formData.schemeId, formData.zoneId, formData.routeId, formData.connectionSearch]);
 
-  // Handle input changes
   const handleChange = (field) => (e) => {
     setFormData((prev) => ({
       ...prev,
       [field]: e.target.value,
-      // Reset dependent fields and ensure mutual exclusivity
       ...(field === "schemeId" ? { zoneId: "", routeId: "", RelatedConnectionId: "" } : {}),
       ...(field === "zoneId" ? { routeId: "", RelatedConnectionId: "" } : {}),
       ...(field === "routeId" ? { RelatedConnectionId: "" } : {}),
-      ...(field === "RelatedConnectionId" ? { zoneId: "", routeId: "" } : {}),
+      ...(field === "RelatedConnectionId" ? { schemeId: "", zoneId: "", routeId: "" } : {}),
     }));
     if (field === "AssignedTo" || field === "TypeId" || field === "title") setError("");
   };
 
-  // Navigate to next stage
   const handleNext = () => {
     if (stage === 1) {
       if (!formData.title || !formData.TypeId || !formData.AssignedTo) {
@@ -156,79 +157,71 @@ const AssignTaskDialog = ({ open, onClose, taskId, onAssigned, theme }) => {
     }
   };
 
-  // Navigate to previous stage
   const handleBack = () => {
     setStage(stage - 1);
     setError("");
   };
 
-  // Handle task creation or assignment
-  const handleSubmit = async () => {
-    setError("");
+const handleSubmit = async () => {
+  setError("");
 
-    if (!formData.AssignedTo) {
-      setError("Please select an assignee.");
-      return;
+  if (!formData.AssignedTo) {
+    setError("Please select an assignee.");
+    return;
+  }
+
+  if (isCreateMode && (!formData.title || !formData.TypeId)) {
+    setError("Title and task type are required.");
+    return;
+  }
+
+  setAssigning(true);
+  try {
+    if (isCreateMode) {
+      const payload = {
+        TypeId: Number(formData.TypeId),
+        title: formData.title,
+        description: formData.description,
+        priority: formData.priority,
+        dueDate: formData.dueDate || null,
+        scheduledAt: formData.dueDate || null,
+        AssignedTo: Number(formData.AssignedTo),
+        connectionId: formData.RelatedConnectionId ? Number(formData.RelatedConnectionId) : null,   // ← rename to match backend
+        zoneId: formData.zoneId ? Number(formData.zoneId) : null,
+        routeId: formData.routeId ? Number(formData.routeId) : null,
+        schemeId: formData.schemeId ? Number(formData.schemeId) : null,
+      };
+
+      // Choose endpoint based on task type
+      const endpoint = isDisconnectionTask 
+        ? '/tasks/disconnection' 
+        : '/create-task';
+
+      const { data } = await axios.post(`${API_URL}${endpoint}`, payload, {
+        withCredentials: true,
+      });
+      onAssigned?.(data);
+    } else {
+      // assign logic remains the same
+      const payload = {
+        userId: formData.AssignedTo,
+        taskTypeId: formData.TypeId || null,
+        note: formData.note,
+      };
+      const { data } = await axios.post(`${API_URL}/tasks/${taskId}/assign`, payload, {
+        withCredentials: true,
+      });
+      onAssigned?.(data);
     }
-
-    if (isCreateMode && (!formData.title || !formData.TypeId)) {
-      setError("Title and task type are required.");
-      return;
-    }
-
-    setAssigning(true);
-    try {
-      if (isCreateMode) {
-        // Create task
-const payload = {
-  TypeId: Number(formData.TypeId),
-  title: formData.title,
-  description: formData.description,
-  priority: formData.priority,
-  dueDate: formData.dueDate || null,
-  scheduledAt: formData.dueDate || null,
-  AssignedTo: Number(formData.AssignedTo),
-
-  RelatedConnectionId:
-    formData.RelatedConnectionId ? Number(formData.RelatedConnectionId) : null,
-
-  RelatedZoneId:
-    formData.zoneId && formData.zoneId !== "" ? Number(formData.zoneId) : null,
-
-  RelatedRouteId:
-    formData.routeId && formData.routeId !== "" ? Number(formData.routeId) : null,
-
-  RelatedSchemeId:
-    formData.schemeId && formData.schemeId !== "" ? Number(formData.schemeId) : null,
+    handleClose();
+  } catch (err) {
+    console.error(`Error ${isCreateMode ? "creating" : "assigning"} task:`, err);
+    setError(err.response?.data?.error || `Failed to ${isCreateMode ? "create" : "assign"} task.`);
+  } finally {
+    setAssigning(false);
+  }
 };
 
-
-        const { data } = await axios.post(`${API_URL}/create-task`, payload, {
-          withCredentials: true,
-        });
-        onAssigned?.(data);
-      } else {
-        // Assign task
-        const payload = {
-          userId: formData.AssignedTo,
-          taskTypeId: formData.TypeId || null,
-          note: formData.note,
-        };
-        const { data } = await axios.post(`${API_URL}/tasks/${taskId}/assign`, payload, {
-          withCredentials: true,
-        });
-        onAssigned?.(data);
-      }
-      handleClose();
-    } catch (err) {
-      console.error(`Error ${isCreateMode ? "creating" : "assigning"} task:`, err);
-      setError(err.response?.data?.error || `Failed to ${isCreateMode ? "create" : "assign"} task.`);
-    } finally {
-      setAssigning(false);
-    }
-  };
-
-  // Reset form and close dialog
   const handleClose = () => {
     setFormData({
       title: "",
@@ -249,139 +242,130 @@ const payload = {
     onClose();
   };
 
-  // Filter zones and routes based on selections
+  // Display helpers
   const selectedScheme = schemes.find((s) => s.id === formData.schemeId);
   const zones = selectedScheme?.zones || [];
   const selectedZone = zones.find((z) => z.id === formData.zoneId);
   const routes = selectedZone?.routes || [];
 
-  // Get display names for confirmation
-  const taskTypeName = taskTypes.find((t) => t.id === formData.TypeId)?.name || "N/A";
+  const schemeName = selectedScheme?.name || null;
+
+  const taskTypeName = selectedTaskType?.name || "N/A";
   const assigneeName = users.find((u) => u.id === formData.AssignedTo)
-    ? `${users.find((u) => u.id === formData.AssignedTo).firstName} ${users.find((u) => u.id === formData.AssignedTo).lastName}`
+    ? `${users.find((u) => u.id === formData.AssignedTo)?.firstName || ""} ${
+        users.find((u) => u.id === formData.AssignedTo)?.lastName || ""
+      }`
     : "N/A";
-  const connectionName = connections.find((c) => c.connections[0]?.id === formData.RelatedConnectionId)
-    ? `${connections.find((c) => c.connections[0]?.id === formData.RelatedConnectionId).customerName}`
-    : null;
+
+  const connectionObj = connections.find((c) => c.connections?.[0]?.id === formData.RelatedConnectionId);
+  const connectionName = connectionObj ? connectionObj.customerName : null;
+
   const zoneName = zones.find((z) => z.id === formData.zoneId)?.name || null;
   const routeName = routes.find((r) => r.id === formData.routeId)?.name || null;
+
   const assignmentDisplay = connectionName
     ? `Connection: ${connectionName}`
     : zoneName
     ? `Zone: ${zoneName}`
     : routeName
     ? `Route: ${routeName}`
+    : schemeName
+    ? `Scheme: ${schemeName}`
     : "None";
 
   const loadingAll = loading.users || loading.types || loading.schemes || loading.connections;
 
   return (
-    <Dialog open={open} onClose={handleClose} >
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>
         {isCreateMode
           ? stage === 1
             ? "Create Task"
             : stage === 2
-            ? "Assign Zone or Route"
-            : "Assign Connection or Confirm"
+            ? "Select Scheme / Zone / Route (optional)"
+            : "Select Connection (optional) & Confirm"
           : "Assign Task"}
       </DialogTitle>
 
       <DialogContent dividers>
         {loadingAll ? (
-          <Box display="flex" justifyContent="center" py={3}>
+          <Box display="flex" justifyContent="center" py={4}>
             <CircularProgress />
           </Box>
         ) : (
-          <Grid container spacing={2}>
+          <Grid container spacing={2.5}>
             {stage === 1 && (
               <>
                 {isCreateMode && (
-                  <Grid item xs={12}>
-                  
-                  </Grid>
+                  <>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Task Title"
+                        value={formData.title}
+                        onChange={handleChange("title")}
+                        required
+                      />
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Description"
+                        multiline
+                        minRows={2}
+                        value={formData.description}
+                        onChange={handleChange("description")}
+                      />
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <TextField
+                        select
+                        fullWidth
+                        label="Task Type"
+                        value={formData.TypeId}
+                        onChange={handleChange("TypeId")}
+                        required
+                      >
+                        <MenuItem value="">— Select Task Type —</MenuItem>
+                        {taskTypes.map((type) => (
+                          <MenuItem key={type.id} value={type.id}>
+                            {type.name}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <TextField
+                        select
+                        fullWidth
+                        label="Priority"
+                        value={formData.priority}
+                        onChange={handleChange("priority")}
+                      >
+                        {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((p) => (
+                          <MenuItem key={p} value={p}>
+                            {p}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Due Date"
+                        type="date"
+                        value={formData.dueDate}
+                        onChange={handleChange("dueDate")}
+                        InputLabelProps={{ shrink: true }}
+                      />
+                    </Grid>
+                  </>
                 )}
 
-                {/* Title (Create Mode Only) */}
-                {isCreateMode && (
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      label="Task Title"
-                      value={formData.title}
-                      onChange={handleChange("title")}
-                      required
-                    />
-                  </Grid>
-                )}
-
-                {/* Description (Create Mode Only) */}
-                {isCreateMode && (
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      label="Description"
-                      multiline
-                      minRows={2}
-                      value={formData.description}
-                      onChange={handleChange("description")}
-                    />
-                  </Grid>
-                )}
-
-                {/* Task Type */}
-                <Grid item xs={12}>
-                  <TextField
-                    select
-                    fullWidth
-                    label="Task Type"
-                    value={formData.TypeId}
-                    onChange={handleChange("TypeId")}
-                    required={isCreateMode}
-                  >
-                    <MenuItem value="">— Select Task Type —</MenuItem>
-                    {taskTypes.map((type) => (
-                      <MenuItem key={type.id} value={type.id}>
-                        {type.name}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Grid>
-
-                {/* Priority (Create Mode Only) */}
-                {isCreateMode && (
-                  <Grid item xs={12}>
-                    <TextField
-                      select
-                      fullWidth
-                      label="Priority"
-                      value={formData.priority}
-                      onChange={handleChange("priority")}
-                    >
-                      {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((priority) => (
-                        <MenuItem key={priority} value={priority}>
-                          {priority}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </Grid>
-                )}
-
-                {/* Due Date (Create Mode Only) */}
-                {isCreateMode && (
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      label="Due Date"
-                      type="date"
-                      value={formData.dueDate}
-                      onChange={handleChange("dueDate")}
-                      InputLabelProps={{ shrink: true }}
-                    />
-                  </Grid>
-                )}
-
-                {/* Assignee */}
                 <Grid item xs={12}>
                   <TextField
                     select
@@ -401,7 +385,6 @@ const payload = {
                   </TextField>
                 </Grid>
 
-                {/* Note (Assign Mode Only) */}
                 {!isCreateMode && (
                   <Grid item xs={12}>
                     <TextField
@@ -415,21 +398,16 @@ const payload = {
                   </Grid>
                 )}
 
-                 <Typography variant="body3" color="textSecondary" mb={2} align="center" p={2}>
-                      Click Next to assign the task to a zone/route or a connection
-                    </Typography>
+                <Grid item xs={12}>
+                  <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 1 }}>
+                    Next → Optionally select scheme/zone/route or connection
+                  </Typography>
+                </Grid>
               </>
-              
             )}
-             
 
             {stage === 2 && isCreateMode && (
               <>
-                <Grid item xs={12}>
-                
-                </Grid>
-
-                {/* Scheme */}
                 <Grid item xs={12}>
                   <TextField
                     select
@@ -447,7 +425,6 @@ const payload = {
                   </TextField>
                 </Grid>
 
-                {/* Zone */}
                 <Grid item xs={12}>
                   <TextField
                     select
@@ -455,7 +432,7 @@ const payload = {
                     label="Zone"
                     value={formData.zoneId}
                     onChange={handleChange("zoneId")}
-                    disabled={!formData.schemeId || formData.routeId}
+                    disabled={!formData.schemeId}
                   >
                     <MenuItem value="">— Select Zone —</MenuItem>
                     {zones.map((zone) => (
@@ -466,7 +443,6 @@ const payload = {
                   </TextField>
                 </Grid>
 
-                {/* Route */}
                 <Grid item xs={12}>
                   <TextField
                     select
@@ -485,33 +461,37 @@ const payload = {
                   </TextField>
                 </Grid>
 
-                <Typography variant="body3" color="textSecondary" mb={2} align="center" p={2}>
-                      Click Next skip ,to assign the task to a connection
-                    </Typography>
+                <Grid item xs={12}>
+                  <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 1 }}>
+                    Next → Optionally select a specific connection
+                  </Typography>
+                </Grid>
               </>
             )}
 
             {stage === 3 && isCreateMode && (
               <>
                 <Grid item xs={12}>
-                  <Typography variant="body2" color="textSecondary" mb={2}>
-                    Select a connection or confirm to create the task.
+                  <Typography variant="body1" fontWeight="medium" gutterBottom>
+                    Select Specific Connection (optional)
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    {isDisconnectionTask
+                      ? "For disconnection tasks you may select a connection, route, zone or scheme."
+                      : "Linking to a connection is optional."}
                   </Typography>
                 </Grid>
 
-                {/* Connection Search */}
                 <Grid item xs={12}>
                   <TextField
                     fullWidth
                     label="Search Customer"
                     value={formData.connectionSearch}
                     onChange={handleChange("connectionSearch")}
-                    placeholder="Enter customer name"
-                    disabled={formData.zoneId || formData.routeId}
+                    placeholder="Enter customer name, account number, or meter number"
                   />
                 </Grid>
 
-                {/* Connection */}
                 <Grid item xs={12}>
                   <TextField
                     select
@@ -519,49 +499,48 @@ const payload = {
                     label="Connection"
                     value={formData.RelatedConnectionId}
                     onChange={handleChange("RelatedConnectionId")}
-                    disabled={loading.connections || formData.zoneId || formData.routeId}
                   >
-                    <MenuItem value="">— Select Connection —</MenuItem>
+                    <MenuItem value="">— Select Connection (optional) —</MenuItem>
                     {connections.map((customer) => (
-                      <MenuItem key={customer.connections[0]?.id} value={customer.connections[0]?.id}>
-                        {`${customer.customerName} — ${customer.schemeName || "N/A"} / ${customer.zoneName || "N/A"} / ${customer.routeName || "N/A"}`}
+                      <MenuItem
+                        key={customer.connections?.[0]?.id}
+                        value={customer.connections?.[0]?.id}
+                      >
+                        {customer.customerName} —{" "}
+                        {customer.schemeName || "N/A"} / {customer.zoneName || "N/A"} /{" "}
+                        {customer.routeName || "N/A"}
                       </MenuItem>
                     ))}
                   </TextField>
                 </Grid>
 
-                {/* Confirmation Summary */}
-                <Grid item xs={12} mt={2}>
-                  <Typography variant="h6" mb={2}>
-                    Task Details
+                <Grid item xs={12} mt={3}>
+                  <Typography variant="h6" gutterBottom>
+                    Summary
                   </Typography>
-                  <Typography variant="body1">
-                    <strong>Title:</strong> {formData.title}
+                  <Typography>
+                    <strong>Title:</strong> {formData.title || "—"}
                   </Typography>
-                  <Typography variant="body1">
-                    <strong>Description:</strong> {formData.description || "N/A"}
+                  <Typography>
+                    <strong>Type:</strong> {taskTypeName}
                   </Typography>
-                  <Typography variant="body1">
-                    <strong>Task Type:</strong> {taskTypeName}
-                  </Typography>
-                  <Typography variant="body1">
+                  <Typography>
                     <strong>Priority:</strong> {formData.priority}
                   </Typography>
-                  <Typography variant="body1">
-                    <strong>Due Date:</strong>{" "}
-                    {formData.dueDate ? dayjs(formData.dueDate).format("MMM D, YYYY") : "N/A"}
+                  <Typography>
+                    <strong>Due:</strong>{" "}
+                    {formData.dueDate ? dayjs(formData.dueDate).format("MMM D, YYYY") : "—"}
                   </Typography>
-                  <Typography variant="body1">
+                  <Typography>
                     <strong>Assignee:</strong> {assigneeName}
                   </Typography>
-                  <Typography variant="body1">
-                    <strong>Assignment:</strong> {assignmentDisplay}
+                  <Typography>
+                    <strong>Linked to:</strong> {assignmentDisplay}
                   </Typography>
                 </Grid>
               </>
             )}
 
-            {/* Error Message */}
             {error && (
               <Grid item xs={12}>
                 <Typography color="error" variant="body2">
@@ -576,30 +555,23 @@ const payload = {
       <DialogActions>
         {stage === 1 ? (
           <>
-            <Button onClick={handleClose} disabled={assigning}
-            sx={{ color: theme?.palette?.secondary?.main }}
-            >
+            <Button onClick={handleClose} disabled={assigning} color="inherit">
               Cancel
             </Button>
+
             {isCreateMode ? (
               <>
                 <Button
-                 variant="outlined"
+                  variant="outlined"
                   onClick={handleSubmit}
                   disabled={assigning || !formData.AssignedTo || !formData.title || !formData.TypeId}
-                     
                 >
                   {assigning ? "Creating..." : "Create Task"}
                 </Button>
                 <Button
-                  variant="outlined"
+                  variant="contained"
                   onClick={handleNext}
                   disabled={assigning || !formData.AssignedTo || !formData.title || !formData.TypeId}
-               
-                   sx={{ color: theme?.palette?.primary?.contrastText }}
-
-                   
-                
                 >
                   Next
                 </Button>
@@ -616,15 +588,12 @@ const payload = {
           </>
         ) : (
           <>
-            <Button onClick={handleBack} disabled={assigning}>
+            <Button onClick={handleBack} disabled={assigning} color="inherit">
               Back
             </Button>
+
             {stage === 2 ? (
-              <Button
-                variant="contained"
-                onClick={handleNext}
-                disabled={assigning}
-              >
+              <Button variant="contained" onClick={handleNext} disabled={assigning}>
                 Next
               </Button>
             ) : (
@@ -632,8 +601,9 @@ const payload = {
                 variant="contained"
                 onClick={handleSubmit}
                 disabled={assigning}
+                color={isDisconnectionTask ? "error" : "primary"}
               >
-                {assigning ? "Creating..." : "Confirm Task"}
+                {assigning ? "Creating..." : "Confirm & Create"}
               </Button>
             )}
           </>
@@ -648,18 +618,7 @@ AssignTaskDialog.propTypes = {
   onClose: PropTypes.func.isRequired,
   taskId: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.oneOf([null])]),
   onAssigned: PropTypes.func,
-  theme: PropTypes.shape({
-    palette: PropTypes.shape({
-      secondary: PropTypes.shape({
-        main: PropTypes.string,
-      }),
-      primary: PropTypes.shape({
-        main: PropTypes.string,
-        contrastText: PropTypes.string,
-      }),
-    }),
-  }),
-  // customerId: PropTypes.any, // Removed unused prop
+  theme: PropTypes.object,
 };
 
 export default AssignTaskDialog;

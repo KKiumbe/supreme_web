@@ -11,18 +11,21 @@ import {
   CircularProgress,
   Box,
   Typography,
+  Autocomplete,
 } from "@mui/material";
 import axios from "axios";
 import { toast } from "react-toastify";
+import { debounce } from "lodash";
 
 const BASEURL = import.meta.env.VITE_BASE_URL || "";
 
 const ReceiptPayment = ({ open, onClose, paymentId, onReceiptComplete }) => {
   const [payment, setPayment] = useState(null);
-  const [customers, setCustomers] = useState([]);
-  const [connections, setConnections] = useState([]);
 
-  const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [customers, setCustomers] = useState([]);
+  const [filteredCustomers, setFilteredCustomers] = useState([]);
+
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [selectedConnectionId, setSelectedConnectionId] = useState("");
 
   const [loading, setLoading] = useState(false);
@@ -30,7 +33,7 @@ const ReceiptPayment = ({ open, onClose, paymentId, onReceiptComplete }) => {
   const [error, setError] = useState("");
 
   /* -------------------------------------------------------
-     Fetch payment + customers
+     Fetch payment + initial customers
   --------------------------------------------------------*/
   const fetchData = useCallback(async () => {
     if (!paymentId) return;
@@ -39,37 +42,36 @@ const ReceiptPayment = ({ open, onClose, paymentId, onReceiptComplete }) => {
     setError("");
 
     try {
-      // 1️⃣ Payment
+      // Payment
       const paymentRes = await axios.get(
         `${BASEURL}/payment/${paymentId}`,
         { withCredentials: true }
       );
 
-      if (!paymentRes.data?.success) {
-        throw new Error(paymentRes.data?.message || "Failed to fetch payment");
-      }
-
-      const paymentData = paymentRes.data.data;
+      const paymentData = paymentRes.data?.data;
       setPayment(paymentData);
 
-      // 2️⃣ Customers
+      // Customers (initial load)
       const customersRes = await axios.get(
         `${BASEURL}/customers`,
         { withCredentials: true }
       );
 
-      const customersData = customersRes.data?.data?.customers || [];
-      setCustomers(customersData);
+      const list = customersRes.data?.data?.customers || [];
+      setCustomers(list);
+      setFilteredCustomers(list);
 
-      // 3️⃣ Try auto-match customer by name
-      const matchedCustomer = customersData.find(c =>
+      // Auto-match by name
+      const matched = list.find(c =>
         paymentData?.name &&
         c.customerName?.toLowerCase().includes(paymentData.name.toLowerCase())
       );
 
-      if (matchedCustomer) {
-        setSelectedCustomerId(matchedCustomer.id);
-        setConnections(matchedCustomer.connections || []);
+      if (matched) {
+        setSelectedCustomer(matched);
+        if (matched.connections?.length === 1) {
+          setSelectedConnectionId(matched.connections[0].id);
+        }
       }
 
     } catch (err) {
@@ -89,25 +91,46 @@ const ReceiptPayment = ({ open, onClose, paymentId, onReceiptComplete }) => {
   }, [fetchData]);
 
   /* -------------------------------------------------------
-     Handle customer → connection cascade
+     🔍 Debounced customer search (same as Create Payment)
   --------------------------------------------------------*/
-  useEffect(() => {
-    if (!selectedCustomerId) {
-      setConnections([]);
-      setSelectedConnectionId("");
-      return;
-    }
+  const searchCustomers = useCallback(
+    debounce(async (query) => {
+      if (!query?.trim()) {
+        setFilteredCustomers(customers);
+        return;
+      }
 
-    const customer = customers.find(c => c.id === selectedCustomerId);
-    setConnections(customer?.connections || []);
+      try {
+        const res = await axios.get(`${BASEURL}/customers`, {
+          params: { search: query },
+          withCredentials: true,
+        });
+
+        setFilteredCustomers(res.data?.data?.customers || []);
+      } catch {
+        setFilteredCustomers(customers);
+      }
+    }, 300),
+    [customers]
+  );
+
+  /* -------------------------------------------------------
+     Customer → Connection cascade
+  --------------------------------------------------------*/
+  const handleCustomerSelect = (_, value) => {
+    setSelectedCustomer(value);
     setSelectedConnectionId("");
-  }, [selectedCustomerId, customers]);
+
+    if (value?.connections?.length === 1) {
+      setSelectedConnectionId(value.connections[0].id);
+    }
+  };
 
   /* -------------------------------------------------------
      Submit receipt
   --------------------------------------------------------*/
   const handleSubmit = async () => {
-    if (!selectedCustomerId) {
+    if (!selectedCustomer) {
       toast.error("Please select a customer");
       return;
     }
@@ -120,7 +143,7 @@ const ReceiptPayment = ({ open, onClose, paymentId, onReceiptComplete }) => {
     setSubmitting(true);
 
     try {
-      const res = await axios.post(
+      await axios.post(
         `${BASEURL}/receipt/settle-unreceipted`,
         {
           connectionId: Number(selectedConnectionId),
@@ -131,16 +154,11 @@ const ReceiptPayment = ({ open, onClose, paymentId, onReceiptComplete }) => {
         { withCredentials: true }
       );
 
-      if (res.status === 200 || res.status === 201) {
-        toast.success("Payment receipted successfully");
-        onReceiptComplete?.();
-        onClose();
-      } else {
-        throw new Error(res.data?.message || "Unexpected response");
-      }
+      toast.success("Payment receipted successfully");
+      onReceiptComplete?.();
+      onClose();
 
     } catch (err) {
-      console.error(err);
       toast.error(
         err.response?.data?.message ||
         err.message ||
@@ -160,12 +178,7 @@ const ReceiptPayment = ({ open, onClose, paymentId, onReceiptComplete }) => {
 
       <DialogContent>
         {loading ? (
-          <Box
-            display="flex"
-            justifyContent="center"
-            alignItems="center"
-            minHeight="200px"
-          >
+          <Box display="flex" justifyContent="center" minHeight={200}>
             <CircularProgress />
           </Box>
         ) : error ? (
@@ -193,45 +206,42 @@ const ReceiptPayment = ({ open, onClose, paymentId, onReceiptComplete }) => {
               InputProps={{ readOnly: true }}
             />
 
-            {/* Customer */}
-            <TextField
-              label="Customer"
-              select
-              fullWidth
-              value={selectedCustomerId}
-              onChange={(e) => setSelectedCustomerId(e.target.value)}
-            >
-              {customers.length ? (
-                customers.map(c => (
-                  <MenuItem key={c.id} value={c.id}>
-                    {c.customerName} ({c.phoneNumber})
-                  </MenuItem>
-                ))
-              ) : (
-                <MenuItem disabled>No customers found</MenuItem>
+            {/* 🔍 CUSTOMER SEARCH */}
+            <Autocomplete
+              options={filteredCustomers}
+              value={selectedCustomer}
+              onChange={handleCustomerSelect}
+              onInputChange={(_, value) => searchCustomers(value)}
+              getOptionLabel={(o) =>
+                `${o.customerName} (${o.accountNumber})${o.phoneNumber ? ` - ${o.phoneNumber}` : ""}`
+              }
+              isOptionEqualToValue={(o, v) => o.id === v.id}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Search Customer"
+                  placeholder="Name, phone, or account"
+                  required
+                />
               )}
-            </TextField>
+            />
 
-            {/* Connection */}
-            <TextField
-              label="Connection"
-              select
-              fullWidth
-              disabled={!connections.length}
-              value={selectedConnectionId}
-              onChange={(e) => setSelectedConnectionId(e.target.value)}
-            >
-              {connections.length ? (
-                connections.map(conn => (
+            {/* CONNECTION */}
+            {selectedCustomer && (
+              <TextField
+                select
+                label="Connection"
+                value={selectedConnectionId}
+                onChange={(e) => setSelectedConnectionId(e.target.value)}
+                required
+              >
+                {selectedCustomer.connections?.map(conn => (
                   <MenuItem key={conn.id} value={conn.id}>
-                    Connection #{conn.connectionNumber} –{" "}
-                    {conn.scheme?.name || "No Scheme"}
+                    Conn #{conn.connectionNumber} — {conn.scheme?.name || "No Scheme"}
                   </MenuItem>
-                ))
-              ) : (
-                <MenuItem disabled>No connections available</MenuItem>
-              )}
-            </TextField>
+                ))}
+              </TextField>
+            )}
           </Box>
         ) : (
           <Typography>No payment found</Typography>
@@ -246,12 +256,7 @@ const ReceiptPayment = ({ open, onClose, paymentId, onReceiptComplete }) => {
         <Button
           variant="contained"
           onClick={handleSubmit}
-          disabled={
-            loading ||
-            submitting ||
-            !selectedCustomerId ||
-            !selectedConnectionId
-          }
+          disabled={submitting || !selectedCustomer || !selectedConnectionId}
         >
           {submitting ? "Submitting..." : "Receipt"}
         </Button>
