@@ -77,7 +77,7 @@ const CustomersScreen = () => {
       try {
         const [schemesRes, tariffsRes] = await Promise.all([
           axios.get(`${BASEURL}/schemes`, { withCredentials: true }),
-          axios.get(`${BASEURL}/tariffs/block`, { withCredentials: true }), // Fixed typo
+          axios.get(`${BASEURL}/tarrifs/block`, { withCredentials: true }), // Fixed typo
         ]);
 
         setSchemes(schemesRes.data.data || []);
