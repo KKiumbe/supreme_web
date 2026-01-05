@@ -9,87 +9,107 @@ import {
   Grid,
   Autocomplete,
   MenuItem,
-  CircularProgress,
-  Skeleton,
-  useTheme,
-  useMediaQuery,
+  Skeleton
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
-import { Search as SearchIcon, Refresh as RefreshIcon, Download as DownloadIcon } from "@mui/icons-material";
+import {
+  Search as SearchIcon,
+  Refresh as RefreshIcon,
+  Download as DownloadIcon,
+} from "@mui/icons-material";
 import axios from "axios";
 import { useAuthStore } from "../../store/authStore";
 import { useNavigate } from "react-router-dom";
 
-// Debounce hook
+/* -------------------------------------------------------
+   Debounce Hook
+------------------------------------------------------- */
 const useDebounce = (value, delay = 500) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
+
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedValue(value), delay);
     return () => clearTimeout(handler);
   }, [value, delay]);
+
   return debouncedValue;
 };
 
+/* -------------------------------------------------------
+   Screen
+------------------------------------------------------- */
 const PaymentsScreen = () => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
+  const navigate = useNavigate();
+  const currentUser = useAuthStore(state => state.currentUser);
+  const BASEURL = import.meta.env.VITE_BASE_URL;
 
-  // State
+  /* -------------------------------------------------------
+     Auth Guard
+  ------------------------------------------------------- */
+  useEffect(() => {
+    if (!currentUser) navigate("/login");
+  }, [currentUser, navigate]);
+
+  /* -------------------------------------------------------
+     State
+  ------------------------------------------------------- */
   const [payments, setPayments] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
   const [pagination, setPagination] = useState({
     page: 1,
     pageSize: 10,
     totalCount: 0,
     totalPages: 1,
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+
   const [search, setSearch] = useState("");
   const [modeOfPayment, setModeOfPayment] = useState("");
+
   const debouncedSearch = useDebounce(search);
-
-  // Payment modes
-
-    const currentUser = useAuthStore((state) => state.currentUser);
-    const navigate = useNavigate();
-  
-    const BASEURL = import.meta.env.VITE_BASE_URL;
-
-
-      useEffect(() => {
-        if (!currentUser) {
-          navigate("/login");
-        }
-      }, [currentUser, navigate]);
 
   const paymentModes = ["MPESA", "CASH", "BANK_TRANSFER"];
 
-  // Fetch payments
+  /* -------------------------------------------------------
+     Fetch Payments
+  ------------------------------------------------------- */
   const fetchPayments = useCallback(async () => {
     setLoading(true);
     setError(null);
+
     try {
       const params = new URLSearchParams({
         page: pagination.page.toString(),
         pageSize: pagination.pageSize.toString(),
-        ...(debouncedSearch && { search: debouncedSearch }),
-        ...(modeOfPayment && { modeOfPayment }),
       });
 
-      const res = await axios.get(`${BASEURL}/payments?${params}`,{
-        withCredentials: true
-      });
-      if (!res.data?.data) {
-        throw new Error("Invalid API response structure");
+      // 🔍 Smart search routing
+      if (debouncedSearch) {
+        if (/^\d{1,6}$/.test(debouncedSearch)) {
+          params.append("ref", debouncedSearch);
+        } else if (/^[a-zA-Z\s]+$/.test(debouncedSearch)) {
+          params.append("name", debouncedSearch);
+        } else {
+          params.append("transactionId", debouncedSearch);
+        }
       }
 
-      setPayments(res.data.data || []);
+      if (modeOfPayment) {
+        params.append("mode", modeOfPayment);
+      }
+
+      const res = await axios.get(`${BASEURL}/payments?${params.toString()}`, {
+        withCredentials: true,
+      });
+
+      setPayments(res.data?.data ?? []);
       setPagination({
-        page: res.data.page || 1,
-        pageSize: res.data.pageSize || 10,
-        totalCount: res.data.totalCount || 0,
-        totalPages: res.data.totalPages || 1,
+        page: res.data.page,
+        pageSize: res.data.pageSize,
+        totalCount: res.data.totalCount,
+        totalPages: res.data.totalPages,
       });
     } catch (err) {
       console.error("Failed to fetch payments:", err);
@@ -98,92 +118,114 @@ const PaymentsScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.pageSize, debouncedSearch, modeOfPayment, BASEURL]);
+  }, [
+    BASEURL,
+    pagination.page,
+    pagination.pageSize,
+    debouncedSearch,
+    modeOfPayment,
+  ]);
 
   useEffect(() => {
     fetchPayments();
   }, [fetchPayments]);
 
-  // Handle search
-  const handleSearch = (event, value) => {
-    setSearch(value || "");
-    setPagination((prev) => ({ ...prev, page: 1 }));
+  /* -------------------------------------------------------
+     Actions
+  ------------------------------------------------------- */
+  const handleSearch = (_, value) => {
+    setSearch(value ?? "");
+    setPagination(prev => ({ ...prev, page: 1 }));
   };
 
-  // Reset filters
   const handleReset = () => {
     setSearch("");
     setModeOfPayment("");
-    setPagination((prev) => ({ ...prev, page: 1 }));
+    setPagination(prev => ({ ...prev, page: 1 }));
   };
 
-  // Export to CSV
   const exportToCSV = (data, filename) => {
-    const headers = ["Amount", "Mode of Payment", "Name", "Transaction ID", "Reference", "Created At"];
-    const rows = data.map((payment) =>
+    const headers = [
+      "Amount",
+      "Mode",
+      "Name",
+      "Transaction ID",
+      "Reference",
+      "Created At",
+    ];
+
+    const rows = data.map(p =>
       [
-        payment.amount,
-        payment.modeOfPayment,
-        payment.name,
-        payment.transactionId,
-        payment.ref || "-",
-        new Date(payment.createdAt).toLocaleString(),
+        p.amount,
+        p.modeOfPayment,
+        p.name,
+        p.transactionId,
+        p.ref || "-",
+        p.createdAt,
       ]
-        .map((field) => `"${field}"`)
+        .map(v => `"${v}"`)
         .join(",")
     );
+
     const csv = [headers.join(","), ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
+
     const a = document.createElement("a");
     a.href = url;
     a.download = filename;
     a.click();
-    window.URL.revokeObjectURL(url);
+    URL.revokeObjectURL(url);
   };
 
-  // Normalize payment data
-  const normalizedPayments = useMemo(() => {
-    return payments.map((payment) => ({
-      id: payment.id,
-      amount: `KES ${payment.amount.toLocaleString()}`,
-      modeOfPayment: payment.modeOfPayment,
-      name: payment.name,
-      transactionId: payment.transactionId,
-      ref: payment.ref || "-",
-      createdAt: new Date(payment.createdAt).toLocaleString(),
-    }));
-  }, [payments]);
+  /* -------------------------------------------------------
+     Normalize for DataGrid
+  ------------------------------------------------------- */
+  const normalizedPayments = useMemo(
+    () =>
+      payments.map(p => ({
+        id: p.id,
+        amount: `KES ${Number(p.amount).toLocaleString()}`,
+        modeOfPayment: p.modeOfPayment,
+        name: p.name,
+        transactionId: p.transactionId,
+        ref: p.ref ?? "-",
+        createdAt: new Date(p.createdAt).toLocaleString(),
+      })),
+    [payments]
+  );
 
-  // DataGrid columns
+  /* -------------------------------------------------------
+     Columns
+  ------------------------------------------------------- */
   const columns = useMemo(
     () => [
-      { field: "amount", headerName: "Amount", width: 120 },
-      { field: "modeOfPayment", headerName: "Payment Mode", width: 150 },
-      { field: "name", headerName: "Name", width: 180 },
-      { field: "transactionId", headerName: "Transaction ID", width: 200 },
-      { field: "ref", headerName: "Reference", width: 150 },
+      { field: "amount", headerName: "Amount", width: 130 },
+      { field: "modeOfPayment", headerName: "Payment Mode", width: 160 },
+      { field: "name", headerName: "Name", width: 200 },
+      { field: "transactionId", headerName: "Transaction ID", width: 220 },
+      { field: "ref", headerName: "Reference", width: 120 },
       { field: "createdAt", headerName: "Created At", width: 200 },
     ],
     []
   );
 
+  /* -------------------------------------------------------
+     Render
+  ------------------------------------------------------- */
   return (
-    <Box
-      sx={{
-        p: 3,
-        minHeight: "calc(100vh - 64px)",
-        maxWidth: "100vw",
-        overflow: "auto",
-      }}
-    >
+    <Box sx={{ p: 3, minHeight: "100vh" }}>
       {/* Header */}
       <Grid container justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h5" fontWeight="bold">
           Payments
         </Typography>
-        <Tooltip title="Export to CSV">
-          <IconButton onClick={() => exportToCSV(normalizedPayments, "payments.csv")}>
+        <Tooltip title="Export CSV">
+          <IconButton
+            onClick={() =>
+              exportToCSV(normalizedPayments, "payments.csv")
+            }
+          >
             <DownloadIcon />
           </IconButton>
         </Tooltip>
@@ -192,52 +234,51 @@ const PaymentsScreen = () => {
       {/* Filters */}
       <Paper sx={{ p: 2, mb: 3 }}>
         <Grid container spacing={2}>
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={5}>
             <Autocomplete
-              options={payments.map((p) => p.name).concat(payments.map((p) => p.transactionId))}
               freeSolo
+              options={[]}
               onInputChange={handleSearch}
-              renderInput={(params) => (
+              renderInput={params => (
                 <TextField
                   {...params}
-                  fullWidth
                   size="small"
-                  placeholder="Search by name or transaction ID"
+                  fullWidth
+                  placeholder="Search by reference, name, or transaction ID"
                   InputProps={{
                     ...params.InputProps,
-                    startAdornment: <SearchIcon sx={{ mr: 1, color: "text.secondary" }} />,
-                  }}
-                  inputProps={{
-                    ...params.inputProps,
-                    "aria-label": "Search payments by name or transaction ID",
+                    startAdornment: (
+                      <SearchIcon sx={{ mr: 1, color: "text.secondary" }} />
+                    ),
                   }}
                 />
               )}
-              noOptionsText="No results found"
             />
           </Grid>
-          <Grid item xs={12} md={2}>
+
+          <Grid item xs={12} md={3}>
             <TextField
               select
-              fullWidth
               size="small"
+              fullWidth
               label="Payment Mode"
               value={modeOfPayment}
-              onChange={(e) => {
+              onChange={e => {
                 setModeOfPayment(e.target.value);
-                setPagination((prev) => ({ ...prev, page: 1 }));
+                setPagination(p => ({ ...p, page: 1 }));
               }}
             >
               <MenuItem value="">All</MenuItem>
-              {paymentModes.map((mode) => (
+              {paymentModes.map(mode => (
                 <MenuItem key={mode} value={mode}>
                   {mode}
                 </MenuItem>
               ))}
             </TextField>
           </Grid>
+
           <Grid item xs={12} md={1}>
-            <Tooltip title="Reset Filters">
+            <Tooltip title="Reset">
               <IconButton onClick={handleReset}>
                 <RefreshIcon />
               </IconButton>
@@ -246,20 +287,18 @@ const PaymentsScreen = () => {
         </Grid>
       </Paper>
 
-      {/* DataGrid */}
-      <Paper sx={{ height: "100%", minHeight: 400 }}>
+      {/* Table */}
+      <Paper sx={{ minHeight: 400 }}>
         {loading ? (
-          <Box>
-            <Skeleton variant="rectangular" height={60} sx={{ mb: 2 }} />
-            <Skeleton variant="rectangular" height={400} />
-          </Box>
+          <>
+            <Skeleton height={60} />
+            <Skeleton height={400} />
+          </>
         ) : (
           <DataGrid
             rows={normalizedPayments}
-            getRowId={(row) => row.id}
             columns={columns}
-            loading={loading}
-            pagination
+            getRowId={row => row.id}
             paginationMode="server"
             rowCount={pagination.totalCount}
             pageSizeOptions={[10, 20, 50]}
@@ -267,18 +306,25 @@ const PaymentsScreen = () => {
               page: pagination.page - 1,
               pageSize: pagination.pageSize,
             }}
-            onPaginationModelChange={(model) =>
-              setPagination({
-                ...pagination,
+            onPaginationModelChange={model =>
+              setPagination(prev => ({
+                ...prev,
                 page: model.page + 1,
                 pageSize: model.pageSize,
-              })
+              }))
             }
             disableRowSelectionOnClick
             slots={{
               noRowsOverlay: () => (
-                <Box display="flex" alignItems="center" justifyContent="center" height="100%">
-                  <Typography color="text.secondary">{error || "No payments found"}</Typography>
+                <Box
+                  height="100%"
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                >
+                  <Typography color="text.secondary">
+                    {error || "No payments found"}
+                  </Typography>
                 </Box>
               ),
             }}
