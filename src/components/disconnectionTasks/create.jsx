@@ -13,6 +13,7 @@ import {
   FormControl,
   InputLabel,
   Select,
+  Divider,
 } from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
@@ -22,12 +23,10 @@ const API_URL = import.meta.env.VITE_BASE_URL;
 
 const SCOPE_TYPES = [
   { value: "CONNECTION", label: "Single Connection" },
-  { value: "ROUTE", label: "Connections in Route" },
-  { value: "ZONE", label: "Connections in Zone" },
-  { value: "SCHEME", label: "Connections in Scheme" },
+  { value: "ROUTE", label: "All Connections in Route" },
+  { value: "ZONE", label: "All Connections in Zone" },
+  { value: "SCHEME", label: "All Connections in Scheme" },
 ];
-
-const PRIORITY_OPTIONS = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
 const CreateDisconnectionTaskPage = ({
   initialData = null,      // for dialog mode
@@ -38,15 +37,14 @@ const CreateDisconnectionTaskPage = ({
   const location = useLocation();
   const prefill = initialData || location.state || {};
 
-  // Form state matching backend payload
   const [formData, setFormData] = useState({
     title: "Create Disconnection Task",
-    description: "This a task to disconnect a connection",
+    description: "Disconnection of overdue connections",
     priority: "HIGH",
     dueDate: "",
     AssignedTo: "",
     TypeId: "",
-    scopeType: "ROUTE",
+    scopeType: "CONNECTION", // safer default
   });
 
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -63,6 +61,8 @@ const CreateDisconnectionTaskPage = ({
   const [selectedZoneId, setSelectedZoneId] = useState("");
   const [selectedRouteId, setSelectedRouteId] = useState("");
 
+  const [minBalance, setMinBalance] = useState("");
+
   const [loading, setLoading] = useState({
     meta: false,
     customers: false,
@@ -72,14 +72,10 @@ const CreateDisconnectionTaskPage = ({
 
   const [error, setError] = useState("");
 
-  // ────────────────────────────────────────────────
-  // Fetch users & task types
-  // ────────────────────────────────────────────────
+  // ─── Fetch metadata ────────────────────────────────────────────────
   useEffect(() => {
     const fetchMeta = async () => {
-      setLoading((prev) => ({ ...prev, meta: true }));
-      setError("");
-
+      setLoading((p) => ({ ...p, meta: true }));
       try {
         const [usersRes, typesRes] = await Promise.all([
           axios.get(`${API_URL}/users`, { withCredentials: true }),
@@ -88,111 +84,90 @@ const CreateDisconnectionTaskPage = ({
 
         setUsers(usersRes.data?.data || []);
 
-        // Handle different possible response shapes
-        const typesData = Array.isArray(typesRes.data)
+        const types = Array.isArray(typesRes.data)
           ? typesRes.data
           : typesRes.data?.data || [];
-        setTaskTypes(typesData);
+        setTaskTypes(types);
 
-        // Optional: auto-select disconnection type if you want
-        const disconnection = typesData.find(
+        const disconnection = types.find(
           (t) => t.name?.toUpperCase() === "DISCONNECTION"
         );
         if (disconnection) {
-          setFormData((prev) => ({ ...prev, TypeId: disconnection.id }));
+          setFormData((p) => ({ ...p, TypeId: disconnection.id }));
         }
       } catch (err) {
-        console.error("Meta fetch error:", err);
-        setError("Failed to load users and task types");
+        console.error(err);
+        setError("Failed to load users or task types");
       } finally {
-        setLoading((prev) => ({ ...prev, meta: false }));
+        setLoading((p) => ({ ...p, meta: false }));
       }
     };
 
     fetchMeta();
   }, []);
 
-  // ────────────────────────────────────────────────
-  // Fetch customers
-  // ────────────────────────────────────────────────
+  // ─── Fetch customers ───────────────────────────────────────────────
   useEffect(() => {
     const fetchCustomers = async () => {
-      setLoading((prev) => ({ ...prev, customers: true }));
-
+      setLoading((p) => ({ ...p, customers: true }));
       try {
-        const res = await axios.get(`${API_URL}/customers`, {
-          withCredentials: true,
-        });
+        const res = await axios.get(`${API_URL}/customers`, { withCredentials: true });
         const list = res.data?.data?.customers || [];
         setCustomers(list);
         setFilteredCustomers(list);
       } catch (err) {
-        console.error("Customers fetch error:", err);
+        console.error(err);
         setCustomers([]);
         setFilteredCustomers([]);
       } finally {
-        setLoading((prev) => ({ ...prev, customers: false }));
+        setLoading((p) => ({ ...p, customers: false }));
       }
     };
-
     fetchCustomers();
   }, []);
 
-  // ────────────────────────────────────────────────
-  // Fetch schemes (with zones & routes)
-  // ────────────────────────────────────────────────
+  // ─── Fetch schemes (with zones & routes) ───────────────────────────
   useEffect(() => {
     const fetchSchemes = async () => {
-      setLoading((prev) => ({ ...prev, schemes: true }));
-
+      setLoading((p) => ({ ...p, schemes: true }));
       try {
-        const res = await axios.get(`${API_URL}/schemes`, {
-          withCredentials: true,
-        });
-
+        const res = await axios.get(`${API_URL}/schemes`, { withCredentials: true });
         if (res.data?.success && Array.isArray(res.data.data)) {
           setSchemes(res.data.data);
-        } else {
-          setSchemes([]);
         }
       } catch (err) {
-        console.error("Schemes fetch error:", err);
-        setSchemes([]);
+        console.error(err);
       } finally {
-        setLoading((prev) => ({ ...prev, schemes: false }));
+        setLoading((p) => ({ ...p, schemes: false }));
       }
     };
-
     fetchSchemes();
   }, []);
 
-  // ────────────────────────────────────────────────
-  // Prefill from dialog props or navigation state
-  // ────────────────────────────────────────────────
+  // ─── Prefill if coming from connection detail ──────────────────────
   useEffect(() => {
     if (!prefill.connectionId) return;
 
     const fakeCustomer = {
       id: prefill.customerId,
       customerName: prefill.customerName || "Unknown",
-      connections: [
-        {
-          id: prefill.connectionId,
-          connectionNumber: prefill.connectionNumber,
-          schemeId: prefill.schemeId,
-          zoneId: prefill.zoneId,
-          routeId: prefill.routeId,
-        },
-      ],
+      connections: [{
+        id: prefill.connectionId,
+        connectionNumber: prefill.connectionNumber,
+        schemeId: prefill.schemeId,
+        zoneId: prefill.zoneId,
+        routeId: prefill.routeId,
+      }],
     };
 
     setSelectedCustomer(fakeCustomer);
     setSelectedConnection(fakeCustomer.connections[0]);
 
-    setFormData((prev) => ({
-      ...prev,
+    setFormData((p) => ({
+      ...p,
       title: `Disconnect Conn #${prefill.connectionNumber}`,
-      description: `Disconnection request for ${prefill.customerName || "customer"}`,
+      description: `Disconnection for ${prefill.customerName || "customer"}`,
+      scopeType: "CONNECTION",
     }));
 
     if (prefill.schemeId) setSelectedSchemeId(prefill.schemeId);
@@ -200,9 +175,7 @@ const CreateDisconnectionTaskPage = ({
     if (prefill.routeId) setSelectedRouteId(prefill.routeId);
   }, [prefill]);
 
-  // ────────────────────────────────────────────────
-  // Debounced customer search
-  // ────────────────────────────────────────────────
+  // ─── Debounced customer search ─────────────────────────────────────
   const searchCustomers = useCallback(
     debounce(async (query) => {
       if (!query?.trim()) {
@@ -222,44 +195,36 @@ const CreateDisconnectionTaskPage = ({
     [customers]
   );
 
-  // ────────────────────────────────────────────────
-  // Form change handler
-  // ────────────────────────────────────────────────
   const handleChange = (field) => (e) => {
     setFormData((prev) => ({ ...prev, [field]: e.target.value }));
-    if (["title", "AssignedTo", "TypeId"].includes(field)) {
-      setError("");
-    }
+    if (field !== "description") setError("");
   };
 
-  // ────────────────────────────────────────────────
-  // Submit
-  // ────────────────────────────────────────────────
   const handleSubmit = async () => {
     setError("");
 
-    if (!formData.TypeId) {
-      setError("Please select a task type");
-      return;
-    }
-    if (!formData.AssignedTo) {
-      setError("Please select an assignee");
-      return;
-    }
-    if (!formData.title.trim()) {
-      setError("Task title is required");
-      return;
-    }
-    if (formData.scopeType === "CONNECTION" && !selectedConnection?.id) {
-      setError("Please select a connection");
-      return;
-    }
-    if (formData.scopeType !== "CONNECTION" && !selectedSchemeId) {
-      setError("Please select a scheme");
-      return;
+    // Basic validations
+    if (!formData.TypeId) return setError("Task type is required");
+    if (!formData.AssignedTo) return setError("Please assign the task");
+    if (!formData.title.trim()) return setError("Title is required");
+
+    // Scope-specific validations
+    if (formData.scopeType === "CONNECTION") {
+      if (!selectedConnection?.id) return setError("Please select a connection");
+    } else if (formData.scopeType === "ROUTE") {
+      if (!selectedRouteId) return setError("Please select a route");
+    } else if (formData.scopeType === "ZONE") {
+      if (!selectedZoneId) return setError("Please select a zone");
+    } else if (formData.scopeType === "SCHEME") {
+      if (!selectedSchemeId) return setError("Please select a scheme");
     }
 
-    setLoading((prev) => ({ ...prev, submitting: true }));
+    // Optional min balance validation
+    if (minBalance !== "" && (isNaN(Number(minBalance)) || Number(minBalance) < 0)) {
+      return setError("Minimum balance must be a positive number");
+    }
+
+    setLoading((p) => ({ ...p, submitting: true }));
 
     try {
       const payload = {
@@ -273,7 +238,7 @@ const CreateDisconnectionTaskPage = ({
         scopeType: formData.scopeType,
       };
 
-      // Add location ID based on scope
+      // Scope-specific ID
       if (formData.scopeType === "CONNECTION") {
         payload.connectionId = Number(selectedConnection.id);
       } else if (formData.scopeType === "ROUTE") {
@@ -284,53 +249,58 @@ const CreateDisconnectionTaskPage = ({
         payload.schemeId = Number(selectedSchemeId);
       }
 
+      if (minBalance !== "") {
+        payload.minBalance = Number(minBalance);
+      }
+
       await axios.post(`${API_URL}/tasks/disconnection`, payload, {
         withCredentials: true,
       });
 
-      if (onTaskCreated) {
-        onTaskCreated();
-      } else {
+      onTaskCreated?.();
+      if (!onTaskCreated) {
         navigate("/connections", {
           state: { message: "Disconnection task created", severity: "success" },
         });
       }
     } catch (err) {
-      const msg = err.response?.data?.message || "Failed to create task";
+      const msg = err.response?.data?.message || "Failed to create disconnection task";
       setError(msg);
       console.error(err);
     } finally {
-      setLoading((prev) => ({ ...prev, submitting: false }));
+      setLoading((p) => ({ ...p, submitting: false }));
     }
   };
 
   const handleCancel = () => {
-    if (onCancel) onCancel();
-    else navigate(-1);
+    onCancel?.() || navigate(-1);
   };
 
-  // ────────────────────────────────────────────────
-  // Render
-  // ────────────────────────────────────────────────
   if (loading.meta) {
     return (
-      <Box display="flex" justifyContent="center" py={10}>
+      <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}>
         <CircularProgress />
       </Box>
     );
   }
 
+  const showLocationFields = formData.scopeType !== "CONNECTION";
+
   return (
-    <Box sx={{ p: initialData ? 0 : 3 }}>
-      <Paper sx={{ p: 3, maxWidth: 900, mx: "auto" }}>
-        <Typography variant="h5" gutterBottom>
-          
+    <Box sx={{ p: initialData ? 0 : { xs: 2, md: 4 } }}>
+      <Paper elevation={3} sx={{ p: { xs: 2, md: 4 }, maxWidth: 920, mx: "auto" }}>
+        <Typography variant="h5" component="h1" gutterBottom  fontWeight={600}>
+          Create Disconnection Task
         </Typography>
 
-        {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
 
         <Grid container spacing={2.5}>
-          {/* Task Type */}
+          {/* ─── Core Task Info ─── */}
           <Grid item xs={12} sm={6}>
             <FormControl fullWidth required>
               <InputLabel>Task Type</InputLabel>
@@ -339,24 +309,31 @@ const CreateDisconnectionTaskPage = ({
                 label="Task Type"
                 onChange={handleChange("TypeId")}
               >
-                <MenuItem value="">— Select Task Type —</MenuItem>
-                {taskTypes.map((type) => (
-                  <MenuItem key={type.id} value={type.id}>
-                    {type.name}
+                <MenuItem value="">Select type</MenuItem>
+                {taskTypes.map((t) => (
+                  <MenuItem key={t.id} value={t.id}>
+                    {t.name}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
           </Grid>
 
-          {/* Scope */}
           <Grid item xs={12} sm={6}>
-            <FormControl fullWidth>
+            <FormControl fullWidth required>
               <InputLabel>Scope</InputLabel>
               <Select
                 value={formData.scopeType}
                 label="Scope"
-                onChange={handleChange("scopeType")}
+                onChange={(e) => {
+                  handleChange("scopeType")(e);
+                  // Reset location selections when scope changes
+                  setSelectedSchemeId("");
+                  setSelectedZoneId("");
+                  setSelectedRouteId("");
+                  setSelectedCustomer(null);
+                  setSelectedConnection(null);
+                }}
               >
                 {SCOPE_TYPES.map((s) => (
                   <MenuItem key={s.value} value={s.value}>
@@ -367,10 +344,17 @@ const CreateDisconnectionTaskPage = ({
             </FormControl>
           </Grid>
 
-          {/* Customer + Connection (only for single connection) */}
+          {/* ─── Single Connection ─── */}
           {formData.scopeType === "CONNECTION" && (
             <>
               <Grid item xs={12}>
+                <Divider sx={{ my: 1 }} />
+                <Typography variant="subtitle1" gutterBottom>
+                  Select Customer & Connection
+                </Typography>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
                 <Autocomplete
                   options={filteredCustomers}
                   value={selectedCustomer}
@@ -383,14 +367,14 @@ const CreateDisconnectionTaskPage = ({
                     opt.customerName + (opt.phoneNumber ? ` — ${opt.phoneNumber}` : "")
                   }
                   renderInput={(params) => (
-                    <TextField {...params} label="Search Customer" fullWidth />
+                    <TextField {...params} label="Search Customer" required fullWidth />
                   )}
                 />
               </Grid>
 
               {selectedCustomer && (
-                <Grid item xs={12}>
-                  <FormControl fullWidth>
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth required>
                     <InputLabel>Connection</InputLabel>
                     <Select
                       value={selectedConnection?.id || ""}
@@ -402,7 +386,7 @@ const CreateDisconnectionTaskPage = ({
                         setSelectedConnection(conn || null);
                       }}
                     >
-                      <MenuItem value="">— Select Connection —</MenuItem>
+                      <MenuItem value="">Select connection</MenuItem>
                       {selectedCustomer.connections?.map((c) => (
                         <MenuItem key={c.id} value={c.id}>
                           Conn #{c.connectionNumber}
@@ -415,93 +399,107 @@ const CreateDisconnectionTaskPage = ({
             </>
           )}
 
-          {/* Scheme */}
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth>
-              <InputLabel>Scheme</InputLabel>
-              {loading.schemes ? (
-                <CircularProgress size={24} />
-              ) : (
-                <Select
-                  value={selectedSchemeId}
-                  label="Scheme"
-                  onChange={(e) => {
-                    setSelectedSchemeId(e.target.value);
-                    setSelectedZoneId("");
-                    setSelectedRouteId("");
-                  }}
-                >
-                  <MenuItem value="">— Select Scheme —</MenuItem>
-                  {schemes.map((s) => (
-                    <MenuItem key={s.id} value={s.id}>
-                      {s.name}
-                    </MenuItem>
-                  ))}
-                </Select>
+          {/* ─── Scheme / Zone / Route ─── */}
+          {showLocationFields && (
+            <>
+              <Grid item xs={12}>
+                <Divider sx={{ my: 1 }} />
+                <Typography variant="subtitle1" gutterBottom>
+                  Location Scope
+                </Typography>
+              </Grid>
+
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth required={showLocationFields}>
+                  <InputLabel>Scheme</InputLabel>
+                  {loading.schemes ? (
+                    <CircularProgress size={24} />
+                  ) : (
+                    <Select
+                      value={selectedSchemeId}
+                      label="Scheme"
+                      onChange={(e) => {
+                        setSelectedSchemeId(e.target.value);
+                        setSelectedZoneId("");
+                        setSelectedRouteId("");
+                      }}
+                    >
+                      <MenuItem value="">Select Scheme</MenuItem>
+                      {schemes.map((s) => (
+                        <MenuItem key={s.id} value={s.id}>
+                          {s.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  )}
+                </FormControl>
+              </Grid>
+
+              {selectedSchemeId && (
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth required={formData.scopeType !== "SCHEME"}>
+                    <InputLabel>Zone</InputLabel>
+                    <Select
+                      value={selectedZoneId}
+                      label="Zone"
+                      onChange={(e) => {
+                        setSelectedZoneId(e.target.value);
+                        setSelectedRouteId("");
+                      }}
+                      disabled={!schemes.find((s) => s.id === Number(selectedSchemeId))?.zones?.length}
+                    >
+                      <MenuItem value="">All Zones</MenuItem>
+                      {schemes
+                        .find((s) => s.id === Number(selectedSchemeId))
+                        ?.zones?.map((z) => (
+                          <MenuItem key={z.id} value={z.id}>
+                            {z.name}
+                          </MenuItem>
+                        ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
               )}
-            </FormControl>
+
+              {formData.scopeType === "ROUTE" && selectedZoneId && (
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth required>
+                    <InputLabel>Route</InputLabel>
+                    <Select
+                      value={selectedRouteId}
+                      label="Route"
+                      onChange={(e) => setSelectedRouteId(e.target.value)}
+                    >
+                      <MenuItem value="">Select Route</MenuItem>
+                      {schemes
+                        .find((s) => s.id === Number(selectedSchemeId))
+                        ?.zones?.find((z) => z.id === Number(selectedZoneId))
+                        ?.routes?.map((r) => (
+                          <MenuItem key={r.id} value={r.id}>
+                            {r.name} {r.code ? `(${r.code})` : ""}
+                          </MenuItem>
+                        ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              )}
+            </>
+          )}
+
+          {/* ─── Common Fields ─── */}
+          <Grid item xs={12}>
+            <Divider sx={{ my: 2 }} />
           </Grid>
 
-          {/* Zone */}
-          {selectedSchemeId && formData.scopeType !== "CONNECTION" && (
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>Zone</InputLabel>
-                <Select
-                  value={selectedZoneId}
-                  label="Zone"
-                  onChange={(e) => {
-                    setSelectedZoneId(e.target.value);
-                    setSelectedRouteId("");
-                  }}
-                >
-                  <MenuItem value="">— Select Zone —</MenuItem>
-                  {schemes
-                    .find((s) => s.id === Number(selectedSchemeId))
-                    ?.zones?.map((z) => (
-                      <MenuItem key={z.id} value={z.id}>
-                        {z.name}
-                      </MenuItem>
-                    ))}
-                </Select>
-              </FormControl>
-            </Grid>
-          )}
-
-          {/* Route */}
-          {selectedZoneId && formData.scopeType === "ROUTE" && (
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>Route</InputLabel>
-                <Select
-                  value={selectedRouteId}
-                  label="Route"
-                  onChange={(e) => setSelectedRouteId(e.target.value)}
-                >
-                  <MenuItem value="">— Select Route —</MenuItem>
-                  {schemes
-                    .find((s) => s.id === Number(selectedSchemeId))
-                    ?.zones?.find((z) => z.id === Number(selectedZoneId))
-                    ?.routes?.map((r) => (
-                      <MenuItem key={r.id} value={r.id}>
-                        {r.name} {r.code ? `(${r.code})` : ""}
-                      </MenuItem>
-                    ))}
-                </Select>
-              </FormControl>
-            </Grid>
-          )}
-
-          {/* Assignee */}
           <Grid item xs={12} sm={6}>
-            <FormControl fullWidth>
-              <InputLabel>Assigned To</InputLabel>
+            <FormControl fullWidth required>
+              <InputLabel>Assign To</InputLabel>
               <Select
                 value={formData.AssignedTo}
-                label="Assigned To"
+                label="Assign To"
                 onChange={handleChange("AssignedTo")}
               >
-                <MenuItem value="">— Select User —</MenuItem>
+                <MenuItem value="">Select user</MenuItem>
                 {users.map((u) => (
                   <MenuItem key={u.id} value={u.id}>
                     {u.firstName} {u.lastName}
@@ -511,7 +509,19 @@ const CreateDisconnectionTaskPage = ({
             </FormControl>
           </Grid>
 
-          {/* Due Date */}
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              type="number"
+              label="Min. Outstanding Balance (optional)"
+              value={minBalance}
+              onChange={(e) => setMinBalance(e.target.value)}
+              inputProps={{ min: 0, step: "0.01" }}
+              helperText="Only disconnect connections ≥ this amount"
+              placeholder="e.g. 1500"
+            />
+          </Grid>
+
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
@@ -523,7 +533,6 @@ const CreateDisconnectionTaskPage = ({
             />
           </Grid>
 
-          {/* Title */}
           <Grid item xs={12}>
             <TextField
               fullWidth
@@ -531,27 +540,30 @@ const CreateDisconnectionTaskPage = ({
               label="Task Title"
               value={formData.title}
               onChange={handleChange("title")}
-              placeholder="e.g. Disconnection - overdue account"
+              placeholder="e.g. Disconnection - Overdue > 90 days"
             />
           </Grid>
 
-          {/* Description */}
           <Grid item xs={12}>
             <TextField
               fullWidth
               multiline
               minRows={3}
-              label="Description / Reason"
+              label="Description / Reason / Instructions"
               value={formData.description}
               onChange={handleChange("description")}
-              placeholder="Enter reason for disconnection, special instructions, etc."
+              placeholder="Enter reason, special notes, safety instructions, etc."
             />
           </Grid>
 
-          {/* Submit / Cancel */}
+          {/* Actions */}
           <Grid item xs={12}>
-            <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3 }}>
-              <Button variant="outlined" onClick={handleCancel} disabled={loading.submitting}>
+            <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 4 }}>
+              <Button
+                variant="outlined"
+                onClick={handleCancel}
+                disabled={loading.submitting}
+              >
                 Cancel
               </Button>
               <Button
@@ -559,6 +571,7 @@ const CreateDisconnectionTaskPage = ({
                 color="error"
                 onClick={handleSubmit}
                 disabled={loading.submitting}
+                startIcon={loading.submitting ? <CircularProgress size={20} color="inherit" /> : null}
               >
                 {loading.submitting ? "Creating..." : "Create Disconnection Task"}
               </Button>
@@ -568,6 +581,14 @@ const CreateDisconnectionTaskPage = ({
       </Paper>
     </Box>
   );
+};
+
+import PropTypes from "prop-types";
+
+CreateDisconnectionTaskPage.propTypes = {
+  initialData: PropTypes.object,
+  onTaskCreated: PropTypes.func,
+  onCancel: PropTypes.func,
 };
 
 export default CreateDisconnectionTaskPage;

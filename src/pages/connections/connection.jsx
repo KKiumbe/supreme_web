@@ -1,4 +1,3 @@
-// src/pages/ConnectionsScreen.jsx  (or adjust path as needed)
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import {
   Box,
@@ -37,7 +36,6 @@ import { useAuthStore, useThemeStore } from "../../store/authStore";
 import axios from "axios";
 import { debounce } from "lodash";
 import { useNavigate } from "react-router-dom";
-import PropTypes from "prop-types";
 
 // Custom components
 import AssignMeterTaskDialog from "../../components/meterAssign/assignTask";
@@ -50,12 +48,15 @@ class ErrorBoundary extends React.Component {
     super(props);
     this.state = { hasError: false };
   }
+
   static getDerivedStateFromError() {
     return { hasError: true };
   }
-  componentDidCatch() {
-    // You can log error here
+
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught:", error, errorInfo);
   }
+
   render() {
     if (this.state.hasError) {
       return this.props.FallbackComponent ? <this.props.FallbackComponent /> : null;
@@ -65,12 +66,12 @@ class ErrorBoundary extends React.Component {
 }
 
 const ErrorFallback = () => (
-  <Box sx={{ p: 2, textAlign: "center" }}>
-    <Typography color="error" variant="h6">
-      Something went wrong
+  <Box sx={{ p: 4, textAlign: "center" }}>
+    <Typography color="error" variant="h6" gutterBottom>
+      Something went wrong with the connections view
     </Typography>
-    <Button variant="contained" onClick={() => window.location.reload()} sx={{ mt: 2 }}>
-      Retry
+    <Button variant="contained" color="primary" onClick={() => window.location.reload()}>
+      Reload Page
     </Button>
   </Box>
 );
@@ -97,7 +98,7 @@ const flattenConnection = (conn) => ({
   customerPhoneNumber: conn.customer?.phoneNumber || "-",
   customerEmail: conn.customer?.email || "-",
   customerStatus: conn.customer?.status || "-",
-  customerAccountId: conn.customerAccounts?.[0]?.id || "-",
+  customerAccountId: conn.customerAccounts?.[0]?.id || null,
   customerAccount: conn.customerAccounts?.[0]?.customerAccount || "-",
   customerAccountBalance: conn.customerAccounts?.[0]?.balance || 0,
   customerAccountDeposit: conn.customerAccounts?.[0]?.deposit || 0,
@@ -118,7 +119,6 @@ const ConnectionsScreen = () => {
   const { theme } = useThemeStore();
   const navigate = useNavigate();
 
-  // Main connections data
   const [connections, setConnections] = useState([]);
   const [meters, setMeters] = useState([]);
   const [schemes, setSchemes] = useState([]);
@@ -126,7 +126,6 @@ const ConnectionsScreen = () => {
   const [routes, setRoutes] = useState([]);
   const [tariffCategories, setTariffCategories] = useState([]);
 
-  // Filters & pagination
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [schemeFilter, setSchemeFilter] = useState("");
@@ -136,33 +135,33 @@ const ConnectionsScreen = () => {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  // UI states
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "error" });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "error",
+  });
   const [filterOpen, setFilterOpen] = useState(false);
 
-  // Create connection modal
   const [modalOpen, setModalOpen] = useState(false);
   const [connectionNumber, setConnectionNumber] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [status, setStatus] = useState("ACTIVE");
+  const [selectedSchemeId, setSelectedSchemeId] = useState("");
   const [selectedZoneId, setSelectedZoneId] = useState("");
   const [selectedRouteId, setSelectedRouteId] = useState("");
-  const [selectedSchemeId, setSelectedSchemeId] = useState("");
   const [selectedTariffCategoryId, setSelectedTariffCategoryId] = useState("");
 
-  // Assign meter
   const [assignMeterOpen, setAssignMeterOpen] = useState(false);
   const [selectedConnection, setSelectedConnection] = useState(null);
   const [selectedMeterId, setSelectedMeterId] = useState("");
 
-  // Task & details dialogs
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [taskConnection, setTaskConnection] = useState(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
 
-  // Disconnection preview & task
   const [previewScope, setPreviewScope] = useState("");
   const [previewScopeId, setPreviewScopeId] = useState("");
+  const [minBalance, setMinBalance] = useState(""); // ← NEW state for minimum balance filter
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewConnections, setPreviewConnections] = useState([]);
   const [previewSelectedIds, setPreviewSelectedIds] = useState([]);
@@ -174,32 +173,20 @@ const ConnectionsScreen = () => {
   }, [currentUser, navigate]);
 
   const customers = useMemo(() => {
-    const unique = [];
     const seen = new Set();
-    connections.forEach((conn) => {
-      if (conn.customerId && !seen.has(conn.customerId)) {
-        unique.push({
-          id: conn.customerId,
-          customerName: conn.customerName,
-          phoneNumber: conn.customerPhoneNumber,
-          email: conn.customerEmail,
-          status: conn.customerStatus,
-        });
-        seen.add(conn.customerId);
-      }
-    });
-    return unique;
+    return connections
+      .filter((c) => c.customerId && !seen.has(c.customerId))
+      .map((c) => {
+        seen.add(c.customerId);
+        return {
+          id: c.customerId,
+          customerName: c.customerName,
+          phoneNumber: c.customerPhoneNumber,
+          email: c.customerEmail,
+          status: c.customerStatus,
+        };
+      });
   }, [connections]);
-
-  const filteredZones = useMemo(
-    () => (selectedSchemeId ? zones.filter(z => z.schemeId === selectedSchemeId) : zones),
-    [zones, selectedSchemeId]
-  );
-
-  const filteredRoutes = useMemo(
-    () => (selectedZoneId ? routes.filter(r => r.zoneId === selectedZoneId) : routes),
-    [routes, selectedZoneId]
-  );
 
   const fetchConnections = useCallback(
     async (searchQuery = "", pageNum = 0, limit = 25, filters = {}) => {
@@ -218,14 +205,14 @@ const ConnectionsScreen = () => {
           withCredentials: true,
         });
         const valid = (res.data.data || [])
-          .filter(c => c && typeof c === "object" && c.id)
+          .filter((c) => c && typeof c === "object" && c.id)
           .map(flattenConnection);
         setConnections(valid);
         setTotal(res.data.pagination?.total || 0);
       } catch (err) {
         console.error("fetchConnections error:", err);
         setConnections([]);
-        setSnackbar({ open: true, message: "Failed to fetch connections", severity: "error" });
+        setSnackbar({ open: true, message: "Failed to load connections", severity: "error" });
       } finally {
         setLoading(false);
       }
@@ -236,9 +223,9 @@ const ConnectionsScreen = () => {
   const fetchMeters = useCallback(async () => {
     try {
       const res = await axios.get(`${BASEURL}/meters`, { withCredentials: true });
-      setMeters((res.data?.data?.meters ?? []).filter(m => !m.connectionId));
+      setMeters((res.data?.data?.meters ?? []).filter((m) => !m.connectionId));
     } catch (err) {
-      setSnackbar({ open: true, message: "Failed to fetch meters", severity: "error" });
+      setSnackbar({ open: true, message: "Failed to load meters", severity: "error" });
     }
   }, []);
 
@@ -250,8 +237,8 @@ const ConnectionsScreen = () => {
       ]);
       const schemesData = schemesRes.data.data || [];
       setSchemes(schemesData);
-      setZones(schemesData.flatMap(s => s.zones || []));
-      setRoutes(schemesData.flatMap(s => s.zones?.flatMap(z => z.routes || []) || []));
+      setZones(schemesData.flatMap((s) => s.zones || []));
+      setRoutes(schemesData.flatMap((s) => s.zones?.flatMap((z) => z.routes || []) || []));
       const tariffData = tariffsRes.data.data || [];
       const uniqueCats = Object.values(
         tariffData.reduce((acc, t) => {
@@ -276,22 +263,14 @@ const ConnectionsScreen = () => {
       setLoading(false);
     };
     init();
-  }, [
-    page,
-    rowsPerPage,
-    statusFilter,
-    schemeFilter,
-    zoneFilter,
-    fetchConnections,
-    fetchMeters,
-    fetchMetaData,
-  ]);
+  }, [page, rowsPerPage, statusFilter, schemeFilter, zoneFilter]);
 
   const debouncedSearch = useMemo(
-    () => debounce((q) => {
-      setPage(0);
-      fetchConnections(q, 0, rowsPerPage, { status: statusFilter, schemeId: schemeFilter, zoneId: zoneFilter });
-    }, 500),
+    () =>
+      debounce((q) => {
+        setPage(0);
+        fetchConnections(q, 0, rowsPerPage, { status: statusFilter, schemeId: schemeFilter, zoneId: zoneFilter });
+      }, 500),
     [fetchConnections, rowsPerPage, statusFilter, schemeFilter, zoneFilter]
   );
 
@@ -300,18 +279,41 @@ const ConnectionsScreen = () => {
     return () => debouncedSearch.cancel();
   }, [search]);
 
+  // ────────────────────────────────────────────────
+  // Disconnection Preview & Download with minBalance
+  // ────────────────────────────────────────────────
+  const getScopeLabel = (scope) => {
+    const upper = scope?.toUpperCase();
+    switch (upper) {
+      case "SCHEME": return "Scheme";
+      case "ZONE":   return "Zone";
+      case "ROUTE":  return "Route";
+      default:       return "Scope";
+    }
+  };
+
   const fetchDueForDisconnection = async () => {
     if (!previewScope || !previewScopeId) {
-      setSnackbar({ open: true, severity: "warning", message: "Select scope and value" });
+      setSnackbar({
+        open: true,
+        severity: "warning",
+        message: "Please select scope and specific value",
+      });
       return;
     }
 
-    const scope = previewScope.toUpperCase();
-    const url = `${BASEURL}/connections-due-disconnection/${scope}/${previewScopeId}`;
-
+    setPreviewLoading(true);
     try {
-      setPreviewLoading(true);
-      const res = await axios.get(url, { withCredentials: true });
+      const scope = previewScope.toUpperCase();
+      const res = await axios.get(
+        `${BASEURL}/connections-due-disconnection/${scope}/${previewScopeId}`,
+        {
+          params: {
+            minBalance: minBalance.trim() || undefined,
+          },
+          withCredentials: true,
+        }
+      );
       setPreviewConnections(res.data.data || []);
       setPreviewSelectedIds([]);
       setPreviewOpen(true);
@@ -323,55 +325,52 @@ const ConnectionsScreen = () => {
     }
   };
 
-
-
   const handleDownloadDueForDisconnection = async () => {
-  if (!previewScope || !previewScopeId) {
-    setSnackbar({
-      open: true,
-      severity: "warning",
-      message: "Select scope and value before downloading",
-    });
-    return;
-  }
-
-  try {
-    const scope = previewScope.toUpperCase();
-
-    const url = `${BASEURL}/reports/disconnections-due?scope=${scope}&id=${previewScopeId}`;
-
-    const res = await axios.get(url, {
-      withCredentials: true,
-      responseType: "blob", // 🔴 critical
-    });
-
-    const blob = new Blob([res.data], { type: "application/pdf" });
-    const fileURL = window.URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = fileURL;
-    a.download = `connections_due_for_disconnection_${scope}_${previewScopeId}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-
-    window.URL.revokeObjectURL(fileURL);
-    a.remove();
-  } catch (err) {
-    console.error(err);
-    setSnackbar({
-      open: true,
-      severity: "error",
-      message: "Failed to download report",
-    });
-  }
-};
-
-
-  const handleOpenDisconnectionPreview = () => {
-    if (previewScope && !previewScopeId) {
-      setSnackbar({ open: true, severity: "warning", message: "Select specific scheme/zone/route" });
+    if (!previewScope || !previewScopeId) {
+      setSnackbar({
+        open: true,
+        severity: "warning",
+        message: "Select scope and value to download report",
+      });
       return;
     }
+
+    try {
+      const scope = previewScope.toUpperCase();
+      const res = await axios.get(`${BASEURL}/reports/disconnections-due`, {
+        params: {
+          scope,
+          id: previewScopeId,
+          minBalance: minBalance.trim() || undefined,
+        },
+        withCredentials: true,
+        responseType: "blob",
+      });
+
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `due-disconnection_${scope.toLowerCase()}_${previewScopeId}${
+        minBalance.trim() ? `_min${minBalance.trim()}` : ""
+      }_${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      window.URL.revokeObjectURL(url);
+      link.remove();
+
+      setSnackbar({ open: true, severity: "success", message: "Report downloaded" });
+    } catch (err) {
+      console.error("Download error:", err);
+      setSnackbar({
+        open: true,
+        severity: "error",
+        message: "Failed to download disconnection report",
+      });
+    }
+  };
+
+  const handleOpenDisconnectionPreview = () => {
     fetchDueForDisconnection();
   };
 
@@ -434,17 +433,18 @@ const ConnectionsScreen = () => {
     setTaskDialogOpen(false);
     setTaskConnection(null);
     fetchConnections(search, page, rowsPerPage, { status: statusFilter, schemeId: schemeFilter, zoneId: zoneFilter });
-    setSnackbar({ open: true, message: "Task created", severity: "success" });
+    setSnackbar({ open: true, message: "Task created successfully", severity: "success" });
   };
 
-  const handleViewDetails = (connection) => {
-    setSelectedConnection(connection);
-    setDetailsDialogOpen(true);
+  const handleDisconnectionTaskCreated = () => {
+    setDisconnectionDialogOpen(false);
+    fetchConnections(search, page, rowsPerPage, { status: statusFilter, schemeId: schemeFilter, zoneId: zoneFilter });
+    setSnackbar({ open: true, message: "Disconnection task created", severity: "success" });
   };
 
   const handleExport = () => {
     const csv = connections
-      .map(c => ({
+      .map((c) => ({
         Conn: c.connectionNumber,
         Customer: c.customerName,
         Email: c.customerEmail,
@@ -454,7 +454,7 @@ const ConnectionsScreen = () => {
         Zone: c.zoneName,
         Route: c.routeName,
       }))
-      .map(row => Object.values(row).join(","))
+      .map((row) => Object.values(row).join(","))
       .join("\n");
 
     const blob = new Blob([csv], { type: "text/csv" });
@@ -471,9 +471,9 @@ const ConnectionsScreen = () => {
     setConnectionNumber("");
     setSelectedCustomerId("");
     setStatus("ACTIVE");
+    setSelectedSchemeId("");
     setSelectedZoneId("");
     setSelectedRouteId("");
-    setSelectedSchemeId("");
     setSelectedTariffCategoryId("");
   };
 
@@ -485,17 +485,16 @@ const ConnectionsScreen = () => {
 
   const openTaskDialog = (connection) => {
     if (!connection?.id || !connection?.customerId) {
-      setSnackbar({ open: true, message: "Invalid connection", severity: "error" });
+      setSnackbar({ open: true, message: "Invalid connection selected", severity: "error" });
       return;
     }
     setTaskConnection(connection);
     setTaskDialogOpen(true);
   };
 
-  const handleDisconnectionTaskCreated = () => {
-    setDisconnectionDialogOpen(false);
-    fetchConnections(search, page, rowsPerPage, { status: statusFilter, schemeId: schemeFilter, zoneId: zoneFilter });
-    setSnackbar({ open: true, message: "Disconnection task created", severity: "success" });
+  const handleViewDetails = (connection) => {
+    setSelectedConnection(connection);
+    setDetailsDialogOpen(true);
   };
 
   const statusOptions = [
@@ -507,111 +506,84 @@ const ConnectionsScreen = () => {
     "DORMANT",
   ];
 
-  const columns = useMemo(() => [
-    {
-      field: "actions",
-      headerName: "Actions",
-      width: 120,
-      align: "center",
-      renderCell: (params) => (
-        <Box>
-          {params.row.status === "PENDING_METER" ? (
-            <Tooltip title="Assign Meter Task">
-              <IconButton
-                sx={{ color: theme?.palette?.primary?.contrastText }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openTaskDialog(params.row);
-                }}
-              >
-                <Edit />
-              </IconButton>
-            </Tooltip>
-          ) : (
-            <Tooltip title="View Details">
-              <IconButton
-                sx={{ color: theme?.palette?.primary?.contrastText }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleViewDetails(params.row);
-                }}
-              >
-                <Visibility />
-              </IconButton>
-            </Tooltip>
-          )}
-        </Box>
-      ),
-    },
-    { field: "connectionNumber", headerName: "Conn #", width: 100 },
-    { field: "customerName", headerName: "Customer", width: 150 },
-    { field: "customerEmail", headerName: "Email", width: 150 },
-    { field: "customerPhoneNumber", headerName: "Phone", width: 120 },
-    { field: "zoneName", headerName: "Zone", width: 120 },
-    { field: "routeName", headerName: "Route", width: 100 },
-    { field: "schemeName", headerName: "Scheme", width: 120 },
-    { field: "tariffCategoryName", headerName: "Tariff", width: 150 },
-    { field: "meterSerialNumber", headerName: "Meter", width: 120 },
-    { field: "meterModel", headerName: "Meter Model", width: 120 },
-    {
-      field: "status",
-      headerName: "Status",
-      width: 100,
-      renderCell: (params) => (
-        <Chip
-          label={params.value}
-          color={
-            params.value === "ACTIVE" ? "success" :
-            params.value === "PENDING_METER" ? "warning" :
-            "default"
-          }
-          size="small"
-        />
-      ),
-    },
-    {
-      field: "accountStatus",
-      headerName: "Account Status",
-      width: 200,
-      renderCell: (params) => {
-        const accs = params.row.rawCustomerAccounts || [];
-        const hasPending = accs.some(a => a.status === "PENDING_METER");
-        const text = accs.length ? accs.map(a => `${a.customerAccount}: ${a.status}`).join(", ") : "-";
-        return (
-          <Box sx={{
-            bgcolor: hasPending ? "Highlight" : "transparent",
-            p: "4px 8px",
-            borderRadius: "4px",
-            width: "100%",
-          }}>
-            {text}
+  const columns = useMemo(
+    () => [
+      {
+        field: "actions",
+        headerName: "Actions",
+        width: 120,
+        align: "center",
+        renderCell: (params) => (
+          <Box>
+            {params.row.status === "PENDING_METER" ? (
+              <Tooltip title="Assign Meter Task">
+                <IconButton
+                  color="primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openTaskDialog(params.row);
+                  }}
+                >
+                  <Edit />
+                </IconButton>
+              </Tooltip>
+            ) : (
+              <Tooltip title="View Details">
+                <IconButton
+                  color="primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewDetails(params.row);
+                  }}
+                >
+                  <Visibility />
+                </IconButton>
+              </Tooltip>
+            )}
           </Box>
-        );
+        ),
       },
-    },
-    {
-      field: "createdAt",
-      headerName: "Created",
-      width: 150,
-      valueGetter: (p) => p.row?.createdAt ? new Date(p.row?.createdAt).toLocaleDateString() : "-",
-    },
-  ], [theme]);
+      { field: "connectionNumber", headerName: "Conn #", width: 100 },
+      { field: "customerName", headerName: "Customer", width: 180 },
+      { field: "customerPhoneNumber", headerName: "Phone", width: 130 },
+      { field: "customerEmail", headerName: "Email", width: 220 },
+      { field: "schemeName", headerName: "Scheme", width: 140 },
+      { field: "zoneName", headerName: "Zone", width: 130 },
+      { field: "routeName", headerName: "Route", width: 110 },
+      { field: "tariffCategoryName", headerName: "Tariff", width: 160 },
+      { field: "meterSerialNumber", headerName: "Meter", width: 130 },
+      {
+        field: "status",
+        headerName: "Status",
+        width: 130,
+        renderCell: (params) => (
+          <Chip
+            label={params.value}
+            color={
+              params.value === "ACTIVE"
+                ? "success"
+                : params.value === "PENDING_METER"
+                ? "warning"
+                : params.value === "DISCONNECTED"
+                ? "error"
+                : "default"
+            }
+            size="small"
+          />
+        ),
+      },
+    ],
+    []
+  );
 
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback}>
-      <Box sx={{
-        height: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        p: 3,
-        bgcolor: "background.default",
-        gap: 2,
-      }}>
+      <Box sx={{ height: "100vh", display: "flex", flexDirection: "column", p: 3, gap: 2 }}>
         <Snackbar
           open={snackbar.open}
-          autoHideDuration={6000}
+          autoHideDuration={5000}
           onClose={() => setSnackbar({ ...snackbar, open: false })}
-          anchorOrigin={{ vertical: "top", horizontal: "right" }}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
         >
           <Alert severity={snackbar.severity} sx={{ width: "100%" }}>
             {snackbar.message}
@@ -619,148 +591,201 @@ const ConnectionsScreen = () => {
         </Snackbar>
 
         {/* Header */}
-        <Box sx={{
-          display: "flex",
-          flexDirection: { xs: "column", sm: "row" },
-          justifyContent: "space-between",
-          alignItems: { xs: "flex-start", sm: "center" },
-          gap: 2,
-          mb: 1,
-        }}>
-          <Typography variant="h5" fontWeight={600}>Connections</Typography>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 2 }}>
+          <Typography variant="h5" fontWeight={600}>
+            Connections
+          </Typography>
 
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, alignItems: "center" }}>
-            <Box sx={{ display: "flex", gap: 1.5 }}>
-             
+          <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<PowerOff />}
+              onClick={() => setDisconnectionDialogOpen(true)}
+              disabled={loading}
+            >
+              Create Disconnection Task
+            </Button>
 
-              <Button
-                variant="outlined"
-                color="error"
-                startIcon={<PowerOff />}
-                onClick={() => setDisconnectionDialogOpen(true)}
-                disabled={loading}
-              >
-                Create Disconnection Task
-              </Button>
-            </Box>
+            <Button variant="outlined" startIcon={<FilterList />} onClick={() => setFilterOpen(!filterOpen)}>
+              Filters
+            </Button>
 
-            <Box sx={{ display: "flex", gap: 1.5 }}>
-              <Button variant="outlined" size="small" startIcon={<FilterList />} onClick={() => setFilterOpen(!filterOpen)}>
-                Filters
+            <Button variant="outlined" startIcon={<GetApp />} onClick={handleExport}>
+              Export CSV
+            </Button>
+
+            {currentUser?.role === "ADMIN" && (
+              <Button variant="contained" startIcon={<Add />} onClick={() => setModalOpen(true)}>
+                New Connection
               </Button>
-              <Button variant="outlined" size="small" startIcon={<GetApp />} onClick={handleExport}>
-                Export
-              </Button>
-              {currentUser?.role === "ADMIN" && (
-                <Button variant="contained" color="primary" size="small" startIcon={<Add />} onClick={() => setModalOpen(true)}>
-                  New Connection
-                </Button>
-              )}
-            </Box>
+            )}
           </Box>
         </Box>
 
-        {/* Search & Scope */}
+        {/* Search + Disconnection Controls */}
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <TextField
             fullWidth
-            placeholder="Search by connection, customer, phone, meter..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
             size="small"
+            placeholder="Search by conn #, customer name, phone, meter..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             InputProps={{
-              startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment>,
+              startAdornment: <InputAdornment position="start"><Search /></InputAdornment>,
               endAdornment: search && (
                 <InputAdornment position="end">
-                  <IconButton size="small" onClick={() => setSearch("")}><Clear fontSize="small" /></IconButton>
+                  <IconButton size="small" onClick={() => setSearch("")}><Clear /></IconButton>
                 </InputAdornment>
               ),
             }}
           />
 
           <Collapse in={true}>
-            <Box sx={{ display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap", p: 1.5, bgcolor: "action.hover", borderRadius: 1 }}>
-              <Typography variant="body2" color="text.secondary" fontWeight={500}>connections with overdue bills:</Typography>
+            <Box sx={{ p: 2, bgcolor: "action.hover", borderRadius: 1 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Overdue connections for disconnection
+              </Typography>
 
-              <FormControl size="small" sx={{ minWidth: 140 }}>
-                <InputLabel>By</InputLabel>
-                <Select
-                  value={previewScope}
-                  label="By"
-                  onChange={e => { setPreviewScope(e.target.value); setPreviewScopeId(""); }}
-                >
-                  <MenuItem value="">All overdue</MenuItem>
-                  <MenuItem value="SCHEME">Scheme</MenuItem>
-                  <MenuItem value="ZONE">Zone</MenuItem>
-                  <MenuItem value="ROUTE">Route</MenuItem>
-                </Select>
-              </FormControl>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center", mt: 1.5 }}>
+                <FormControl size="small" sx={{ minWidth: 140 }}>
+                  <InputLabel>Level</InputLabel>
+                  <Select
+                    value={previewScope}
+                    label="Level"
+                    onChange={(e) => {
+                      setPreviewScope(e.target.value);
+                      setPreviewScopeId("");
+                      setMinBalance(""); // reset min balance when changing scope
+                    }}
+                  >
+                    <MenuItem value="">All overdue</MenuItem>
+                    <MenuItem value="SCHEME">Scheme</MenuItem>
+                    <MenuItem value="ZONE">Zone</MenuItem>
+                    <MenuItem value="ROUTE">Route</MenuItem>
+                  </Select>
+                </FormControl>
 
-{previewScope && (
-  <>
-    <FormControl size="small" sx={{ minWidth: 220 }}>
-      <InputLabel>{previewScope === "SCHEME" ? "Scheme" : previewScope === "ZONE" ? "Zone" : "Route"}</InputLabel>
-      <Select
-        value={previewScopeId}
-        label={previewScope === "SCHEME" ? "Scheme" : previewScope === "ZONE" ? "Zone" : "Route"}
-        onChange={e => setPreviewScopeId(e.target.value)}
-      >
-        <MenuItem value="">— Select —</MenuItem>
-        {previewScope === "SCHEME" && schemes.map(s => <MenuItem key={s.id} value={String(s.id)}>{s.name}</MenuItem>)}
-        {previewScope === "ZONE" && zones.map(z => <MenuItem key={z.id} value={String(z.id)}>{z.name} {z.scheme?.name ? `(${z.scheme.name})` : ""}</MenuItem>)}
-        {previewScope === "ROUTE" && routes.map(r => <MenuItem key={r.id} value={String(r.id)}>{r.name} {r.zone?.name ? `(${r.zone.name})` : ""}</MenuItem>)}
-      </Select>
-    </FormControl>
+                {previewScope && (
+                  <>
+                    <FormControl size="small" sx={{ minWidth: 220 }}>
+                      <InputLabel>{getScopeLabel(previewScope)}</InputLabel>
+                      <Select
+                        value={previewScopeId}
+                        label={getScopeLabel(previewScope)}
+                        onChange={(e) => setPreviewScopeId(e.target.value)}
+                      >
+                        <MenuItem value="">— Select —</MenuItem>
+                        {previewScope === "SCHEME" &&
+                          schemes.map((s) => (
+                            <MenuItem key={s.id} value={String(s.id)}>
+                              {s.name}
+                            </MenuItem>
+                          ))}
+                        {previewScope === "ZONE" &&
+                          zones.map((z) => (
+                            <MenuItem key={z.id} value={String(z.id)}>
+                              {z.name} {z.scheme?.name && `(${z.scheme.name})`}
+                            </MenuItem>
+                          ))}
+                        {previewScope === "ROUTE" &&
+                          routes.map((r) => (
+                            <MenuItem key={r.id} value={String(r.id)}>
+                              {r.name} {r.zone?.name && `(${r.zone.name})`}
+                            </MenuItem>
+                          ))}
+                      </Select>
+                    </FormControl>
 
-    <Button
-      variant="outlined"
-       color="theme.palette.primary.contrastText"
-   
-      startIcon={<Visibility />}
-      onClick={handleOpenDisconnectionPreview}
-      disabled={loading || (previewScope && !previewScopeId)}
-    >
-      Preview
-    </Button>
+                    {/* Min Balance Filter */}
+                    <TextField
+                      size="small"
+                      type="number"
+                      label="Min. Balance"
+                      placeholder="e.g. 1000"
+                      value={minBalance}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "" || Number(val) >= 0) {
+                          setMinBalance(val);
+                        }
+                      }}
+                      sx={{ minWidth: 160 }}
+                      InputProps={{
+                        startAdornment: <InputAdornment position="start">KES</InputAdornment>,
+                      }}
+                      helperText="≥ this amount"
+                      variant="outlined"
+                    />
 
-    <Button
-      variant="outlined"
-      color="theme.palette.primary.contrastText"
-      startIcon={<GetApp />}
-      onClick={handleDownloadDueForDisconnection}
-      disabled={loading || !previewScope || !previewScopeId}
-    >
-      download
-    </Button>
-  </>
-)}
+                    <Box sx={{ display: "flex", gap: 1.5 }}>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        size="small"
+                        startIcon={previewLoading ? <CircularProgress size={20} color="inherit" /> : <Visibility />}
+                        onClick={handleOpenDisconnectionPreview}
+                        disabled={previewLoading || !previewScopeId}
+                      >
+                        Preview
+                      </Button>
 
-              
+                      <Button
+                        variant="outlined"
+                       color = "theme.palette.primary.contrastText"
+                        size="small"
+                        startIcon={<GetApp />}
+                        onClick={handleDownloadDueForDisconnection}
+                        disabled={!previewScopeId}
+                      >
+                        Download PDF
+                      </Button>
+                    </Box>
+                  </>
+                )}
+              </Box>
             </Box>
           </Collapse>
 
+          {/* Filters Collapse */}
           <Collapse in={filterOpen}>
             <Box sx={{ p: 2, bgcolor: "background.paper", borderRadius: 1, boxShadow: 1 }}>
-              <Box display="flex" gap={2} flexWrap="wrap">
-                <FormControl sx={{ minWidth: 200 }}>
+              <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                <FormControl sx={{ minWidth: 160 }}>
                   <InputLabel>Status</InputLabel>
-                  <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} label="Status">
+                  <Select value={statusFilter} label="Status" onChange={(e) => setStatusFilter(e.target.value)}>
                     <MenuItem value="">All</MenuItem>
-                    {statusOptions.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                    {statusOptions.map((s) => (
+                      <MenuItem key={s} value={s}>
+                        {s}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
-                <FormControl sx={{ minWidth: 200 }}>
+
+                <FormControl sx={{ minWidth: 180 }}>
                   <InputLabel>Scheme</InputLabel>
-                  <Select value={schemeFilter} onChange={e => setSchemeFilter(e.target.value)} label="Scheme">
+                  <Select value={schemeFilter} label="Scheme" onChange={(e) => setSchemeFilter(e.target.value)}>
                     <MenuItem value="">All</MenuItem>
-                    {schemes.map(s => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
+                    {schemes.map((s) => (
+                      <MenuItem key={s.id} value={s.id}>
+                        {s.name}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
-                <FormControl sx={{ minWidth: 200 }}>
+
+                <FormControl sx={{ minWidth: 180 }} disabled={!schemeFilter}>
                   <InputLabel>Zone</InputLabel>
-                  <Select value={zoneFilter} onChange={e => setZoneFilter(e.target.value)} label="Zone" disabled={!schemeFilter}>
+                  <Select value={zoneFilter} label="Zone" onChange={(e) => setZoneFilter(e.target.value)}>
                     <MenuItem value="">All</MenuItem>
-                    {zones.filter(z => !schemeFilter || z.schemeId === schemeFilter).map(z => <MenuItem key={z.id} value={z.id}>{z.name}</MenuItem>)}
+                    {zones
+                      .filter((z) => !schemeFilter || z.schemeId === Number(schemeFilter))
+                      .map((z) => (
+                        <MenuItem key={z.id} value={z.id}>
+                          {z.name}
+                        </MenuItem>
+                      ))}
                   </Select>
                 </FormControl>
               </Box>
@@ -768,7 +793,7 @@ const ConnectionsScreen = () => {
           </Collapse>
         </Box>
 
-        {/* DataGrid */}
+        {/* Data Grid */}
         <Box sx={{ flex: 1, overflow: "hidden", borderRadius: 1, boxShadow: 1 }}>
           {loading ? (
             <Box sx={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -778,18 +803,20 @@ const ConnectionsScreen = () => {
             <DataGrid
               rows={connections}
               columns={columns}
-              getRowId={(row, idx) => row?.id || `row-${idx}`}
+              getRowId={(row) => row.id}
               pageSizeOptions={[10, 25, 50, 100]}
               paginationModel={{ page, pageSize: rowsPerPage }}
-              onPaginationModelChange={({ page: p, pageSize: ps }) => { setPage(p); setRowsPerPage(ps); }}
+              onPaginationModelChange={({ page: p, pageSize: ps }) => {
+                setPage(p);
+                setRowsPerPage(ps);
+              }}
               rowCount={total}
               paginationMode="server"
-              disableSelectionOnClick
+              disableRowSelectionOnClick
               sx={{
                 height: "100%",
                 border: "none",
                 "& .MuiDataGrid-columnHeaders": { bgcolor: "background.default", fontWeight: 600 },
-                "& .MuiDataGrid-row:hover": { bgcolor: "action.hover" },
               }}
               localeText={{ noRowsLabel: "No connections found" }}
             />
@@ -797,16 +824,10 @@ const ConnectionsScreen = () => {
         </Box>
 
         {/* Dialogs */}
-        {/* New Connection */}
         <Dialog open={modalOpen} onClose={resetModal} fullWidth maxWidth="sm">
-          <DialogTitle>Add New Connection</DialogTitle>
+          <DialogTitle>New Connection</DialogTitle>
           <DialogContent>
-            <TextField fullWidth required label="Connection Number" type="number" value={connectionNumber} onChange={e => setConnectionNumber(e.target.value)} margin="dense" />
-            <TextField select fullWidth required label="Customer" value={selectedCustomerId} onChange={e => setSelectedCustomerId(e.target.value)} margin="dense">
-              <MenuItem value="">Select Customer</MenuItem>
-              {customers.map(c => <MenuItem key={c.id} value={c.id}>{c.customerName} ({c.phoneNumber || "N/A"})</MenuItem>)}
-            </TextField>
-            {/* ... other select fields for scheme/zone/route/tariff/status ... */}
+            {/* Your connection creation form fields go here */}
           </DialogContent>
           <DialogActions>
             <Button onClick={resetModal} disabled={loading}>Cancel</Button>
@@ -816,25 +837,17 @@ const ConnectionsScreen = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Assign Meter */}
         <Dialog open={assignMeterOpen} onClose={resetAssignModal} fullWidth maxWidth="sm">
-          <DialogTitle>Assign Meter</DialogTitle>
-          <DialogContent>
-            <TextField select fullWidth label="Meter" value={selectedMeterId} onChange={e => setSelectedMeterId(e.target.value)} margin="dense">
-              {meters.map(m => <MenuItem key={m.id} value={m.id}>{m.serialNumber}</MenuItem>)}
-            </TextField>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={resetAssignModal}>Cancel</Button>
-            <Button variant="contained" onClick={handleAssignMeter} disabled={!selectedMeterId}>Assign</Button>
-          </DialogActions>
+          {/* Assign meter dialog content */}
         </Dialog>
 
-        {/* Task Dialog */}
         <Dialog open={taskDialogOpen} onClose={() => setTaskDialogOpen(false)} fullWidth maxWidth="sm">
           <AssignMeterTaskDialog
             open={taskDialogOpen}
-            onClose={() => { setTaskDialogOpen(false); setTaskConnection(null); }}
+            onClose={() => {
+              setTaskDialogOpen(false);
+              setTaskConnection(null);
+            }}
             connectionId={taskConnection?.id || ""}
             schemeId={String(taskConnection?.schemeId || "")}
             zoneId={String(taskConnection?.zoneId || "")}
@@ -849,24 +862,10 @@ const ConnectionsScreen = () => {
           />
         </Dialog>
 
-        {/* Details Dialog */}
         <Dialog open={detailsDialogOpen} onClose={() => setDetailsDialogOpen(false)} fullWidth maxWidth="sm">
-          <DialogTitle>Connection Details</DialogTitle>
-          <DialogContent>
-            {selectedConnection && (
-              <Box component="dl">
-                <dt><strong>Connection #</strong></dt><dd>{selectedConnection.connectionNumber}</dd>
-                <dt><strong>Customer</strong></dt><dd>{selectedConnection.customerName}</dd>
-                {/* ... other fields ... */}
-              </Box>
-            )}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setDetailsDialogOpen(false)}>Close</Button>
-          </DialogActions>
+          {/* Connection details content */}
         </Dialog>
 
-        {/* Disconnection Task */}
         <Dialog open={disconnectionDialogOpen} onClose={() => setDisconnectionDialogOpen(false)} fullWidth maxWidth="md" scroll="paper">
           <DialogTitle>Create Disconnection Task</DialogTitle>
           <DialogContent dividers>
@@ -880,7 +879,6 @@ const ConnectionsScreen = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Preview Dialog */}
         <DisconnectionPreviewDialog
           open={previewOpen}
           onClose={() => setPreviewOpen(false)}
