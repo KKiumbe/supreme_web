@@ -79,7 +79,7 @@ const BankUploadsScreen = () => {
     try {
       const params = new URLSearchParams({
         page: pagination.page.toString(),
-        limit: pagination.pageSize.toString(),
+        limit: pagination.pageSize?.toString(),
       });
 
       const res = await axios.get(
@@ -199,7 +199,7 @@ const BankUploadsScreen = () => {
         processedRows: r.processedRows,
         status: r.status,
         uploadedBy: r.uploadedBy,
-        createdAt: new Date(r.createdAt).toLocaleString(),
+        createdAt: new Date(r.createdAt)?.toLocaleString(),
       })),
     [rows]
   );

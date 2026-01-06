@@ -408,7 +408,7 @@ const App = () => {
                 /> 
 
                       <Route
-                  path="upload-bank-payments/9"
+                  path="upload-bank-payments"
                   element={
                     <ProtectedRoute>
                       <BankUploadsScreen />
