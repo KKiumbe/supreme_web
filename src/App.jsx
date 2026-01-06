@@ -61,6 +61,7 @@ import CreateSurvey from "./pages/surveys/addsurvey";
 import CreateCustomerScreen from "./pages/customers/addCustomer";
 import AdjustmentsList from "./pages/billing/adjustment/adjustment";
 import TaskTypesScreen from "./pages/tasks/tasksTypes";
+import BankUploadsScreen from "./pages/payments/bankuploads";
 
 const App = () => {
   const { darkMode } = useThemeStore();
@@ -402,6 +403,15 @@ const App = () => {
                   element={
                     <ProtectedRoute>
                       <UnreceipedPayments />
+                    </ProtectedRoute>
+                  }
+                /> 
+
+                      <Route
+                  path="upload-bank-payments/9"
+                  element={
+                    <ProtectedRoute>
+                      <BankUploadsScreen />
                     </ProtectedRoute>
                   }
                 /> 
