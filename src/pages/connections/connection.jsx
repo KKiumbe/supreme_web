@@ -515,10 +515,10 @@ const ConnectionsScreen = () => {
         align: "center",
         renderCell: (params) => (
           <Box>
-            {params.row.status === "PENDING_METER" ? (
+            {params?.row?.status === "PENDING_METER" ? (
               <Tooltip title="Assign Meter Task">
                 <IconButton
-                  color="primary"
+                  color="theme.palette.primary.contrastText"
                   onClick={(e) => {
                     e.stopPropagation();
                     openTaskDialog(params.row);
@@ -530,7 +530,7 @@ const ConnectionsScreen = () => {
             ) : (
               <Tooltip title="View Details">
                 <IconButton
-                  color="primary"
+                  color="theme.palette.primary.contrastText"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleViewDetails(params.row);
@@ -862,9 +862,99 @@ const ConnectionsScreen = () => {
           />
         </Dialog>
 
-        <Dialog open={detailsDialogOpen} onClose={() => setDetailsDialogOpen(false)} fullWidth maxWidth="sm">
-          {/* Connection details content */}
-        </Dialog>
+      <Dialog 
+  open={detailsDialogOpen} 
+  onClose={() => setDetailsDialogOpen(false)} 
+  fullWidth 
+  maxWidth="md"
+>
+  <DialogTitle>
+    Connection Details – #{selectedConnection?.connectionNumber || "—"}
+  </DialogTitle>
+  
+  <DialogContent dividers>
+    {selectedConnection ? (
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2.5, py: 1 }}>
+        {/* Customer section */}
+        <Box>
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            Customer
+          </Typography>
+          <Typography variant="body1">
+            <strong>Name:</strong> {selectedConnection.customerName || '—'}
+          </Typography>
+          <Typography>
+            <strong>Phone:</strong> {selectedConnection.customerPhoneNumber || '—'}
+          </Typography>
+          <Typography>
+            <strong>Email:</strong> {selectedConnection.customerEmail || '—'}
+          </Typography>
+          <Typography>
+            <strong>Account #:</strong> {selectedConnection.customerAccount || '—'}
+          </Typography>
+        </Box>
+
+        {/* Connection / Meter section */}
+        <Box>
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            Connection & Meter
+          </Typography>
+          <Typography>
+            <strong>Status:</strong> {selectedConnection.status}
+          </Typography>
+          <Typography>
+            <strong>Meter Serial:</strong> {selectedConnection.meterSerialNumber || 'Not assigned'}
+          </Typography>
+          <Typography>
+            <strong>Meter Model:</strong> {selectedConnection.meterModel || '—'}
+          </Typography>
+          <Typography>
+            <strong>Plot Number:</strong> {selectedConnection.plotNumber || '—'}
+          </Typography>
+        </Box>
+
+        {/* Location section */}
+        <Box>
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            Location
+          </Typography>
+          <Typography>
+            <strong>Scheme:</strong> {selectedConnection.schemeName || '—'}
+          </Typography>
+          <Typography>
+            <strong>Zone:</strong> {selectedConnection.zoneName || '—'}
+          </Typography>
+          <Typography>
+            <strong>Route:</strong> {selectedConnection.routeName || '—'}
+          </Typography>
+        </Box>
+
+        {/* Tariff & Financials */}
+        <Box>
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            Tariff & Balance
+          </Typography>
+          <Typography>
+            <strong>Tariff Category:</strong> {selectedConnection.tariffCategoryName || '—'}
+          </Typography>
+          <Typography color={selectedConnection.customerAccountBalance < 0 ? "error" : "inherit"}>
+            <strong>Account Balance:</strong> KES {selectedConnection.customerAccountBalance?.toLocaleString() || '0'}
+          </Typography>
+          <Typography>
+            <strong>Deposit:</strong> KES {selectedConnection.customerAccountDeposit?.toLocaleString() || '0'}
+          </Typography>
+        </Box>
+      </Box>
+    ) : (
+      <Typography color="text.secondary">No connection selected</Typography>
+    )}
+  </DialogContent>
+
+  <DialogActions>
+    <Button onClick={() => setDetailsDialogOpen(false)}>Close</Button>
+    {/* Optional: Add Edit / Assign meter / Create task buttons here later */}
+  </DialogActions>
+</Dialog>
 
         <Dialog open={disconnectionDialogOpen} onClose={() => setDisconnectionDialogOpen(false)} fullWidth maxWidth="md" scroll="paper">
           <DialogTitle>Create Disconnection Task</DialogTitle>

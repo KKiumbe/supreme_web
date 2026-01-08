@@ -9,23 +9,24 @@ import {
   MenuItem,
   IconButton,
   useMediaQuery,
+  Chip,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { Add, Refresh, Visibility } from "@mui/icons-material";
-import { Chip } from "@mui/material";
 import axios from "axios";
 import dayjs from "dayjs";
-import AssignTaskDialog from "../../components/tasks/createTasks";
 
-import { getTheme } from "../../store/theme";
+import AssignTaskDialog from "../../components/tasks/createTasks";
 import TaskDetails from "../../components/tasks/tasksDetails";
+import { getTheme } from "../../store/theme";
 
 const API_URL = import.meta.env.VITE_BASE_URL;
 
 const TaskBoard = () => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(0); // DataGrid pages start at 0
+
+  const [page, setPage] = useState(0); // DataGrid is 0-based
   const [limit, setLimit] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
 
@@ -33,6 +34,7 @@ const TaskBoard = () => {
 
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState(null);
+
   const [selectedTask, setSelectedTask] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState(null);
@@ -40,7 +42,9 @@ const TaskBoard = () => {
   const theme = getTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
-  // Flatten task data
+  /* --------------------------------------
+   * 🔧 Helpers
+   * ------------------------------------ */
   const flattenTask = (task) => ({
     ...task,
     typeName: task.Type?.name || "-",
@@ -52,55 +56,6 @@ const TaskBoard = () => {
       : "Unknown",
   });
 
-  // Fetch tasks with pagination
-  const fetchTasks = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get(`${API_URL}/get-tasks`, {
-        withCredentials: true,
-        params: {
-          page: page + 1, // backend expects 1-based page
-          limit,
-          status: filter.status || undefined,
-        },
-      });
-
-      const paginated = response.data;
-
-      setTasks(paginated.data.map(flattenTask));
-      setTotalItems(paginated.pagination.totalItems);
-    } catch (error) {
-      console.error("Error fetching tasks:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch task details
-  const fetchTaskDetails = async (taskId) => {
-    setDetailsLoading(true);
-    setDetailsError(null);
-    try {
-      const response = await axios.get(`${API_URL}/get-task/${taskId}`, {
-        withCredentials: true,
-      });
-      if (response.data.success) {
-        setSelectedTask(response.data.data);
-      } else {
-        setDetailsError("Failed to fetch task details");
-      }
-    } catch (err) {
-      setDetailsError("Error fetching task details: " + err.message);
-    } finally {
-      setDetailsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchTasks();
-  }, [page, limit, filter.status]);
-
-  // Status and priority chip colors
   const getStatusColor = (status) =>
     ({
       PENDING: "warning",
@@ -118,13 +73,70 @@ const TaskBoard = () => {
       CRITICAL: "secondary",
     }[priority] || "default");
 
-  const handleSearch = (e) => {
-    setFilter((prev) => ({ ...prev, search: e.target.value }));
+  /* --------------------------------------
+   * 📦 Fetch Tasks (SERVER search + pagination)
+   * ------------------------------------ */
+  const fetchTasks = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API_URL}/get-tasks`, {
+        withCredentials: true,
+        params: {
+          page: page + 1, // backend expects 1-based page
+          limit,
+          status: filter.status || undefined,
+          q: filter.search || undefined,
+        },
+      });
+
+      const { data, pagination } = response.data;
+
+      setTasks(data.map(flattenTask));
+      setTotalItems(pagination.totalItems);
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const filteredTasks = tasks.filter((task) =>
-    task.title.toLowerCase().includes(filter.search.toLowerCase())
-  );
+  /* --------------------------------------
+   * 🔍 Task Details
+   * ------------------------------------ */
+  const fetchTaskDetails = async (taskId) => {
+    setDetailsLoading(true);
+    setDetailsError(null);
+    try {
+      const response = await axios.get(`${API_URL}/get-task/${taskId}`, {
+        withCredentials: true,
+      });
+
+      if (response.data.success) {
+        setSelectedTask(response.data.data);
+      } else {
+        setDetailsError("Failed to fetch task details");
+      }
+    } catch (err) {
+      setDetailsError("Error fetching task details: " + err.message);
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
+  /* --------------------------------------
+   * 🔁 Effects
+   * ------------------------------------ */
+  useEffect(() => {
+    fetchTasks();
+  }, [page, limit, filter.status, filter.search]);
+
+  /* --------------------------------------
+   * 🧭 Handlers
+   * ------------------------------------ */
+  const handleSearch = (e) => {
+    setFilter((prev) => ({ ...prev, search: e.target.value }));
+    setPage(0);
+  };
 
   const openAssignDialog = (taskId = null) => {
     setSelectedTaskId(taskId);
@@ -157,7 +169,9 @@ const TaskBoard = () => {
     setDetailsError(null);
   };
 
-  // Columns
+  /* --------------------------------------
+   * 📊 Columns
+   * ------------------------------------ */
   const columns = [
     {
       field: "actions",
@@ -169,7 +183,7 @@ const TaskBoard = () => {
           color="primary"
           onClick={(e) => {
             e.stopPropagation();
-            handleSelectTask(params.row.id);
+            handleSelectTask(params?.row?.id);
           }}
         >
           <Visibility />
@@ -184,7 +198,7 @@ const TaskBoard = () => {
       width: 120,
       renderCell: (params) => (
         <Chip
-          label={params.row.priority}
+          label={params?.row?.priority}
           color={getPriorityColor(params?.row?.priority)}
           size="small"
         />
@@ -222,6 +236,9 @@ const TaskBoard = () => {
     },
   ];
 
+  /* --------------------------------------
+   * 🖥️ Render
+   * ------------------------------------ */
   return (
     <Box
       sx={{
@@ -240,7 +257,7 @@ const TaskBoard = () => {
           transition: "flex 0.3s ease",
         }}
       >
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Box display="flex" justifyContent="space-between" mb={3}>
           <Typography variant="h6" fontWeight="bold">
             Task Board
           </Typography>
@@ -263,7 +280,6 @@ const TaskBoard = () => {
         <Box display="flex" gap={1} mb={3}>
           <TextField
             label="Search Task"
-            variant="outlined"
             size="small"
             value={filter.search}
             onChange={handleSearch}
@@ -274,26 +290,31 @@ const TaskBoard = () => {
             label="Status"
             size="small"
             value={filter.status}
-            onChange={(e) => setFilter((prev) => ({ ...prev, status: e.target.value }))}
+            onChange={(e) => {
+              setFilter((prev) => ({ ...prev, status: e.target.value }));
+              setPage(0);
+            }}
             sx={{ width: 200 }}
           >
             <MenuItem value="">All</MenuItem>
-            {["PENDING", "ASSIGNED", "IN_PROGRESS", "COMPLETED", "FAILED"].map((status) => (
-              <MenuItem key={status} value={status}>
-                {status}
-              </MenuItem>
-            ))}
+            {["PENDING", "ASSIGNED", "IN_PROGRESS", "COMPLETED", "FAILED"].map(
+              (status) => (
+                <MenuItem key={status} value={status}>
+                  {status}
+                </MenuItem>
+              )
+            )}
           </TextField>
         </Box>
 
         <Paper sx={{ p: 1, height: "calc(100% - 120px)" }}>
           {loading ? (
-            <Box display="flex" justifyContent="center" alignItems="center" p={5}>
+            <Box display="flex" justifyContent="center" p={5}>
               <CircularProgress />
             </Box>
           ) : (
             <DataGrid
-              rows={filteredTasks}
+              rows={tasks}
               columns={columns}
               pagination
               paginationMode="server"
@@ -303,7 +324,7 @@ const TaskBoard = () => {
               onPageChange={(newPage) => setPage(newPage)}
               onPageSizeChange={(newLimit) => {
                 setLimit(newLimit);
-                setPage(0); // reset to page 0
+                setPage(0);
               }}
               rowsPerPageOptions={[10, 25, 50]}
               getRowId={(row) => row.id}
@@ -313,7 +334,7 @@ const TaskBoard = () => {
         </Paper>
       </Box>
 
-      {/* Right Side: Task Details */}
+      {/* Right Side */}
       <Box
         sx={{
           flex: isMobile ? "1" : selectedTask ? "0 0 500px" : "0 0 0",
@@ -323,13 +344,13 @@ const TaskBoard = () => {
         }}
       >
         {detailsLoading ? (
-          <Box display="flex" justifyContent="center" alignItems="center" p={5}>
+          <Box display="flex" justifyContent="center" p={5}>
             <CircularProgress />
           </Box>
         ) : detailsError ? (
           <Box sx={{ p: 3 }}>
             <Typography color="error">{detailsError}</Typography>
-            <Button variant="outlined" onClick={handleCloseDetails} sx={{ mt: 2 }}>
+            <Button onClick={handleCloseDetails} sx={{ mt: 2 }}>
               Close
             </Button>
           </Box>

@@ -16,24 +16,29 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
+import PriceChangeOutlinedIcon from "@mui/icons-material/PriceChangeOutlined";
+
 import { Search as SearchIcon, Refresh as RefreshIcon, Visibility as VisibilityIcon } from "@mui/icons-material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
+
 import BillDetails from "../../components/bills/billDetail";
+import CreateAdjustmentDialog from "../../components/adjustments/CreateAdjustmentDialog";
 
-
-// Debounce hook
+// Simple debounce hook
 const useDebounce = (value, delay = 500) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
+
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedValue(value), delay);
     return () => clearTimeout(handler);
   }, [value, delay]);
+
   return debouncedValue;
 };
 
-const BASEURL = import.meta.env.VITE_BASE_URL || "";
+const BASE_URL = import.meta.env.VITE_BASE_URL || "";
 
 const BillList = () => {
   const { currentUser } = useAuthStore();
@@ -41,75 +46,80 @@ const BillList = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
-  // State
+  // ── State ───────────────────────────────────────
   const [bills, setBills] = useState([]);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
     total: 0,
-    totalPages: 1,
-    hasNext: false,
-    hasPrev: false,
   });
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
   const [customers, setCustomers] = useState([]);
   const [billTypes, setBillTypes] = useState([]);
+
   const [search, setSearch] = useState("");
-  const [billType, setBillType] = useState("");
-  const [status, setStatus] = useState("");
-  const [selectedBill, setSelectedBill] = useState(null);
-  const [detailsLoading, setDetailsLoading] = useState(false);
-  const [detailsError, setDetailsError] = useState(null);
   const debouncedSearch = useDebounce(search);
 
-  // Fetch customers and bill types
+  const [billTypeFilter, setBillTypeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+
+  const [selectedBillId, setSelectedBillId] = useState(null);
+  const [billDetails, setBillDetails] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+
+  const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false);
+  const [billForAdjustment, setBillForAdjustment] = useState(null);
+
+  // ── Fetch dropdown data ─────────────────────────
   useEffect(() => {
-    const fetchDropdowns = async () => {
+    const fetchDropdownData = async () => {
       try {
-        const [customersRes, billTypesRes] = await Promise.all([
-          axios.get(`${BASEURL}/customers`, { withCredentials: true }),
-          axios.get(`${BASEURL}/get-bill-types`, { withCredentials: true }),
+        const [custRes, typesRes] = await Promise.all([
+          axios.get(`${BASE_URL}/customers`, { withCredentials: true }),
+          axios.get(`${BASE_URL}/get-bill-types`, { withCredentials: true }),
         ]);
 
-        setCustomers(customersRes.data?.data?.customers || []);
-        setBillTypes(billTypesRes.data?.data || []);
+        setCustomers(custRes.data?.data?.customers || []);
+        setBillTypes(typesRes.data?.data || []);
       } catch (err) {
         console.error("Failed to load dropdowns:", err);
         setError("Failed to load customers or bill types");
       }
     };
-    fetchDropdowns();
+
+    fetchDropdownData();
   }, []);
 
-  // Fetch bills
+  // ── Fetch bills list ────────────────────────────
   const fetchBills = useCallback(async () => {
     setLoading(true);
     setError(null);
+
     try {
       const params = new URLSearchParams({
         page: pagination.page.toString(),
         limit: pagination.limit.toString(),
         ...(debouncedSearch && { search: debouncedSearch }),
-        ...(billType && { billType }),
-        ...(status && { status }),
+        ...(billTypeFilter && { billType: billTypeFilter }),
+        ...(statusFilter && { status: statusFilter }),
       });
 
-      const res = await axios.get(`${BASEURL}/get-bills?${params}`, { withCredentials: true });
+      const res = await axios.get(`${BASE_URL}/get-bills?${params}`, {
+        withCredentials: true,
+      });
 
-      if (!res.data?.success || !res.data?.data) {
-        throw new Error("Invalid API response structure");
+      if (!res.data?.success) {
+        throw new Error("Invalid API response");
       }
 
       setBills(res.data.data || []);
-      setPagination({
-        page: res.data.pagination?.page || 1,
-        limit: res.data.pagination?.limit || 20,
+      setPagination((prev) => ({
+        ...prev,
         total: res.data.pagination?.total || 0,
-        totalPages: res.data.pagination?.totalPages || 1,
-        hasNext: res.data.pagination?.hasNext || false,
-        hasPrev: res.data.pagination?.hasPrev || false,
-      });
+      }));
     } catch (err) {
       console.error("Failed to fetch bills:", err);
       setError(err.response?.data?.message || "Failed to load bills");
@@ -117,130 +127,141 @@ const BillList = () => {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, debouncedSearch, billType, status]);
+  }, [pagination.page, pagination.limit, debouncedSearch, billTypeFilter, statusFilter]);
 
   useEffect(() => {
     fetchBills();
   }, [fetchBills]);
 
-  // Fetch bill details
+  // ── Fetch single bill details ───────────────────
   const fetchBillDetails = useCallback(async (billId) => {
     setDetailsLoading(true);
-    setDetailsError(null);
     try {
-      const res = await axios.get(`${BASEURL}/get-bill/${billId}`, { withCredentials: true });
-      if (!res.data?.success || !res.data?.data) {
-        throw new Error("Invalid bill details response");
+      const res = await axios.get(`${BASE_URL}/get-bill/${billId}`, {
+        withCredentials: true,
+      });
+
+      if (res.data?.success) {
+        setBillDetails(res.data.data);
+      } else {
+        throw new Error("Invalid bill response");
       }
-      setSelectedBill(res.data.data);
     } catch (err) {
       console.error("Failed to fetch bill details:", err);
-      setDetailsError(err.response?.data?.message || "Failed to load bill details");
-      setSelectedBill(null);
+      setError(err.response?.data?.message || "Failed to load bill details");
+      setBillDetails(null);
     } finally {
       setDetailsLoading(false);
     }
   }, []);
 
-  // Handle view bill
+  // ── Handlers ────────────────────────────────────
   const handleViewBill = (billId) => {
+    setSelectedBillId(billId);
     fetchBillDetails(billId);
   };
 
-  // Handle close details
-  const handleCloseDetails = () => {
-    setSelectedBill(null);
-    setDetailsError(null);
+  const handleOpenAdjustment = (bill) => {
+    setBillForAdjustment(bill);
+    setAdjustmentDialogOpen(true);
   };
 
-  // Handle search and customer selection
-  const handleSearch = (event, value) => {
-    setSearch(value || "");
-    setPagination((prev) => ({ ...prev, page: 1 }));
-  };
-
-  const handleCustomerSelect = (event, value) => {
-    setSearch(value ? value.customerName : "");
-    setPagination((prev) => ({ ...prev, page: 1 }));
-  };
-
-  // Reset filters
-  const handleReset = () => {
+  const handleResetFilters = () => {
     setSearch("");
-    setBillType("");
-    setStatus("");
-    setPagination((prev) => ({ ...prev, page: 1 }));
+    setBillTypeFilter("");
+    setStatusFilter("");
+    setPagination((p) => ({ ...p, page: 1 }));
   };
 
-  // Normalize bill data
-  const normalizedBills = useMemo(() => {
-    const billTypeMap = Object.fromEntries(billTypes.map((bt) => [bt.id, bt.name]));
+  // ── Prepare rows for DataGrid ───────────────────
+  const rows = useMemo(() => {
+    const billTypeMap = {};
+    billTypes.forEach((t) => {
+      billTypeMap[t.id] = t.name;
+    });
+
     return bills.map((bill) => ({
       id: bill.id,
-      billNumber: bill.billNumber || "-",
-      customerName: bill?.connection?.customer?.customerName || "-",
-      phoneNumber: bill.connection?.customer?.phoneNumber || "-",
-      billAmount: bill.billAmount ? `KES ${bill.billAmount}` : "-",
-      amountPaid: bill.amountPaid ? `KES ${bill.amountPaid}` : "-",
-      closingBalance: bill.closingBalance ? `KES ${bill.closingBalance}` : "-",
-      status: bill.status || "-",
-      billPeriod: bill.billPeriod ? new Date(bill.billPeriod).toLocaleDateString() : "-",
-      createdAt: bill.createdAt ? new Date(bill.createdAt).toLocaleString() : "-",
-      billType: billTypeMap[bill.type?.id] || bill.type?.name || "-",
+      originalBill: bill,           // keep full object for adjustment & actions
+      billNumber: bill.billNumber || "—",
+      customerName: bill.connection?.customer?.customerName || "—",
+      phoneNumber: bill.connection?.customer?.phoneNumber || "—",
+      billAmount: bill.billAmount ? `KES ${bill.billAmount.toLocaleString()}` : "—",
+      amountPaid: bill.amountPaid ? `KES ${bill.amountPaid.toLocaleString()}` : "—",
+      closingBalance: bill.closingBalance ? `KES ${bill.closingBalance.toLocaleString()}` : "—",
+      status: bill.status || "—",
+      billPeriod: bill.billPeriod ? new Date(bill.billPeriod).toLocaleDateString() : "—",
+      createdAt: bill.createdAt ? new Date(bill.createdAt).toLocaleString() : "—",
+      billType: billTypeMap[bill.type?.id] || bill.type?.name || "—",
       items: bill.items?.length
         ? bill.items
-            .map((item) => `${item.description} (Qty: ${item.quantity}, KES ${item.amount})`)
+            .map((i) => `${i.description} (×${i.quantity}, KES ${i.amount})`)
             .join(", ")
-        : "-",
+        : "—",
     }));
   }, [bills, billTypes]);
 
-  // DataGrid columns
   const columns = [
-       {
-      field: "actions",
-      headerName: "Actions",
-      width: 100,
-      renderCell: (params) => (
-        <Tooltip title="View Bill">
-          <IconButton onClick={() => handleViewBill(params.row.id)}>
-            <VisibilityIcon />
-          </IconButton>
-        </Tooltip>
-      ),
-    },
-    { field: "billNumber", headerName: "Bill Number", width: 150 },
-    { field: "customerName", headerName: "Customer Name", width: 180 },
-    { field: "phoneNumber", headerName: "Phone Number", width: 140 },
-    { field: "billAmount", headerName: "Bill Amount", width: 120 },
-    { field: "amountPaid", headerName: "Amount Paid", width: 120 },
-    { field: "closingBalance", headerName: "Closing Balance(At invoiced)", width: 120 },
+
+{
+  field: "actions",
+  headerName: "Details/Adjust",
+  width: 130,
+  sortable: false,
+  renderCell: ({ row }) => (
+    <>
+      <Tooltip title="View Bill">
+        <IconButton size="small" onClick={() => handleViewBill(row.id)}>
+          <VisibilityIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+
+      <Tooltip title="Create Adjustment">
+        <IconButton
+          size="small"
+          //color="primary"
+          onClick={() => handleOpenAdjustment(row.originalBill)}
+        >
+          <PriceChangeOutlinedIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+    </>
+  ),
+},
+
+    { field: "billNumber", headerName: "Bill No.", width: 140 },
+    { field: "customerName", headerName: "Customer", width: 180 },
+    { field: "phoneNumber", headerName: "Phone", width: 130 },
+    { field: "billAmount", headerName: "Amount", width: 110 },
+    { field: "amountPaid", headerName: "Paid", width: 110 },
+    { field: "closingBalance", headerName: "Balance", width: 110 },
     {
       field: "status",
       headerName: "Status",
       width: 100,
-      renderCell: (params) => (
+      renderCell: ({ value }) => (
         <Chip
-          label={params?.value}
-          color={params?.value === "PAID" ? "success" : params?.value === "UNPAID" ? "warning" : "default"}
+          label={value}
+          color={value === "PAID" ? "success" : value === "UNPAID" ? "warning" : "default"}
           size="small"
         />
       ),
     },
-    { field: "billPeriod", headerName: "Bill Period", width: 120 },
-    { field: "createdAt", headerName: "Created At", width: 160 },
-    { field: "billType", headerName: "Bill Type", width: 120 },
+    { field: "billPeriod", headerName: "Period", width: 110 },
+    { field: "createdAt", headerName: "Created", width: 160 },
+    { field: "billType", headerName: "Type", width: 110 },
     {
       field: "items",
       headerName: "Items",
-      width: 250,
-      renderCell: (params) => (
-        <Tooltip title={params?.value}>
-          <span>{params?.value}</span>
+      width: 260,
+      renderCell: ({ value }) => (
+        <Tooltip title={value || ""}>
+          <Box component="span" sx={{ textOverflow: "ellipsis", overflow: "hidden" }}>
+            {value}
+          </Box>
         </Tooltip>
       ),
     },
- 
   ];
 
   if (!currentUser) {
@@ -249,87 +270,79 @@ const BillList = () => {
   }
 
   return (
-   <Box sx={{
-  p: 3,
-  display: isMobile ? "block" : "flex",
-  gap: 2,
-  minHeight: "calc(100vh - 64px)",  // <-- allow content to expand
- overflow: "visible",
-              // <-- important (prevents DataGrid overflow)
-  maxWidth: "100vw",
-}}>
-
-      {/* Left Side: Bills List */}
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        {/* Header */}
-        <Grid container justifyContent="space-between" alignItems="center" mb={3}>
-          <Typography variant="h5" fontWeight="bold">
-            Bills
-          </Typography>
-        </Grid>
+    <Box
+      sx={{
+        p: 3,
+        display: "flex",
+        gap: 2,
+        minHeight: "calc(100vh - 64px)",
+        overflow: "hidden",
+      }}
+    >
+      {/* Main content */}
+      <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <Typography variant="h5" fontWeight="bold" gutterBottom>
+          Bills
+        </Typography>
 
         {/* Filters */}
         <Paper sx={{ p: 2, mb: 3 }}>
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={4}>
+          <Grid container spacing={2} alignItems="flex-end">
+            <Grid item xs={12} sm={5} md={4}>
               <Autocomplete
                 options={customers}
-                getOptionLabel={(option) =>
-                  `${option.customerName} (${option.nationalId})${
-                    option.phoneNumber ? ` - ${option.phoneNumber}` : ""
-                  }`
+                getOptionLabel={(opt) =>
+                  `${opt.customerName} (${opt.nationalId || "?"})` +
+                  (opt.phoneNumber ? ` — ${opt.phoneNumber}` : "")
                 }
-                onInputChange={handleSearch}
-                onChange={handleCustomerSelect}
                 freeSolo
+                onInputChange={(_, val) => setSearch(val || "")}
+                onChange={(_, val) => setSearch(val?.customerName || "")}
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    fullWidth
                     size="small"
-                    placeholder="Search by name, phone, or connection number"
+                    placeholder="Name, phone, national ID..."
                     InputProps={{
                       ...params.InputProps,
                       startAdornment: <SearchIcon sx={{ mr: 1, color: "text.secondary" }} />,
                     }}
                   />
                 )}
-                noOptionsText="No customers found"
-                isOptionEqualToValue={(option, value) => option.id === value.id}
               />
             </Grid>
 
-            <Grid item xs={12} md={2}>
+            <Grid item xs={6} sm={3} md={2}>
               <TextField
                 select
                 fullWidth
                 size="small"
                 label="Bill Type"
-                value={billType}
+                value={billTypeFilter}
                 onChange={(e) => {
-                  setBillType(e.target.value);
-                  setPagination((prev) => ({ ...prev, page: 1 }));
+                  setBillTypeFilter(e.target.value);
+                  setPagination((p) => ({ ...p, page: 1 }));
                 }}
               >
                 <MenuItem value="">All</MenuItem>
-                {billTypes.map((bt) => (
-                  <MenuItem key={bt.id} value={bt.name}>
-                    {bt.name}
+                {billTypes.map((t) => (
+                  <MenuItem key={t.id} value={t.name}>
+                    {t.name}
                   </MenuItem>
                 ))}
               </TextField>
             </Grid>
 
-            <Grid item xs={12} md={2}>
+            <Grid item xs={6} sm={2} md={2}>
               <TextField
                 select
                 fullWidth
                 size="small"
                 label="Status"
-                value={status}
+                value={statusFilter}
                 onChange={(e) => {
-                  setStatus(e.target.value);
-                  setPagination((prev) => ({ ...prev, page: 1 }));
+                  setStatusFilter(e.target.value);
+                  setPagination((p) => ({ ...p, page: 1 }));
                 }}
               >
                 <MenuItem value="">All</MenuItem>
@@ -338,9 +351,9 @@ const BillList = () => {
               </TextField>
             </Grid>
 
-            <Grid item xs={12} md={1}>
-              <Tooltip title="Reset Filters">
-                <IconButton onClick={handleReset}>
+            <Grid item>
+              <Tooltip title="Reset filters">
+                <IconButton onClick={handleResetFilters}>
                   <RefreshIcon />
                 </IconButton>
               </Tooltip>
@@ -349,19 +362,13 @@ const BillList = () => {
         </Paper>
 
         {/* DataGrid */}
-
-        <Box sx={{ flex: 1, minHeight: 0 }}>
-
-           <Paper sx={{ flex: 1, minHeight: 0, height: "100%" }}>
-
+        <Paper sx={{ flex: 1, overflow: "hidden" }}>
           <DataGrid
-            rows={normalizedBills}
-            getRowId={(row) => row.id}
+            rows={rows}
             columns={columns}
             loading={loading}
-            pagination
-            paginationMode="server"
             rowCount={pagination.total}
+            paginationMode="server"
             pageSizeOptions={[10, 20, 50]}
             paginationModel={{
               page: pagination.page - 1,
@@ -377,56 +384,63 @@ const BillList = () => {
             disableRowSelectionOnClick
             slots={{
               noRowsOverlay: () => (
-                <Box display="flex" alignItems="center" justifyContent="center" height="100%">
-                  <Typography color="text.secondary">{error || "No bills found"}</Typography>
+                <Box sx={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Typography color="text.secondary">
+                    {error || (loading ? "Loading..." : "No bills found")}
+                  </Typography>
                 </Box>
               ),
             }}
+            sx={{ border: 0 }}
           />
         </Paper>
-
-
-        </Box>
-     
       </Box>
 
-      {/* Right Side: Bill Details */}
-<Box
-  sx={{
-    position: "fixed",
-    top: 64, // adjust if your header is different
-    right: 0,
-    width: selectedBill ? 450 : 0,
-    height: "calc(100vh - 64px)",
-    overflow: "auto",
-    bgcolor: "background.paper",
-    boxShadow: selectedBill ? "-4px 0px 12px rgba(0,0,0,0.1)" : "none",
-    transition: "width 0.3s ease",
-    zIndex: 1200,
-  }}
->
-
-
-
+      {/* Right sidebar – Bill Details */}
+      <Box
+        sx={{
+          width: selectedBillId ? 460 : 0,
+          flexShrink: 0,
+          bgcolor: "background.paper",
+          borderLeft: "1px solid",
+          borderColor: "divider",
+          transition: "width 0.3s ease",
+          overflowY: "auto",
+          boxShadow: "-4px 0 12px rgba(0,0,0,0.08)",
+        }}
+      >
         {detailsLoading ? (
-          <Box display="flex" justifyContent="center" alignItems="center" p={5}>
+          <Box p={4} display="flex" justifyContent="center">
             <CircularProgress />
           </Box>
-        ) : detailsError ? (
-          <Box sx={{ p: 3 }}>
-            <Typography color="error">{detailsError}</Typography>
-            <Button variant="outlined" onClick={handleCloseDetails} sx={{ mt: 2 }}>
+        ) : billDetails ? (
+          <BillDetails task={billDetails} onClose={() => setSelectedBillId(null)} />
+        ) : selectedBillId ? (
+          <Box p={3}>
+            <Typography color="error">Failed to load bill details</Typography>
+            <Button variant="outlined" onClick={() => setSelectedBillId(null)} sx={{ mt: 2 }}>
               Close
             </Button>
           </Box>
-        ) : selectedBill ? (
-          <BillDetails task={selectedBill} onClose={handleCloseDetails} />
-        ) : (
-          <Box sx={{ p: 3 }}>
-            <Typography>Select a bill to view details</Typography>
-          </Box>
-        )}
+        ) : null}
       </Box>
+
+      {/* Adjustment Dialog */}
+      <CreateAdjustmentDialog
+        open={adjustmentDialogOpen}
+        invoiceId={billForAdjustment?.id}
+        billNumber={billForAdjustment?.billNumber}
+        customerName={billForAdjustment?.connection?.customer?.customerName}
+        onClose={() => {
+          setAdjustmentDialogOpen(false);
+          setBillForAdjustment(null);
+        }}
+        onSuccess={() => {
+          fetchBills();
+          setAdjustmentDialogOpen(false);
+          setBillForAdjustment(null);
+        }}
+      />
     </Box>
   );
 };

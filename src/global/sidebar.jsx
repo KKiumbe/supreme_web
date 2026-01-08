@@ -36,6 +36,7 @@ import {
   PersonAddAlt,
   PostAdd,
   AutoFixHigh,
+  Tune
 } from "@mui/icons-material";
 
 import BusinessIcon from "@mui/icons-material/Business";
@@ -181,6 +182,11 @@ const Sidebar = () => {
             children: [
               { icon: <Water sx={{ fontSize: 20 }} />, label: "Normal Readings", path: "/meter-readings" },
               { icon: <FlashOn sx={{ fontSize: 20 }} />, label: "Abnormal Readings", path: "/abnormal-readings" },
+ { 
+  icon: <Tune sx={{ fontSize: 20 }} />, 
+  label: "Meter Reading Adjustments", 
+  path: "/meter-reading-adjustments" 
+},
             ],
           },
         ])}

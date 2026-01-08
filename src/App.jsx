@@ -62,6 +62,7 @@ import CreateCustomerScreen from "./pages/customers/addCustomer";
 import AdjustmentsList from "./pages/billing/adjustment/adjustment";
 import TaskTypesScreen from "./pages/tasks/tasksTypes";
 import BankUploadsScreen from "./pages/payments/bankuploads";
+import MeterReadingAdjustmentsScreen from "./pages/meterReading/readingsAdjustment";
 
 const App = () => {
   const { darkMode } = useThemeStore();
@@ -207,11 +208,22 @@ const App = () => {
                   }
                 /> 
 
-                <Route
-                  path="/water-reading/:id"
+                
+
+                     <Route
+                  path="/meter-readings"
                   element={
                     <ProtectedRoute>
-                      <MeterReadingDetails />
+                      <WaterReadingsList/>
+                    </ProtectedRoute>
+                  }
+                /> 
+
+                <Route
+                  path="/meter-reading-adjustments"
+                  element={
+                    <ProtectedRoute>
+                      <MeterReadingAdjustmentsScreen />
                     </ProtectedRoute>
                   }/>
 
