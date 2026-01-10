@@ -9,16 +9,17 @@ import {
   Chip,
   Grid,
   Autocomplete,
-  MenuItem,
   CircularProgress,
-  Button,
-  useTheme,
-  useMediaQuery,
+  Alert,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
+import {
+  Search as SearchIcon,
+  Refresh as RefreshIcon,
+  Visibility as VisibilityIcon,
+} from "@mui/icons-material";
 import PriceChangeOutlinedIcon from "@mui/icons-material/PriceChangeOutlined";
 
-import { Search as SearchIcon, Refresh as RefreshIcon, Visibility as VisibilityIcon } from "@mui/icons-material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
@@ -26,7 +27,7 @@ import { useAuthStore } from "../../store/authStore";
 import BillDetails from "../../components/bills/billDetail";
 import CreateAdjustmentDialog from "../../components/adjustments/CreateAdjustmentDialog";
 
-// Simple debounce hook
+// ── Helpers ───────────────────────────────────────
 const useDebounce = (value, delay = 500) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
 
@@ -38,88 +39,117 @@ const useDebounce = (value, delay = 500) => {
   return debouncedValue;
 };
 
+// ── Constants ─────────────────────────────────────
 const BASE_URL = import.meta.env.VITE_BASE_URL || "";
 
+// ── Main Component ────────────────────────────────
 const BillList = () => {
   const { currentUser } = useAuthStore();
   const navigate = useNavigate();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
   // ── State ───────────────────────────────────────
   const [bills, setBills] = useState([]);
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 20,
-    total: 0,
-  });
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0 });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const [customers, setCustomers] = useState([]);
   const [billTypes, setBillTypes] = useState([]);
 
-  const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search);
+  // Connection-based search
+  const [connections, setConnections] = useState([]);
+  const [selectedConnection, setSelectedConnection] = useState(null);
+  const [connectionInputValue, setConnectionInputValue] = useState("");
 
-  const [billTypeFilter, setBillTypeFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-
+  // Bill detail sidebar
   const [selectedBillId, setSelectedBillId] = useState(null);
   const [billDetails, setBillDetails] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
 
+  // Adjustment dialog
   const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false);
   const [billForAdjustment, setBillForAdjustment] = useState(null);
 
-  // ── Fetch dropdown data ─────────────────────────
+  // ── Data Fetching ─────────────────────────────────
+  // Load bill types once
   useEffect(() => {
-    const fetchDropdownData = async () => {
+    const fetchInitialData = async () => {
       try {
-        const [custRes, typesRes] = await Promise.all([
-          axios.get(`${BASE_URL}/customers`, { withCredentials: true }),
-          axios.get(`${BASE_URL}/get-bill-types`, { withCredentials: true }),
-        ]);
-
-        setCustomers(custRes.data?.data?.customers || []);
-        setBillTypes(typesRes.data?.data || []);
+        const { data } = await axios.get(`${BASE_URL}/get-bill-types`, {
+          withCredentials: true,
+        });
+        setBillTypes(data?.data || []);
       } catch (err) {
-        console.error("Failed to load dropdowns:", err);
-        setError("Failed to load customers or bill types");
+        console.error("Failed to load bill types:", err);
       }
     };
 
-    fetchDropdownData();
+    fetchInitialData();
   }, []);
 
-  // ── Fetch bills list ────────────────────────────
+  // Search connections (debounced)
+  useEffect(() => {
+    const search = connectionInputValue.trim();
+
+    if (!search || (search.match(/^\d+$/) && search.length > 6)) {
+      setConnections([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await axios.get(
+          `${BASE_URL}/get-connections?search=${encodeURIComponent(search)}`,
+          { withCredentials: true }
+        );
+        setConnections(data?.data || []);
+      } catch (err) {
+        console.error("Failed to search connections:", err);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [connectionInputValue]);
+
+  // Fetch bills – either for selected connection or all bills
   const fetchBills = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString(),
-        ...(debouncedSearch && { search: debouncedSearch }),
-        ...(billTypeFilter && { billType: billTypeFilter }),
-        ...(statusFilter && { status: statusFilter }),
-      });
+      if (selectedConnection) {
+        // Fetch bills for specific connection
+        const params = new URLSearchParams({
+          page: pagination.page.toString(),
+          limit: pagination.limit.toString(),
+        });
 
-      const res = await axios.get(`${BASE_URL}/get-bills?${params}`, {
-        withCredentials: true,
-      });
+        const res = await axios.get(
+          `${BASE_URL}/connections/${selectedConnection.id}/bills?${params}`,
+          { withCredentials: true }
+        );
 
-      if (!res.data?.success) {
-        throw new Error("Invalid API response");
+        setBills(res.data?.data || []);
+        setPagination((prev) => ({ ...prev, total: res.data?.meta?.total || 0 }));
+      } else {
+        // Fetch all bills with filters
+        const params = new URLSearchParams({
+          page: pagination.page.toString(),
+          limit: pagination.limit.toString(),
+        });
+
+        const res = await axios.get(`${BASE_URL}/get-bills?${params}`, {
+          withCredentials: true,
+        });
+
+        if (!res.data?.success) throw new Error("Invalid response");
+
+        setBills(res.data.data || []);
+        setPagination((prev) => ({
+          ...prev,
+          total: res.data.pagination?.total || 0,
+        }));
       }
-
-      setBills(res.data.data || []);
-      setPagination((prev) => ({
-        ...prev,
-        total: res.data.pagination?.total || 0,
-      }));
     } catch (err) {
       console.error("Failed to fetch bills:", err);
       setError(err.response?.data?.message || "Failed to load bills");
@@ -127,35 +157,32 @@ const BillList = () => {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, debouncedSearch, billTypeFilter, statusFilter]);
+  }, [selectedConnection, pagination.page, pagination.limit]);
 
   useEffect(() => {
     fetchBills();
   }, [fetchBills]);
 
-  // ── Fetch single bill details ───────────────────
+  // Fetch single bill details for sidebar
   const fetchBillDetails = useCallback(async (billId) => {
     setDetailsLoading(true);
     try {
-      const res = await axios.get(`${BASE_URL}/get-bill/${billId}`, {
+      const { data } = await axios.get(`${BASE_URL}/get-bill/${billId}`, {
         withCredentials: true,
       });
 
-      if (res.data?.success) {
-        setBillDetails(res.data.data);
-      } else {
-        throw new Error("Invalid bill response");
+      if (data?.success) {
+        setBillDetails(data.data);
       }
     } catch (err) {
       console.error("Failed to fetch bill details:", err);
-      setError(err.response?.data?.message || "Failed to load bill details");
       setBillDetails(null);
     } finally {
       setDetailsLoading(false);
     }
   }, []);
 
-  // ── Handlers ────────────────────────────────────
+  // ── Handlers ──────────────────────────────────────
   const handleViewBill = (billId) => {
     setSelectedBillId(billId);
     fetchBillDetails(billId);
@@ -166,69 +193,65 @@ const BillList = () => {
     setAdjustmentDialogOpen(true);
   };
 
-  const handleResetFilters = () => {
-    setSearch("");
-    setBillTypeFilter("");
-    setStatusFilter("");
+  const handleClearConnection = () => {
+    setSelectedConnection(null);
+    setConnectionInputValue("");
+    setConnections([]);
     setPagination((p) => ({ ...p, page: 1 }));
   };
 
-  // ── Prepare rows for DataGrid ───────────────────
-  const rows = useMemo(() => {
-    const billTypeMap = {};
-    billTypes.forEach((t) => {
-      billTypeMap[t.id] = t.name;
-    });
+  // ── Data Preparation ──────────────────────────────
+  const billTypeMap = useMemo(
+    () => Object.fromEntries(billTypes.map((t) => [t.id, t.name])),
+    [billTypes]
+  );
 
-    return bills.map((bill) => ({
-      id: bill.id,
-      originalBill: bill,           // keep full object for adjustment & actions
-      billNumber: bill.billNumber || "—",
-      customerName: bill.connection?.customer?.customerName || "—",
-      phoneNumber: bill.connection?.customer?.phoneNumber || "—",
-      billAmount: bill.billAmount ? `KES ${bill.billAmount.toLocaleString()}` : "—",
-      amountPaid: bill.amountPaid ? `KES ${bill.amountPaid.toLocaleString()}` : "—",
-      closingBalance: bill.closingBalance ? `KES ${bill.closingBalance.toLocaleString()}` : "—",
-      status: bill.status || "—",
-      billPeriod: bill.billPeriod ? new Date(bill.billPeriod).toLocaleDateString() : "—",
-      createdAt: bill.createdAt ? new Date(bill.createdAt).toLocaleString() : "—",
-      billType: billTypeMap[bill.type?.id] || bill.type?.name || "—",
-      items: bill.items?.length
-        ? bill.items
-            .map((i) => `${i.description} (×${i.quantity}, KES ${i.amount})`)
-            .join(", ")
-        : "—",
-    }));
-  }, [bills, billTypes]);
+  const rows = useMemo(
+    () =>
+      bills.map((bill) => ({
+        id: bill.id,
+        originalBill: bill,
+        billNumber: bill.billNumber || "—",
+        customerName: bill.connection?.customer?.customerName || selectedConnection?.customerName || "—",
+        phoneNumber: bill.connection?.customer?.phoneNumber || "—",
+        billAmount: bill.billAmount ? `KES ${Number(bill.billAmount).toLocaleString()}` : "—",
+        amountPaid: bill.amountPaid ? `KES ${Number(bill.amountPaid).toLocaleString()}` : "—",
+        closingBalance: bill.closingBalance
+          ? `KES ${Number(bill.closingBalance).toLocaleString()}`
+          : "—",
+        status: bill.status || "—",
+        billPeriod: bill.billPeriod ? new Date(bill.billPeriod).toLocaleDateString() : "—",
+        createdAt: bill.createdAt ? new Date(bill.createdAt).toLocaleString() : "—",
+        billType: billTypeMap[bill.type?.id] || bill.type?.name || "—",
+        items:
+          bill.items?.length > 0
+            ? bill.items.map((i) => `${i.description} (×${i.quantity})`).join(", ")
+            : "—",
+      })),
+    [bills, billTypeMap, selectedConnection]
+  );
 
   const columns = [
-
-{
-  field: "actions",
-  headerName: "Details/Adjust",
-  width: 130,
-  sortable: false,
-  renderCell: ({ row }) => (
-    <>
-      <Tooltip title="View Bill">
-        <IconButton size="small" onClick={() => handleViewBill(row.id)}>
-          <VisibilityIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
-
-      <Tooltip title="Create Adjustment">
-        <IconButton
-          size="small"
-          //color="primary"
-          onClick={() => handleOpenAdjustment(row.originalBill)}
-        >
-          <PriceChangeOutlinedIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
-    </>
-  ),
-},
-
+    {
+      field: "actions",
+      headerName: "Actions",
+      width: 130,
+      sortable: false,
+      renderCell: ({ row }) => (
+        <>
+          <Tooltip title="View Details">
+            <IconButton size="small" onClick={() => handleViewBill(row.id)}>
+              <VisibilityIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Create Adjustment">
+            <IconButton size="small" onClick={() => handleOpenAdjustment(row.originalBill)}>
+              <PriceChangeOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </>
+      ),
+    },
     { field: "billNumber", headerName: "Bill No.", width: 140 },
     { field: "customerName", headerName: "Customer", width: 180 },
     { field: "phoneNumber", headerName: "Phone", width: 130 },
@@ -282,86 +305,100 @@ const BillList = () => {
       {/* Main content */}
       <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <Typography variant="h5" fontWeight="bold" gutterBottom>
-          Bills
+          Bills Management
         </Typography>
 
-        {/* Filters */}
+        {/* Search Bar */}
         <Paper sx={{ p: 2, mb: 3 }}>
           <Grid container spacing={2} alignItems="flex-end">
-            <Grid item xs={12} sm={5} md={4}>
-              <Autocomplete
-                options={customers}
-                getOptionLabel={(opt) =>
-                  `${opt.customerName} (${opt.nationalId || "?"})` +
-                  (opt.phoneNumber ? ` — ${opt.phoneNumber}` : "")
-                }
-                freeSolo
-                onInputChange={(_, val) => setSearch(val || "")}
-                onChange={(_, val) => setSearch(val?.customerName || "")}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    size="small"
-                    placeholder="Name, phone, national ID..."
-                    InputProps={{
-                      ...params.InputProps,
-                      startAdornment: <SearchIcon sx={{ mr: 1, color: "text.secondary" }} />,
-                    }}
-                  />
-                )}
-              />
-            </Grid>
+            <Grid item xs={12} sm={6} md={5}>
+            <Autocomplete
+  options={connections}
+  value={selectedConnection}
+  inputValue={connectionInputValue}
+  onInputChange={(_, newInputValue, reason) => {
+    if (reason === "input") {
+      setConnectionInputValue(newInputValue);
+    }
+  }}
+  onChange={(_, newValue) => {
+    setSelectedConnection(newValue);
+    setPagination(prev => ({ ...prev, page: 1 }));
+    // Optional: keep the typed text after selection for better UX
+    // setConnectionInputValue(newValue ? `${newValue.connectionNumber} - ${newValue.customer?.customerName}` : "");
+  }}
+  getOptionLabel={(option) => {
+    const customer = option.customer;
+    const account = option.customerAccounts?.[0];
+    return `${option.connectionNumber || "—"} | ${customer?.customerName || "—"} | ${customer?.phoneNumber || "—"} ${
+      account?.balance ? `(Bal: KES ${Number(account.balance).toLocaleString()})` : ""
+    }`;
+  }}
+  renderOption={(props, option) => {
+    const customer = option.customer;
+    const account = option.customerAccounts?.[0];
+    const balance = account?.balance ? Number(account.balance).toLocaleString() : "—";
 
-            <Grid item xs={6} sm={3} md={2}>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                label="Bill Type"
-                value={billTypeFilter}
-                onChange={(e) => {
-                  setBillTypeFilter(e.target.value);
-                  setPagination((p) => ({ ...p, page: 1 }));
-                }}
-              >
-                <MenuItem value="">All</MenuItem>
-                {billTypes.map((t) => (
-                  <MenuItem key={t.id} value={t.name}>
-                    {t.name}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-
-            <Grid item xs={6} sm={2} md={2}>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                label="Status"
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setPagination((p) => ({ ...p, page: 1 }));
-                }}
-              >
-                <MenuItem value="">All</MenuItem>
-                <MenuItem value="PAID">Paid</MenuItem>
-                <MenuItem value="UNPAID">Unpaid</MenuItem>
-              </TextField>
+    return (
+      <li {...props} key={option.id}>
+        <Box sx={{ display: "flex", flexDirection: "column", py: 0.5 }}>
+          <Typography variant="body2" fontWeight={600}>
+            {option.connectionNumber} — {customer?.customerName || "Unknown"}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Phone: {customer?.phoneNumber || "—"} • Acc: {account?.customerAccount || "—"}
+          </Typography>
+          <Typography variant="caption" color={Number(balance) < 0 ? "error" : "success"}>
+            Balance: KES {balance} • {option.status}
+          </Typography>
+        </Box>
+      </li>
+    );
+  }}
+  isOptionEqualToValue={(option, value) => option.id === value?.id}
+  loading={false} // you could add loading state if you want
+  noOptionsText={
+    connectionInputValue.length < 2
+      ? "Type at least 2 characters..."
+      : "No matching connections found"
+  }
+  renderInput={(params) => (
+    <TextField
+      {...params}
+      label="Search Connection / Name / Phone"
+      placeholder="e.g. 3639 or David Mugo or 798806690"
+      size="small"
+      InputProps={{
+        ...params.InputProps,
+        startAdornment: (
+          <>
+            <SearchIcon sx={{ mr: 1, color: "text.secondary" }} />
+            {params.InputProps.startAdornment}
+          </>
+        ),
+      }}
+    />
+  )}
+/>
             </Grid>
 
             <Grid item>
-              <Tooltip title="Reset filters">
-                <IconButton onClick={handleResetFilters}>
+              <Tooltip title="Clear selection">
+                <IconButton onClick={handleClearConnection}>
                   <RefreshIcon />
                 </IconButton>
               </Tooltip>
             </Grid>
           </Grid>
+
+          {error && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {error}
+            </Alert>
+          )}
         </Paper>
 
-        {/* DataGrid */}
+        {/* Data Grid */}
         <Paper sx={{ flex: 1, overflow: "hidden" }}>
           <DataGrid
             rows={rows}
@@ -386,7 +423,7 @@ const BillList = () => {
               noRowsOverlay: () => (
                 <Box sx={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Typography color="text.secondary">
-                    {error || (loading ? "Loading..." : "No bills found")}
+                    {error || (loading ? "Loading bills..." : "No bills found")}
                   </Typography>
                 </Box>
               ),
@@ -396,7 +433,7 @@ const BillList = () => {
         </Paper>
       </Box>
 
-      {/* Right sidebar – Bill Details */}
+      {/* Bill Details Sidebar */}
       <Box
         sx={{
           width: selectedBillId ? 460 : 0,
@@ -418,9 +455,6 @@ const BillList = () => {
         ) : selectedBillId ? (
           <Box p={3}>
             <Typography color="error">Failed to load bill details</Typography>
-            <Button variant="outlined" onClick={() => setSelectedBillId(null)} sx={{ mt: 2 }}>
-              Close
-            </Button>
           </Box>
         ) : null}
       </Box>
