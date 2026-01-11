@@ -60,6 +60,7 @@ const CreateDisconnectionTaskPage = ({
   const [selectedSchemeId, setSelectedSchemeId] = useState("");
   const [selectedZoneId, setSelectedZoneId] = useState("");
   const [selectedRouteId, setSelectedRouteId] = useState("");
+  const [unpaidMonths, setUnpaidMonths] = useState(""); // ✅ NEW
 
   const [minBalance, setMinBalance] = useState("");
 
@@ -224,6 +225,15 @@ const CreateDisconnectionTaskPage = ({
       return setError("Minimum balance must be a positive number");
     }
 
+    // Optional unpaid months validation
+if (
+  unpaidMonths !== "" &&
+  (!Number.isInteger(Number(unpaidMonths)) || Number(unpaidMonths) < 1)
+) {
+  return setError("Unpaid months must be a whole number ≥ 1");
+}
+
+
     setLoading((p) => ({ ...p, submitting: true }));
 
     try {
@@ -249,9 +259,14 @@ const CreateDisconnectionTaskPage = ({
         payload.schemeId = Number(selectedSchemeId);
       }
 
-      if (minBalance !== "") {
-        payload.minBalance = Number(minBalance);
-      }
+  if (minBalance !== "") {
+  payload.minBalance = Number(minBalance);
+}
+
+if (unpaidMonths !== "") {
+  payload.unpaidMonths = Number(unpaidMonths);
+}
+
 
       await axios.post(`${API_URL}/tasks/disconnection`, payload, {
         withCredentials: true,
@@ -521,6 +536,25 @@ const CreateDisconnectionTaskPage = ({
               placeholder="e.g. 1500"
             />
           </Grid>
+
+          <Grid item xs={12} sm={6}>
+  <TextField
+    fullWidth
+    type="number"
+    label="Min. Unpaid Months (optional)"
+    value={unpaidMonths}
+    onChange={(e) => {
+      const val = e.target.value;
+      if (val === "" || Number(val) >= 1) {
+        setUnpaidMonths(val);
+      }
+    }}
+    inputProps={{ min: 1, step: 1 }}
+    helperText="Disconnect only if unpaid for at least this many months"
+    placeholder="e.g. 2"
+  />
+</Grid>
+
 
           <Grid item xs={12} sm={6}>
             <TextField

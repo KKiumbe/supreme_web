@@ -34,6 +34,15 @@ const CustomerDetails = ({ customerId, onClose }) => {
   );
   const [submittingCommitment, setSubmittingCommitment] = useState(false);
 
+  const [statementFromDate, setStatementFromDate] = useState(
+  dayjs().startOf("month").format("YYYY-MM-DD")
+);
+
+const [statementToDate, setStatementToDate] = useState(
+  dayjs().format("YYYY-MM-DD")
+);
+
+
   const theme = getTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -191,48 +200,53 @@ const CustomerDetails = ({ customerId, onClose }) => {
   };
 
   // Download/View Connection Statement PDF
-  const handleViewStatement = async (connectionId) => {
-    try {
-      setLoading(true);
+const handleViewStatement = async (connectionId) => {
+  try {
+    setLoading(true);
 
-      const response = await axios.get(
-        `${API_URL}/reports/connection/statement/${connectionId}`,
-        {
-          withCredentials: true,
-          responseType: "blob",
-        }
-      );
+    const response = await axios.get(
+      `${API_URL}/reports/connection/statement/${connectionId}`,
+      {
+        withCredentials: true,
+        responseType: "blob",
+        params: {
+          from: statementFromDate,
+          to: statementToDate,
+        },
+      }
+    );
 
-      const blob = new Blob([response.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
+    const blob = new Blob([response.data], { type: "application/pdf" });
+    const url = window.URL.createObjectURL(blob);
 
-      // Auto-download
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `Statement_${connectionId}_${customer?.accountNumber || "customer"}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute(
+      "download",
+      `Statement_${connectionId}_${statementFromDate}_to_${statementToDate}.pdf`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 
-      // Clean up
-      setTimeout(() => window.URL.revokeObjectURL(url), 100);
+    setTimeout(() => window.URL.revokeObjectURL(url), 100);
 
-      setSnackbar({
-        open: true,
-        message: "Statement downloaded successfully",
-        severity: "success",
-      });
-    } catch (err) {
-      console.error(err);
-      setSnackbar({
-        open: true,
-        message: err.response?.data?.message || "Failed to download statement",
-        severity: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+    setSnackbar({
+      open: true,
+      message: "Statement downloaded successfully",
+      severity: "success",
+    });
+  } catch (err) {
+    setSnackbar({
+      open: true,
+      message: err.response?.data?.message || "Failed to download statement",
+      severity: "error",
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   if (loading && !customer) {
     return (
@@ -375,6 +389,27 @@ const CustomerDetails = ({ customerId, onClose }) => {
                     ))}
                   </>
                 )}
+
+                <Box mt={1.5} display="flex" gap={1} flexWrap="wrap">
+  <TextField
+    label="From"
+    type="date"
+    size="small"
+    value={statementFromDate}
+    onChange={(e) => setStatementFromDate(e.target.value)}
+    InputLabelProps={{ shrink: true }}
+  />
+
+  <TextField
+    label="To"
+    type="date"
+    size="small"
+    value={statementToDate}
+    onChange={(e) => setStatementToDate(e.target.value)}
+    InputLabelProps={{ shrink: true }}
+  />
+</Box>
+
 
                 {/* Statement button */}
                 <Button

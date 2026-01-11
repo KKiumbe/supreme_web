@@ -167,6 +167,7 @@ const ConnectionsScreen = () => {
   const [previewSelectedIds, setPreviewSelectedIds] = useState([]);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [disconnectionDialogOpen, setDisconnectionDialogOpen] = useState(false);
+  const [minUnpaidMonths, setMinUnpaidMonths] = useState(""); // ✅ NEW
 
   useEffect(() => {
     if (!currentUser) navigate("/login");
@@ -292,83 +293,102 @@ const ConnectionsScreen = () => {
     }
   };
 
-  const fetchDueForDisconnection = async () => {
-    if (!previewScope || !previewScopeId) {
-      setSnackbar({
-        open: true,
-        severity: "warning",
-        message: "Please select scope and specific value",
-      });
-      return;
-    }
+const fetchDueForDisconnection = async () => {
+  if (!previewScope || !previewScopeId) {
+    setSnackbar({
+      open: true,
+      severity: "warning",
+      message: "Please select scope and specific value",
+    });
+    return;
+  }
 
-    setPreviewLoading(true);
-    try {
-      const scope = previewScope.toUpperCase();
-      const res = await axios.get(
-        `${BASEURL}/connections-due-disconnection/${scope}/${previewScopeId}`,
-        {
-          params: {
-            minBalance: minBalance.trim() || undefined,
-          },
-          withCredentials: true,
-        }
-      );
-      setPreviewConnections(res.data.data || []);
-      setPreviewSelectedIds([]);
-      setPreviewOpen(true);
-    } catch (err) {
-      const msg = err.response?.data?.message || "Failed to load preview";
-      setSnackbar({ open: true, message: msg, severity: "error" });
-    } finally {
-      setPreviewLoading(false);
-    }
-  };
+  setPreviewLoading(true);
+  try {
+    const scope = previewScope.toUpperCase();
 
-  const handleDownloadDueForDisconnection = async () => {
-    if (!previewScope || !previewScopeId) {
-      setSnackbar({
-        open: true,
-        severity: "warning",
-        message: "Select scope and value to download report",
-      });
-      return;
-    }
+    const res = await axios.get(
+      `${BASEURL}/connections-due-disconnection/${scope}/${previewScopeId}`,
+      {
+        params: {
+          minBalance: minBalance.trim() || undefined,
+          minUnpaidMonths: minUnpaidMonths.trim() || undefined, // ✅ NEW
+        },
+        withCredentials: true,
+      }
+    );
 
-    try {
-      const scope = previewScope.toUpperCase();
-      const res = await axios.get(`${BASEURL}/reports/disconnections-due`, {
+    setPreviewConnections(res.data.data || []);
+    setPreviewSelectedIds([]);
+    setPreviewOpen(true);
+  } catch (err) {
+    const msg = err.response?.data?.message || "Failed to load preview";
+    setSnackbar({ open: true, message: msg, severity: "error" });
+  } finally {
+    setPreviewLoading(false);
+  }
+};
+
+
+const handleDownloadDueForDisconnection = async () => {
+  if (!previewScope || !previewScopeId) {
+    setSnackbar({
+      open: true,
+      severity: "warning",
+      message: "Select scope and value to download report",
+    });
+    return;
+  }
+
+  try {
+    const scope = previewScope.toUpperCase();
+
+    const res = await axios.get(
+      `${BASEURL}/reports/disconnections-due`,
+      {
         params: {
           scope,
           id: previewScopeId,
           minBalance: minBalance.trim() || undefined,
+          minUnpaidMonths: minUnpaidMonths.trim() || undefined, // ✅ NEW
         },
         withCredentials: true,
         responseType: "blob",
-      });
+      }
+    );
 
-      const blob = new Blob([res.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `due-disconnection_${scope.toLowerCase()}_${previewScopeId}${
-        minBalance.trim() ? `_min${minBalance.trim()}` : ""
-      }_${new Date().toISOString().slice(0, 10)}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      window.URL.revokeObjectURL(url);
-      link.remove();
+    const blob = new Blob([res.data], { type: "application/pdf" });
+    const url = window.URL.createObjectURL(blob);
 
-      setSnackbar({ open: true, severity: "success", message: "Report downloaded" });
-    } catch (err) {
-      console.error("Download error:", err);
-      setSnackbar({
-        open: true,
-        severity: "error",
-        message: "Failed to download disconnection report",
-      });
-    }
-  };
+    const fileNameParts = [
+      "due-disconnection",
+      scope.toLowerCase(),
+      previewScopeId,
+      minBalance && `minBal-${minBalance}`,
+      minUnpaidMonths && `minMonths-${minUnpaidMonths}`,
+      new Date().toISOString().slice(0, 10),
+    ].filter(Boolean);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${fileNameParts.join("_")}.pdf`;
+
+    document.body.appendChild(link);
+    link.click();
+    window.URL.revokeObjectURL(url);
+    link.remove();
+
+    setSnackbar({ open: true, severity: "success", message: "Report downloaded" });
+  } catch (err) {
+    console.error("Download error:", err);
+    setSnackbar({
+      open: true,
+      severity: "error",
+      message: "Failed to download disconnection report",
+    });
+  }
+};
+
 
   const handleOpenDisconnectionPreview = () => {
     fetchDueForDisconnection();
@@ -596,6 +616,8 @@ const ConnectionsScreen = () => {
             Connections
           </Typography>
 
+          
+
           <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
             <Button
               variant="outlined"
@@ -648,16 +670,18 @@ const ConnectionsScreen = () => {
               </Typography>
 
               <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center", mt: 1.5 }}>
-                <FormControl size="small" sx={{ minWidth: 140 }}>
+                <FormControl size="small" sx={{ minWidth: 90 }}>
                   <InputLabel>Level</InputLabel>
                   <Select
                     value={previewScope}
                     label="Level"
-                    onChange={(e) => {
-                      setPreviewScope(e.target.value);
-                      setPreviewScopeId("");
-                      setMinBalance(""); // reset min balance when changing scope
-                    }}
+                 onChange={(e) => {
+  setPreviewScope(e.target.value);
+  setPreviewScopeId("");
+  setMinBalance("");
+  setMinUnpaidMonths(""); // ✅ reset
+}}
+
                   >
                     <MenuItem value="">All overdue</MenuItem>
                     <MenuItem value="SCHEME">Scheme</MenuItem>
@@ -666,9 +690,12 @@ const ConnectionsScreen = () => {
                   </Select>
                 </FormControl>
 
+                
+
+
                 {previewScope && (
                   <>
-                    <FormControl size="small" sx={{ minWidth: 220 }}>
+                    <FormControl size="small" sx={{ minWidth: 80 }}>
                       <InputLabel>{getScopeLabel(previewScope)}</InputLabel>
                       <Select
                         value={previewScopeId}
@@ -710,13 +737,30 @@ const ConnectionsScreen = () => {
                           setMinBalance(val);
                         }
                       }}
-                      sx={{ minWidth: 160 }}
+                      sx={{ maxWidth: 140 }}
                       InputProps={{
                         startAdornment: <InputAdornment position="start">KES</InputAdornment>,
                       }}
                       helperText="≥ this amount"
                       variant="outlined"
                     />
+
+                    <TextField
+  size="small"
+  type="number"
+  label="Unpaid Months"
+  placeholder="e.g. 2"
+  value={minUnpaidMonths}
+  onChange={(e) => {
+    const val = e.target.value;
+    if (val === "" || Number(val) >= 1) {
+      setMinUnpaidMonths(val);
+    }
+  }}
+  sx={{ maxWidth: 140 }}
+  helperText="≥ number of months unpaid"
+  variant="outlined"
+/>
 
                     <Box sx={{ display: "flex", gap: 1.5 }}>
                       <Button
