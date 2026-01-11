@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Box,
   Typography,
@@ -26,8 +26,11 @@ const TaskBoard = () => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const [page, setPage] = useState(0); // DataGrid is 0-based
-  const [limit, setLimit] = useState(10);
+const [paginationModel, setPaginationModel] = useState({
+  page: 0,
+  pageSize: 10,
+});
+
   const [totalItems, setTotalItems] = useState(0);
 
   const [filter, setFilter] = useState({ status: "", search: "" });
@@ -76,29 +79,34 @@ const TaskBoard = () => {
   /* --------------------------------------
    * 📦 Fetch Tasks (SERVER search + pagination)
    * ------------------------------------ */
-  const fetchTasks = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get(`${API_URL}/get-tasks`, {
-        withCredentials: true,
-        params: {
-          page: page + 1, // backend expects 1-based page
-          limit,
-          status: filter.status || undefined,
-          q: filter.search || undefined,
-        },
-      });
 
-      const { data, pagination } = response.data;
 
-      setTasks(data.map(flattenTask));
-      setTotalItems(pagination.totalItems);
-    } catch (error) {
-      console.error("Error fetching tasks:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+const fetchTasks = useCallback(async () => {
+  setLoading(true);
+
+  try {
+    const response = await axios.get(`${API_URL}/get-tasks`, {
+      withCredentials: true,
+      params: {
+        page: paginationModel.page + 1, // API is 1-based
+        limit: paginationModel.pageSize,
+        status: filter.status || undefined,
+        q: filter.search?.trim() || undefined,
+      },
+    });
+
+
+    const { data, pagination } = response.data;
+
+    setTasks(data.map(flattenTask));
+    setTotalItems(pagination.totalItems);
+  } catch (error) {
+    console.error("Error fetching tasks:", error);
+  } finally {
+    setLoading(false);
+  }
+}, [paginationModel.page, paginationModel.pageSize, filter.status, filter.search]);
+
 
   /* --------------------------------------
    * 🔍 Task Details
@@ -123,20 +131,25 @@ const TaskBoard = () => {
     }
   };
 
-  /* --------------------------------------
-   * 🔁 Effects
-   * ------------------------------------ */
-  useEffect(() => {
-    fetchTasks();
-  }, [page, limit, filter.status, filter.search]);
+useEffect(() => {
+  fetchTasks();
+}, [
+  fetchTasks,              // ← keep this (it's stable thanks to useCallback)
+  paginationModel.page,    // important triggers
+  paginationModel.pageSize,
+  filter.status,
+  filter.search
+]);
 
   /* --------------------------------------
    * 🧭 Handlers
    * ------------------------------------ */
-  const handleSearch = (e) => {
-    setFilter((prev) => ({ ...prev, search: e.target.value }));
-    setPage(0);
-  };
+const handleSearch = (e) => {
+  setFilter((prev) => ({ ...prev, search: e.target.value }));
+  setPaginationModel((prev) => ({ ...prev, page: 0 }));
+};
+
+
 
   const openAssignDialog = (taskId = null) => {
     setSelectedTaskId(taskId);
@@ -292,7 +305,7 @@ const TaskBoard = () => {
             value={filter.status}
             onChange={(e) => {
               setFilter((prev) => ({ ...prev, status: e.target.value }));
-              setPage(0);
+              setPaginationModel((prev) => ({ ...prev, page: 0 }));
             }}
             sx={{ width: 200 }}
           >
@@ -313,23 +326,23 @@ const TaskBoard = () => {
               <CircularProgress />
             </Box>
           ) : (
-            <DataGrid
-              rows={tasks}
-              columns={columns}
-              pagination
-              paginationMode="server"
-              rowCount={totalItems}
-              page={page}
-              pageSize={limit}
-              onPageChange={(newPage) => setPage(newPage)}
-              onPageSizeChange={(newLimit) => {
-                setLimit(newLimit);
-                setPage(0);
-              }}
-              rowsPerPageOptions={[10, 25, 50]}
-              getRowId={(row) => row.id}
-              sx={{ height: "100%" }}
-            />
+   <DataGrid
+  rows={tasks}
+  columns={columns}
+  loading={loading}
+  paginationMode="server"
+  rowCount={totalItems}
+
+  paginationModel={paginationModel}
+  onPaginationModelChange={setPaginationModel}
+
+  pageSizeOptions={[10, 25, 50]}
+  getRowId={(row) => row.id}
+  disableSelectionOnClick
+  sx={{ height: "100%" }}
+/>
+
+
           )}
         </Paper>
       </Box>
