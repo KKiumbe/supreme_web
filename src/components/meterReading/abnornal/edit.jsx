@@ -10,6 +10,8 @@ import {
   Alert,
   Typography,
   Divider,
+  FormControlLabel,
+  Checkbox,
 } from "@mui/material";
 import axios from "axios";
 import PropTypes from "prop-types";
@@ -29,11 +31,13 @@ export default function EditAbnormalReadingModal({
     notes: "",
   });
 
+  // 🔹 Average override
+  const [useCustomAverage, setUseCustomAverage] = useState(false);
+  const [averageConsumption, setAverageConsumption] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [taskModalOpen, setTaskModalOpen] = useState(false);
-
-  // NEW: confirm step for saving corrected reading
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
@@ -43,6 +47,9 @@ export default function EditAbnormalReadingModal({
         currentReading: reading.currentReading ?? "",
         notes: reading.notes ?? "",
       });
+
+      setAverageConsumption(reading.average ?? "");
+      setUseCustomAverage(false);
     }
   }, [reading]);
 
@@ -52,16 +59,12 @@ export default function EditAbnormalReadingModal({
   };
 
   // ------------------------------------
-  // NORMAL UPDATE → confirmation required
+  // UPDATE READING (CONFIRMATION)
   // ------------------------------------
-  const openConfirm = () => {
-  
-
-    setConfirmOpen(true);
-  };
+  const openConfirm = () => setConfirmOpen(true);
 
   const confirmSaveReading = async () => {
-    setConfirmOpen(false); // close confirm modal
+    setConfirmOpen(false);
     setLoading(true);
     setError("");
 
@@ -86,10 +89,10 @@ export default function EditAbnormalReadingModal({
   };
 
   // ------------------------------------
-  // BILL USING AVERAGE
+  // BILL USING AVERAGE (OPTIONAL OVERRIDE)
   // ------------------------------------
   const billOnAverage = async () => {
-    if (!reading?.meter?.connection?.id || !reading?.average) return;
+    if (!reading?.meter?.connection?.id) return;
 
     setLoading(true);
     setError("");
@@ -99,16 +102,19 @@ export default function EditAbnormalReadingModal({
         `${BASEURL}/bill-on-average`,
         {
           connectionId: reading.meter.connection.id,
-          consumption: reading.average,
           meterReadingID: reading.id,
+
+          // ✅ ONLY send override if user enabled it
+          ...(useCustomAverage && averageConsumption !== ""
+            ? { averageConsumption: Number(averageConsumption) }
+            : {}),
         },
-        { withCredentials: true, headers: { "Content-Type": "application/json" } }
+        { withCredentials: true }
       );
 
       onSuccess();
       onClose();
-      setTaskModalOpen(true); // step 2
-
+      setTaskModalOpen(true);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to bill using average.");
     } finally {
@@ -126,8 +132,10 @@ export default function EditAbnormalReadingModal({
           {error && <Alert severity="error">{error}</Alert>}
 
           <Typography variant="subtitle1" fontWeight={700} mt={1}>
-            Customer Average:{" "}
-            <span style={{ color: "green" }}>{reading?.average ?? "-"} units</span>
+            System / Customer Average:{" "}
+            <span style={{ color: "green" }}>
+              {reading?.average ?? "-"} units
+            </span>
           </Typography>
 
           <Divider sx={{ my: 2 }} />
@@ -181,8 +189,29 @@ export default function EditAbnormalReadingModal({
           </Typography>
 
           <Typography color="text.secondary" mb={1}>
-            Use average consumption if the reading is extremely abnormal.
+            Use average consumption when the reading is unreliable.
           </Typography>
+
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={useCustomAverage}
+                onChange={(e) => setUseCustomAverage(e.target.checked)}
+              />
+            }
+            label="Override system average"
+          />
+
+          {useCustomAverage && (
+            <TextField
+              label="Average Consumption (units)"
+              type="number"
+              value={averageConsumption}
+              onChange={(e) => setAverageConsumption(e.target.value)}
+              fullWidth
+              sx={{ mb: 2 }}
+            />
+          )}
 
           <Button
             variant="contained"
@@ -197,7 +226,9 @@ export default function EditAbnormalReadingModal({
         </DialogContent>
 
         <DialogActions>
-          <Button onClick={onClose} disabled={loading}>Close</Button>
+          <Button onClick={onClose} disabled={loading}>
+            Close
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -206,9 +237,9 @@ export default function EditAbnormalReadingModal({
         <DialogTitle>Confirm Update</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to <strong>update the current reading</strong>?  
+            Are you sure you want to <strong>update the current reading</strong>?
             <br />
-            This action cannot be undone. Customer will be Billed Automatically
+            This action cannot be undone. Customer will be billed automatically.
           </Typography>
         </DialogContent>
 
