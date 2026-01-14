@@ -65,22 +65,27 @@ export default function MeterReadingsList() {
         { withCredentials: true }
       );
 
-      const normalized = (res?.data?.data || []).map((item) => ({
-        id: item.id,
-        type: item.type,
-        meterId: item.meterId,
-        serialNumber: item.meter?.serialNumber,
-        connectionNumber: item.meter?.connection?.connectionNumber,
-        previousReading: item.previousReading,
-        currentReading: item.currentReading,
-        consumption: item.consumption,
-        readingDate: item?.readingDate,
-        customerBalance: item.meter?.connection?.customerAccounts?.[0]?.balance,
-        customerName: item?.customer?.customerName,
-        phoneNumber: item?.customer?.phoneNumber,
-        imageUrl: item?.imageUrl,
-        ExceptionId: item?.ExceptionId,
-      }));
+     const normalized = (res?.data?.data || []).map((item) => ({
+  id: item.id,
+  type: item.type,
+  meterId: item.meterId,
+  serialNumber: item.meter?.serialNumber,
+  connectionNumber: item.meter?.connection?.connectionNumber,
+  previousReading: item.previousReading,
+  currentReading: item.currentReading,
+  consumption: item.consumption,
+  readingDate: item?.readingDate,
+  customerBalance: item.meter?.connection?.customerAccounts?.[0]?.balance,
+  customerName: item?.customer?.customerName,
+  phoneNumber: item?.customer?.phoneNumber,
+
+  // ✅ FIX HERE
+  imageUrl: item?.imageUrl
+    ? `${BASEURL}${item.imageUrl}`
+    : null,
+
+  ExceptionId: item?.ExceptionId,
+}));
 
       setReadings(normalized);
 

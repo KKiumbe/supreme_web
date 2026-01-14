@@ -45,8 +45,12 @@ const AssignTaskDialog = ({ open, onClose, taskId, onAssigned, theme }) => {
   const isCreateMode = taskId === null;
 
   // Optional: still detect disconnection for better UX labels only
-  const selectedTaskType = taskTypes.find((t) => t.id === Number(formData.TypeId));
-  const isDisconnectionTask = selectedTaskType?.code === "CONN_DISC";
+const selectedTaskType = taskTypes.find(
+  (t) => t.id === Number(formData.TypeId)
+);
+
+const isDisconnectionTask = selectedTaskType?.code === "CONN_DISC";
+const isMeterReadingTask = selectedTaskType?.code === "MTR_READING";
 
   // Fetch users + task types
   useEffect(() => {
@@ -191,11 +195,14 @@ const handleSubmit = async () => {
         routeId: formData.routeId ? Number(formData.routeId) : null,
         schemeId: formData.schemeId ? Number(formData.schemeId) : null,
       };
+let endpoint = "/create-task";
 
-      // Choose endpoint based on task type
-      const endpoint = isDisconnectionTask 
-        ? '/tasks/disconnection' 
-        : '/create-task';
+if (isMeterReadingTask) {
+  endpoint = "/meter-reading-task";
+} else if (isDisconnectionTask) {
+  endpoint = "/tasks/disconnection";
+}
+
 
       const { data } = await axios.post(`${API_URL}${endpoint}`, payload, {
         withCredentials: true,
