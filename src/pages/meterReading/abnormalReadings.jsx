@@ -23,6 +23,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 
 import EditAbnormalReadingModal from "../../components/meterReading/abnornal/edit";
 import MeterReadingDetails from "../../components/meterReading/abnornal/viewAbnormalReading";
+  import PropTypes from "prop-types";
 
 const BASEURL = import.meta.env.VITE_BASE_URL;
 
@@ -31,45 +32,53 @@ export default function AbnormalMeterReadingsList() {
   const theme = useThemeStore();
   const navigate = useNavigate();
 
-  const [readings, setReadings] = useState([]);
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 20,
-    total: 0,
-  });
+  /* -----------------------------
+     STATE
+  ----------------------------- */
+  const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+
+  const [pagination, setPagination] = useState({
+    page: 0,       // DataGrid uses 0-based index
+    pageSize: 20,
+    total: 0,
+  });
+
   const [averageReading, setAverageReading] = useState(null);
 
-  // Modals
-  const [editModal, setEditModal] = useState({ open: false, reading: null });
+  const [editModal, setEditModal] = useState({
+    open: false,
+    reading: null,
+  });
+
   const [detailsModal, setDetailsModal] = useState({
     open: false,
     readingId: null,
   });
 
-  // -----------------------------
-  // AUTH GUARD
-  // -----------------------------
+  /* -----------------------------
+     AUTH GUARD
+  ----------------------------- */
   useEffect(() => {
     if (!currentUser) navigate("/login");
   }, [currentUser, navigate]);
 
-  // -----------------------------
-  // FETCH LIST
-  // -----------------------------
+  /* -----------------------------
+     FETCH DATA
+  ----------------------------- */
   const fetchReadings = useCallback(async () => {
     setLoading(true);
 
     try {
       const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString(),
+        page: String(pagination.page + 1), // convert to backend page
+        limit: String(pagination.pageSize),
         ...(search && { search }),
       });
 
       const res = await axios.get(
-        `${BASEURL}/get-abnormal-readings?${params}`,
+        `${BASEURL}/get-abnormal-readings?${params.toString()}`,
         { withCredentials: true }
       );
 
@@ -95,30 +104,30 @@ export default function AbnormalMeterReadingsList() {
         readingDate: item.readingDate,
         notes: item.notes,
 
-        exception: item.Exception ?? null,     // ✅ IMPORTANT
-        imageUrl: item.imageUrl ?? null,       // ✅ IMPORTANT
+        exception: item.Exception ?? null,
+        imageUrl: item.imageUrl ?? null,
       }));
 
-      setReadings(normalized);
+      setRows(normalized);
       setPagination((prev) => ({
         ...prev,
-        total: res.data.pagination?.total || prev.total,
+        total: res.data.pagination?.total || 0,
       }));
     } catch (err) {
       console.error(err);
-      alert("Failed to load abnormal readings");
+      alert("Failed to load abnormal meter readings");
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, search]);
+  }, [pagination.page, pagination.pageSize, search]);
 
   useEffect(() => {
     fetchReadings();
   }, [fetchReadings]);
 
-  // -----------------------------
-  // MODAL HANDLERS
-  // -----------------------------
+  /* -----------------------------
+     MODALS
+  ----------------------------- */
   const openDetails = (id) =>
     setDetailsModal({ open: true, readingId: id });
 
@@ -132,96 +141,81 @@ export default function AbnormalMeterReadingsList() {
         { withCredentials: true }
       );
 
-      const fullReading = res.data.data;
-      setAverageReading(fullReading.average);
-
+      setAverageReading(res.data.data.average);
       setEditModal({
         open: true,
-        reading: fullReading,
+        reading: res.data.data,
       });
     } catch (err) {
       console.error(err);
-      alert("Could not load full meter reading details.");
+      alert("Could not load reading details.");
     }
   };
 
   const closeEditModal = () =>
     setEditModal({ open: false, reading: null });
 
+  /* -----------------------------
+     IMAGE CELL
+  ----------------------------- */
 
   function ImageThumbnail({ src, onClick }) {
-  const [loaded, setLoaded] = useState(false);
-  const [error, setError] = useState(false);
+    const [loaded, setLoaded] = useState(false);
+    const [error, setError] = useState(false);
 
-  if (!src) {
-    return <Typography variant="caption">-</Typography>;
+    if (!src) return <Typography variant="caption">-</Typography>;
+
+    return (
+      <Box
+        onClick={onClick}
+        sx={{
+          width: 42,
+          height: 42,
+          borderRadius: 1,
+          border: "1px solid",
+          borderColor: "divider",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          position: "relative",
+          cursor: "pointer",
+        }}
+      >
+        {!loaded && !error && <ImageIcon fontSize="small" />}
+
+        {!loaded && !error && (
+          <CircularProgress size={14} sx={{ position: "absolute" }} />
+        )}
+
+        {!error && (
+          <Box
+            component="img"
+            src={src}
+            onLoad={() => setLoaded(true)}
+            onError={() => setError(true)}
+            sx={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              borderRadius: 1,
+              opacity: loaded ? 1 : 0,
+            }}
+          />
+        )}
+      </Box>
+    );
   }
 
-  return (
-    <Box
-      onClick={onClick}
-      sx={{
-        width: 42,
-        height: 42,
-        borderRadius: 1,
-        border: "1px solid",
-        borderColor: "divider",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        position: "relative",
-        cursor: "pointer",
-        bgcolor: "background.default",
-      }}
-    >
-      {/* Placeholder icon */}
-      {!loaded && !error && (
-        <ImageIcon sx={{ fontSize: 20, color: "text.secondary" }} />
-      )}
+  ImageThumbnail.propTypes = {
+    src: PropTypes.string,
+    onClick: PropTypes.func,
+  };
 
-      {/* Loader */}
-      {!loaded && !error && (
-        <CircularProgress
-          size={14}
-          sx={{ position: "absolute", bottom: 2, right: 2 }}
-        />
-      )}
-
-      {/* Image */}
-      {!error && (
-        <Box
-          component="img"
-          src={src}
-          alt="meter"
-          onLoad={() => setLoaded(true)}
-          onError={() => setError(true)}
-          sx={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            borderRadius: 1,
-            opacity: loaded ? 1 : 0,
-            transition: "opacity 0.2s ease-in-out",
-          }}
-        />
-      )}
-
-      {/* Error */}
-      {error && (
-        <Typography variant="caption" color="error">
-          !
-        </Typography>
-      )}
-    </Box>
-  );
-}
-
-
-  // -----------------------------
-  // COLUMNS
-  // -----------------------------
+  /* -----------------------------
+     COLUMNS
+  ----------------------------- */
   const columns = [
     {
       field: "view",
@@ -253,89 +247,49 @@ export default function AbnormalMeterReadingsList() {
         </Tooltip>
       ),
     },
-     {
-  field: "image",
-  headerName: "Image",
-  width: 90,
-  sortable: false,
-  filterable: false,
-  renderCell: (params) => (
-    <ImageThumbnail
-      src={params.row.imageUrl}
-      onClick={() => openDetails(params.row.id)}
-    />
-  ),
-},
-
-    
     {
-      field: "connectionNumber",
-      headerName: "Connection #",
-      width: 120,
+      field: "image",
+      headerName: "Image",
+      width: 90,
+      sortable: false,
+      renderCell: (params) => (
+        <ImageThumbnail
+          src={params.row.imageUrl}
+          onClick={() => openDetails(params.row.id)}
+        />
+      ),
     },
-    {
-      field: "customerName",
-      headerName: "Customer",
-      flex: 1,
-    },
-    {
-      field: "previousReading",
-      headerName: "Previous",
-      width: 110,
-    },
-    {
-      field: "currentReading",
-      headerName: "Current",
-      width: 110,
-    },
+    { field: "connectionNumber", headerName: "Connection #", width: 130 },
+    { field: "customerName", headerName: "Customer", flex: 1 },
+    { field: "previousReading", headerName: "Previous", width: 110 },
+    { field: "currentReading", headerName: "Current", width: 110 },
     {
       field: "exception",
       headerName: "Exception",
       width: 160,
       renderCell: (params) =>
         params.value ? (
-          <Chip
-            label={params.value}
-            size="small"
-            color="warning"
-            variant="outlined"
-          />
+          <Chip label={params.value} size="small" color="warning" />
         ) : (
           "-"
         ),
     },
-    {
-      field: "readingDate",
-      headerName: "Date",
-      width: 150,
-      
-    },
+    { field: "readingDate", headerName: "Date", width: 160 },
     {
       field: "phoneNumber",
       headerName: "Phone",
       width: 150,
       renderCell: (params) => (
-        <a href={`tel:${params.value}`} style={{ color: "#1976d2" }}>
-          {params.value}
-        </a>
+        <a href={`tel:${params.value}`}>{params.value}</a>
       ),
     },
-    {
-      field: "serialNumber",
-      headerName: "Meter Serial",
-      width: 150,
-    },
-    {
-      field: "model",
-      headerName: "Model",
-      width: 120,
-    },
-   
+    { field: "serialNumber", headerName: "Meter Serial", width: 150 },
+    { field: "model", headerName: "Model", width: 120 },
   ];
 
-  // -----------------------------
-  // RENDER
-  // -----------------------------
+  /* -----------------------------
+     RENDER
+  ----------------------------- */
   return (
     <Box p={3}>
       <Typography variant="h6" mb={2}>
@@ -347,7 +301,10 @@ export default function AbnormalMeterReadingsList() {
           size="small"
           placeholder="Search meter / customer..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPagination((p) => ({ ...p, page: 0 }));
+          }}
           InputProps={{
             startAdornment: <SearchIcon sx={{ mr: 1 }} />,
           }}
@@ -357,18 +314,28 @@ export default function AbnormalMeterReadingsList() {
 
       <Paper sx={{ height: 700 }}>
         <DataGrid
-          rows={readings}
+          rows={rows}
           columns={columns}
           loading={loading}
-          pagination
           paginationMode="server"
-          pageSizeOptions={[10, 20, 50]}
           rowCount={pagination.total}
+
+          page={pagination.page}
+          pageSize={pagination.pageSize}
+
+          onPageChange={(page) =>
+            setPagination((p) => ({ ...p, page }))
+          }
+          onPageSizeChange={(pageSize) =>
+            setPagination((p) => ({ ...p, pageSize, page: 0 }))
+          }
+
+          pageSizeOptions={[10, 20, 50]}
           getRowId={(row) => row.id}
         />
       </Paper>
 
-      {/* EDIT MODAL */}
+      {/* MODALS */}
       <EditAbnormalReadingModal
         open={editModal.open}
         onClose={closeEditModal}
@@ -380,7 +347,6 @@ export default function AbnormalMeterReadingsList() {
         }}
       />
 
-      {/* DETAILS PANEL (IMAGE PREVIEW + EXCEPTION) */}
       {detailsModal.open && (
         <MeterReadingDetails
           readingId={detailsModal.readingId}
