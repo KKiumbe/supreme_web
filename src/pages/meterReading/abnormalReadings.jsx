@@ -314,25 +314,29 @@ export default function AbnormalMeterReadingsList() {
 
       <Paper sx={{ height: 700 }}>
         <DataGrid
-          rows={rows}
-          columns={columns}
-          loading={loading}
-          paginationMode="server"
-          rowCount={pagination.total}
+  rows={rows}
+  columns={columns}
+  loading={loading}
+  paginationMode="server"
+  rowCount={pagination.total}
 
-          page={pagination.page}
-          pageSize={pagination.pageSize}
+  paginationModel={{
+    page: pagination.page,
+    pageSize: pagination.pageSize,
+  }}
 
-          onPageChange={(page) =>
-            setPagination((p) => ({ ...p, page }))
-          }
-          onPageSizeChange={(pageSize) =>
-            setPagination((p) => ({ ...p, pageSize, page: 0 }))
-          }
+  onPaginationModelChange={(model) => {
+    setPagination((prev) => ({
+      ...prev,
+      page: model.page,
+      pageSize: model.pageSize,
+    }));
+  }}
 
-          pageSizeOptions={[10, 20, 50]}
-          getRowId={(row) => row.id}
-        />
+  pageSizeOptions={[10, 20, 50]}
+  getRowId={(row) => row.id}
+/>
+
       </Paper>
 
       {/* MODALS */}
