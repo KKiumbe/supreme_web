@@ -24,6 +24,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import AddReadingStepperModal from "../../components/meterReading/addReading";
 import EditAbnormalReadingModal from "../../components/meterReading/updateAbnormal";
 import MeterReadingDetails from "../../components/meterReading/viewMeterReadings";
+import PropTypes from "prop-types";
 
 const BASEURL = import.meta.env.VITE_BASE_URL;
 
@@ -80,9 +81,7 @@ export default function MeterReadingsList() {
   phoneNumber: item?.customer?.phoneNumber,
 
   // ✅ FIX HERE
-  imageUrl: item?.imageUrl
-    ? `${BASEURL}${item.imageUrl}`
-    : null,
+  imageUrl: item?.imageUrl,
 
   ExceptionId: item?.ExceptionId,
 }));
@@ -112,8 +111,8 @@ export default function MeterReadingsList() {
   };
 
 
-  function ReadingImageThumbnail({ src, onClick }) {
-  const [loaded, setLoaded] = useState(false);
+
+function ReadingImageThumbnail({ src, onClick }) {
   const [error, setError] = useState(false);
 
   if (!src) {
@@ -145,52 +144,32 @@ export default function MeterReadingsList() {
         borderRadius: 1,
         border: "1px solid",
         borderColor: "divider",
-        position: "relative",
-        cursor: "pointer",
         overflow: "hidden",
+        cursor: "pointer",
       }}
     >
-      {!loaded && !error && (
-        <CircularProgress
-          size={14}
-          sx={{ position: "absolute", top: "50%", left: "50%", mt: -1, ml: -1 }}
-        />
-      )}
-
-      {!error && (
-        <Box
-          component="img"
-          src={src}
-          alt="Meter"
-          onLoad={() => setLoaded(true)}
-          onError={() => setError(true)}
-          sx={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            opacity: loaded ? 1 : 0,
-            transition: "opacity 0.2s ease",
-          }}
-        />
-      )}
-
-      {error && (
-        <Box
-          sx={{
-            width: "100%",
-            height: "100%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "error.main",
-          }}
-        >
-          !
-        </Box>
-      )}
+      <Box
+        component="img"
+        src={src}
+        alt="Meter"
+        loading="lazy"
+        onError={() => setError(true)}
+        sx={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          opacity: error ? 0.3 : 1,
+        }}
+      />
     </Box>
   );
 }
+
+ReadingImageThumbnail.propTypes = {
+  src: PropTypes.string,
+  onClick: PropTypes.func,
+};
+
 
 
   const columns = [
