@@ -14,6 +14,7 @@ import {
   Search as SearchIcon,
   Edit as EditIcon,
   Visibility,
+  Download,
 } from "@mui/icons-material";
 import axios from "axios";
 import { useAuthStore, useThemeStore } from "../../store/authStore";
@@ -151,6 +152,41 @@ export default function AbnormalMeterReadingsList() {
       alert("Could not load reading details.");
     }
   };
+
+  const handleDownloadAbnormalReport = async () => {
+  try {
+    setLoading(true);
+
+    const res = await axios.get(
+      `${BASEURL}/reports/abnormal-meter-readings`,
+      {
+        withCredentials: true,
+        responseType: "blob", // ✅ VERY IMPORTANT
+      }
+    );
+
+    // Create blob URL
+    const blob = new Blob([res.data], { type: "application/pdf" });
+    const url = window.URL.createObjectURL(blob);
+
+    // Trigger download
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "Abnormal-Meter-Readings.pdf";
+    document.body.appendChild(link);
+    link.click();
+
+    // Cleanup
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error(err);
+    alert("Failed to download abnormal readings report");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const closeEditModal = () =>
     setEditModal({ open: false, reading: null });
@@ -292,25 +328,54 @@ export default function AbnormalMeterReadingsList() {
   ----------------------------- */
   return (
     <Box p={3}>
-      <Typography variant="h6" mb={2}>
-        Abnormal Meter Readings
-      </Typography>
+   
+   <Grid
+  container
+  justifyContent="space-between"
+  alignItems="center"
+  mb={2}
+>
+  <Typography variant="h6">
+    Abnormal Meter Readings
+  </Typography>
 
-      <Grid container justifyContent="flex-end" mb={2}>
-        <TextField
-          size="small"
-          placeholder="Search meter / customer..."
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPagination((p) => ({ ...p, page: 0 }));
-          }}
-          InputProps={{
-            startAdornment: <SearchIcon sx={{ mr: 1 }} />,
-          }}
-          sx={{ width: 320 }}
-        />
-      </Grid>
+  <Box display="flex" gap={2}>
+
+     <Tooltip title="Download PDF report">
+      <span>
+        <IconButton
+          color="primary"
+          onClick={handleDownloadAbnormalReport}
+          disabled={loading}
+        >
+          {loading ? (
+            <CircularProgress size={12} />
+          ) : (
+            <Download fontSize="large"  color="action"/> // or Download icon if you prefer
+          )}
+        </IconButton>
+      </span>
+    </Tooltip>
+
+
+    <TextField
+      size="small"
+      placeholder="Search meter / customer..."
+      value={search}
+      onChange={(e) => {
+        setSearch(e.target.value);
+        setPagination((p) => ({ ...p, page: 0 }));
+      }}
+      InputProps={{
+        startAdornment: <SearchIcon sx={{ mr: 1 }} />,
+      }}
+      sx={{ width: 320 }}
+    />
+
+   
+  </Box>
+</Grid>
+
 
       <Paper sx={{ height: 700 }}>
         <DataGrid
