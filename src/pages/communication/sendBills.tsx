@@ -14,6 +14,7 @@ import {
   IconButton,
   Tooltip,
   Divider,
+  useTheme,
 } from "@mui/material";
 import { Restore as RestoreIcon, Info as InfoIcon } from "@mui/icons-material";
 import axios from "axios";
@@ -27,7 +28,7 @@ interface Route { id: number; name: string }
 
 export default function SmsBillingScreen() {
   const { currentUser } = useAuthStore();
-
+    const theme = useTheme();
   // ── Data & Selection ───────────────────────────────────
   const [schemes, setSchemes] = useState<Scheme[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);

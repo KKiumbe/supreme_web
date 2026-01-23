@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import {
   Box,
@@ -10,14 +10,26 @@ import {
   ListItem,
   ListItemText,
   Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Alert,
 } from "@mui/material";
 
 import DownloadIcon from "@mui/icons-material/Download";
-
 import CloseIcon from "@mui/icons-material/Close";
-const BillDetails = ({ task: bill, onClose }) => {
+import CancelIcon from "@mui/icons-material/Cancel";
 
-    const API_URL = import.meta.env.VITE_BASE_URL;
+const BillDetails = ({ task: bill, onClose }) => {
+  const API_URL = import.meta.env.VITE_BASE_URL;
+
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
   if (!bill) {
     return (
       <Box sx={{ p: 3 }}>
@@ -26,9 +38,8 @@ const BillDetails = ({ task: bill, onClose }) => {
     );
   }
 
-  console.log(`this is the bill ${JSON.stringify(bill.billId)}`);
-const realBillId = bill?.billId
-  // Destructure bill data with fallbacks
+  const realBillId = bill?.billId;
+
   const {
     billNumber = "-",
     customer = {},
@@ -46,229 +57,247 @@ const realBillId = bill?.billId
   const phoneNumber = customer.phoneNumber || "-";
   const billType = type.name || "-";
 
-  // Format dates
   const formattedBillPeriod =
-    billPeriod !== "-" && !isNaN(new Date(billPeriod).getTime())
+    billPeriod && !isNaN(new Date(billPeriod).getTime())
       ? new Date(billPeriod).toLocaleDateString()
       : "-";
+
   const formattedCreatedAt =
-    createdAt !== "-" && !isNaN(new Date(createdAt).getTime())
+    createdAt && !isNaN(new Date(createdAt).getTime())
       ? new Date(createdAt).toLocaleString()
       : "-";
 
+  /* ---------------------------------
+     🔒 UI Guard: Can Cancel?
+  ---------------------------------- */
+  const canCancel = useMemo(() => {
+    if (status !== "UNPAID") return false;
+    if (Number(amountPaid) > 0) return false;
 
-const downloadBill = async (billId) => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0,
+      23,
+      59,
+      59
+    );
+
+    const period = new Date(billPeriod);
+    return period >= startOfMonth && period <= endOfMonth;
+  }, [status, amountPaid, billPeriod]);
+
+  /* ---------------------------------
+     📥 Download
+  ---------------------------------- */
+  const downloadBill = async (billId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/download-bill/${billId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
+      });
+
+      if (!response.ok) throw new Error("Download failed");
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Bill-${billNumber}.pdf`;
+      a.click();
+
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  /* ---------------------------------
+     ❌ Cancel Bill
+  ---------------------------------- */
+const submitCancellation = async () => {
+  if (!reason.trim()) {
+    setError("Cancellation reason is required.");
+    return;
+  }
+
   try {
+    setLoading(true);
+    setError("");
 
-    console.log(billId);
-
-
-    const token = localStorage.getItem("token"); // or use your auth provider/context
-    const response = await fetch(`${API_URL}/download-bill/${billId}`, {
-      method: "GET",
+    const res = await fetch(`${API_URL}/cancel-bill/${realBillId}`, {
+      method: "POST",
+      credentials: "include", // ✅ cookie-based auth
       headers: {
-        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
-      credentials: "include"
+      body: JSON.stringify({ reason }),
     });
 
-    if (!response.ok) {
-      console.error("Status:", response.status);
-      throw new Error("Failed to download bill");
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message || "Cancellation failed");
     }
 
-    const blob = await response.blob();
-
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Bill-${billNumber}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-
-    window.URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error(error);
+    setCancelOpen(false);
+    onClose(); // triggers refresh upstream
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setLoading(false);
   }
 };
-
-
 
 
   return (
     <Box sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
       {/* Header */}
-      <Box display="flex" justifyContent={"left"} alignItems="center" mb={2}>
+      <Box display="flex" alignItems="center" mb={2} gap={1}>
         <Typography variant="h6" fontWeight="bold">
           Bill Details
         </Typography>
-        <Button
-         
-        
-          onClick={onClose}
-          size="small"
-          color="theme.palette.primary.contrastText"
-        >
+
+        <Button size="small" onClick={onClose}>
           <CloseIcon />
         </Button>
-        <Button
-  variant="contained"
-  color="primary"
-  onClick={() => downloadBill(realBillId)}
->
-  <DownloadIcon />
-  
-</Button>
 
+        <Button
+          variant="contained"
+          size="small"
+          onClick={() => downloadBill(realBillId)}
+        >
+          <DownloadIcon />
+        </Button>
+
+        {canCancel && (
+          <Button
+            variant="outlined"
+            color="error"
+            size="small"
+            startIcon={<CancelIcon />}
+            onClick={() => setCancelOpen(true)}
+          >
+            Cancel Bill
+          </Button>
+        )}
       </Box>
 
       <Divider sx={{ mb: 2 }} />
 
       {/* Bill Information */}
-      <Paper elevation={1} sx={{ p: 2, mb: 2 }}>
-        <Typography variant="subtitle1" fontWeight="medium" mb={1}>
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Typography variant="subtitle1" fontWeight="medium">
           Bill Information
         </Typography>
-        <Box display="flex" flexDirection="column" gap={1}>
-          <Box display="flex" justifyContent="space-between">
-            <Typography variant="body2" color="text.secondary">
-              Bill Number:
-            </Typography>
-            <Typography variant="body2">{billNumber}</Typography>
-          </Box>
-          <Box display="flex" justifyContent="space-between">
-            <Typography variant="body2" color="text.secondary">
-              Bill Type:
-            </Typography>
-            <Typography variant="body2">{billType}</Typography>
-          </Box>
-          <Box display="flex" justifyContent="space-between">
-            <Typography variant="body2" color="text.secondary">
-              Status:
-            </Typography>
-            <Chip
-              label={status}
-              color={status === "PAID" ? "success" : status === "UNPAID" ? "warning" : "default"}
-              size="small"
-            />
-          </Box>
-          <Box display="flex" justifyContent="space-between">
-            <Typography variant="body2" color="text.secondary">
-              Bill Period:
-            </Typography>
-            <Typography variant="body2">{formattedBillPeriod}</Typography>
-          </Box>
-          <Box display="flex" justifyContent="space-between">
-            <Typography variant="body2" color="text.secondary">
-              Created At:
-            </Typography>
-            <Typography variant="body2">{formattedCreatedAt}</Typography>
-          </Box>
+
+        <Box display="flex" justifyContent="space-between">
+          <Typography color="text.secondary">Bill Number</Typography>
+          <Typography>{billNumber}</Typography>
+        </Box>
+
+        <Box display="flex" justifyContent="space-between">
+          <Typography color="text.secondary">Bill Type</Typography>
+          <Typography>{billType}</Typography>
+        </Box>
+
+        <Box display="flex" justifyContent="space-between">
+          <Typography color="text.secondary">Status</Typography>
+          <Chip label={status} size="small" />
+        </Box>
+
+        <Box display="flex" justifyContent="space-between">
+          <Typography color="text.secondary">Bill Period</Typography>
+          <Typography>{formattedBillPeriod}</Typography>
+        </Box>
+
+        <Box display="flex" justifyContent="space-between">
+          <Typography color="text.secondary">Created At</Typography>
+          <Typography>{formattedCreatedAt}</Typography>
         </Box>
       </Paper>
 
-      {/* Customer Information */}
-      <Paper elevation={1} sx={{ p: 2, mb: 2 }}>
-        <Typography variant="subtitle1" fontWeight="medium" mb={1}>
-          Customer Information
-        </Typography>
-        <Box display="flex" flexDirection="column" gap={1}>
-          <Box display="flex" justifyContent="space-between">
-            <Typography variant="body2" color="text.secondary">
-              Name:
-            </Typography>
-            <Typography variant="body2">{customerName}</Typography>
-          </Box>
-          <Box display="flex" justifyContent="space-between">
-            <Typography variant="body2" color="text.secondary">
-              Phone:
-            </Typography>
-            <Typography variant="body2">{phoneNumber}</Typography>
-          </Box>
-        </Box>
-      </Paper>
-
-      {/* Financial Information */}
-      <Paper elevation={1} sx={{ p: 2, mb: 2 }}>
-        <Typography variant="subtitle1" fontWeight="medium" mb={1}>
+      {/* Financials */}
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Typography variant="subtitle1" fontWeight="medium">
           Financial Details
         </Typography>
-        <Box display="flex" flexDirection="column" gap={1}>
-          <Box display="flex" justifyContent="space-between">
-            <Typography variant="body2" color="text.secondary">
-              Bill Amount:
-            </Typography>
-            <Typography variant="body2">KES {billAmount.toLocaleString()}</Typography>
-          </Box>
-          <Box display="flex" justifyContent="space-between">
-            <Typography variant="body2" color="text.secondary">
-              Amount Paid:
-            </Typography>
-            <Typography variant="body2">KES {amountPaid.toLocaleString()}</Typography>
-          </Box>
-          <Box display="flex" justifyContent="space-between">
-            <Typography variant="body2" color="text.secondary">
-              Closing Balance(At Bill Creation):
-            </Typography>
-            <Typography variant="body2">KES {closingBalance.toLocaleString()}</Typography>
-          </Box>
+
+        <Box display="flex" justifyContent="space-between">
+          <Typography>Bill Amount</Typography>
+          <Typography>KES {billAmount.toLocaleString()}</Typography>
+        </Box>
+
+        <Box display="flex" justifyContent="space-between">
+          <Typography>Amount Paid</Typography>
+          <Typography>KES {amountPaid.toLocaleString()}</Typography>
+        </Box>
+
+        <Box display="flex" justifyContent="space-between">
+          <Typography>Closing Balance</Typography>
+          <Typography>KES {closingBalance.toLocaleString()}</Typography>
         </Box>
       </Paper>
 
-      {/* Bill Items */}
-      <Paper elevation={1} sx={{ p: 2, flex: 1, overflow: "auto" }}>
-        <Typography variant="subtitle1" fontWeight="medium" mb={1}>
+      {/* Items */}
+      <Paper sx={{ p: 2, flex: 1, overflow: "auto" }}>
+        <Typography variant="subtitle1" fontWeight="medium">
           Bill Items
         </Typography>
-        {items.length > 0 ? (
+
+        {items.length ? (
           <List dense>
-            {items.map((item, index) => (
-              <ListItem key={index} sx={{ py: 1 }}>
+            {items.map((item, i) => (
+              <ListItem key={i}>
                 <ListItemText
-                  primary={item.description || "-"}
-                  secondary={`Quantity: ${item.quantity || 0}, Amount: KES ${
-                    item.amount ? item.amount.toLocaleString() : 0
-                  }`}
+                  primary={item.description}
+                  secondary={`Qty ${item.quantity} — KES ${item.amount?.toLocaleString()}`}
                 />
               </ListItem>
             ))}
           </List>
         ) : (
-          <Typography variant="body2" color="text.secondary">
-            No items found
-          </Typography>
+          <Typography color="text.secondary">No items</Typography>
         )}
       </Paper>
+
+      {/* Cancel Dialog */}
+      <Dialog open={cancelOpen} onClose={() => setCancelOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Cancel Bill</DialogTitle>
+        <DialogContent>
+          {error && <Alert severity="error">{error}</Alert>}
+          <TextField
+            label="Reason for cancellation"
+            fullWidth
+            multiline
+            minRows={3}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            sx={{ mt: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCancelOpen(false)}>Close</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={submitCancellation}
+            disabled={loading}
+          >
+            Submit Cancellation
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
+
 BillDetails.propTypes = {
-  task: PropTypes.shape({
-    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    billId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    billNumber: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    customer: PropTypes.shape({
-      customerName: PropTypes.string,
-      phoneNumber: PropTypes.string,
-    }),
-    billAmount: PropTypes.number,
-    amountPaid: PropTypes.number,
-    closingBalance: PropTypes.number,
-    status: PropTypes.string,
-    billPeriod: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    createdAt: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    type: PropTypes.shape({
-      name: PropTypes.string,
-    }),
-    items: PropTypes.arrayOf(
-      PropTypes.shape({
-        description: PropTypes.string,
-        quantity: PropTypes.number,
-        amount: PropTypes.number,
-      })
-    ),
-  }),
+  task: PropTypes.object,
   onClose: PropTypes.func,
 };
 
