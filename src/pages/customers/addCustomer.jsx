@@ -22,6 +22,7 @@ import axios from "axios";
 import { useAuthStore } from "../../store/authStore";
 import { useNavigate } from "react-router-dom";
 import debounce from "lodash/debounce";
+import AddCustomerModal from "../../components/customers/addCustomerBypass";
 
 const API_URL = import.meta.env.VITE_BASE_URL || "";
 
@@ -46,6 +47,7 @@ const CreateCustomerScreen = () => {
 
   // Created customer ID
   const [createdCustomerId, setCreatedCustomerId] = useState(null);
+  const [addCustomerModalOpen, setAddCustomerModalOpen] = useState(false);
 
   // Documents
   const [documents, setDocuments] = useState({
@@ -275,6 +277,18 @@ const handleCreateCustomer = async () => {
         />
       </Box>
 
+      <Box display="flex" justifyContent="space-between" mb={2}>
+
+
+  <Button
+    variant="contained"
+    onClick={() => setAddCustomerModalOpen(true)}
+  >
+    Add Customer (ByPass)
+  </Button>
+</Box>
+
+
       <Paper sx={{ height: "70vh" }}>
         <DataGrid
           rows={approvedCustomers}
@@ -373,6 +387,16 @@ const handleCreateCustomer = async () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <AddCustomerModal
+  open={addCustomerModalOpen}
+  onClose={() => setAddCustomerModalOpen(false)}
+  onSuccess={() => {
+    setAddCustomerModalOpen(false);
+    fetchApprovedCustomers(searchQuery);
+  }}
+/>
+
     </Box>
   );
 };
