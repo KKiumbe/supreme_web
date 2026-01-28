@@ -17,12 +17,12 @@ import CustomerDetails from "./pages/customers/customerDetails";
 import PaymentDetails from "./pages/payments/PaymentDetail";
 import CreatePayment from "./pages/payments/addPayment";
 import WaterReadingsList from "./pages/meterReading/waterReadings";
-import MeterReadingDetails from "./pages/meterReading/meterReadingDetails";
+//import MeterReadingDetails from "./pages/meterReading/meterReadingDetails";
 
 import Receipts from "./pages/receipts/receipts";
 import ReceiptDetail from "./pages/receipts/receiptDetails";
 import SentSMSPage from "./pages/communication/sentSMS";
-import SmsScreen from "./pages/communication/sendSMS";
+
 import SendBillsScreen from "./pages/communication/sendBills";
 
 import ReportScreen from "./pages/reports/reports";
@@ -63,6 +63,7 @@ import AdjustmentsList from "./pages/billing/adjustment/adjustment";
 import TaskTypesScreen from "./pages/tasks/tasksTypes";
 import BankUploadsScreen from "./pages/payments/bankuploads";
 import MeterReadingAdjustmentsScreen from "./pages/meterReading/readingsAdjustment";
+import SmsScreen from "./pages/communication/sendSMS";
 
 const App = () => {
   const { darkMode } = useThemeStore();

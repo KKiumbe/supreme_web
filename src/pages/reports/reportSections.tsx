@@ -9,7 +9,12 @@ export type ReportKey =
   | "BILLS_AGING_REPORT"
   | "BILLS_BY_TYPE"
   | "CUSTOMERS_REPORT"
-  | "DISCONNECTED_CONNECTIONS_REPORT";
+  | "DISCONNECTED_CONNECTIONS_REPORT"
+  | "BILLS_BY_CUSTOMER"
+  | "CUSTOMERS_REPORT1"
+  |"PAYMENTS_REPORT1"
+
+  | "METER_READINGS";
 
 export const PAYMENT_MODES = [
   "CASH",
@@ -41,6 +46,11 @@ export const REPORT_SECTIONS: ReportSection[] = [
           { name: "endDate", label: "End Date", type: "date" },
         ],
       },
+        {
+        key: "CUSTOMERS_REPORT1",
+        label: "Customers Report(coming)",
+        params: [],
+      },
     ],
   },
 
@@ -64,6 +74,14 @@ export const REPORT_SECTIONS: ReportSection[] = [
             type: "select",
             source: "BILL_TYPES",
           },
+        ],
+      },
+        {
+        key: "BILLS_BY_CUSTOMER",
+        label: " All Bills:Detailed",
+        params: [
+          { name: "startDate", label: "Start Date", type: "date" },
+          { name: "endDate", label: "End Date", type: "date" },
         ],
       },
     ],
@@ -95,6 +113,14 @@ export const REPORT_SECTIONS: ReportSection[] = [
           { name: "endDate", label: "End Date", type: "date" },
         ],
       },
+       {
+        key: "METER_READINGS",
+        label: "Meter Readings",
+        params: [
+          { name: "startDate", label: "Start Date", type: "date" },
+          { name: "endDate", label: "End Date", type: "date" },
+        ],
+      },
     ],
   },
 
@@ -121,7 +147,15 @@ export const REPORT_SECTIONS: ReportSection[] = [
       source: "PAYMENT_MODES",
     },
   ],
-}
+},
+    {
+        key: "PAYMENTS_REPORT1",
+        label: "Payments Report(coming)",
+        params: [
+          { name: "startDate", label: "Start Date", type: "date" },
+          { name: "endDate", label: "End Date", type: "date" },
+        ],
+      },
 
      
     ],

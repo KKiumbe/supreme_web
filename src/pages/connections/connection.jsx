@@ -563,16 +563,7 @@ const handleDownloadDueForDisconnection = async () => {
           </Box>
         ),
       },
-      { field: "connectionNumber", headerName: "Conn #", width: 100 },
-      { field: "customerName", headerName: "Customer", width: 180 },
-      { field: "customerPhoneNumber", headerName: "Phone", width: 130 },
-      { field: "customerEmail", headerName: "Email", width: 220 },
-      { field: "schemeName", headerName: "Scheme", width: 140 },
-      { field: "zoneName", headerName: "Zone", width: 130 },
-      { field: "routeName", headerName: "Route", width: 110 },
-      { field: "tariffCategoryName", headerName: "Tariff", width: 160 },
-      { field: "meterSerialNumber", headerName: "Meter", width: 130 },
-      {
+         {
         field: "status",
         headerName: "Status",
         width: 130,
@@ -592,6 +583,16 @@ const handleDownloadDueForDisconnection = async () => {
           />
         ),
       },
+      { field: "connectionNumber", headerName: "Conn #", width: 100 },
+      { field: "customerName", headerName: "Customer", width: 180 },
+      { field: "customerPhoneNumber", headerName: "Phone", width: 130 },
+      { field: "customerEmail", headerName: "Email", width: 220 },
+      { field: "schemeName", headerName: "Scheme", width: 140 },
+      { field: "zoneName", headerName: "Zone", width: 130 },
+      { field: "routeName", headerName: "Route", width: 110 },
+      { field: "tariffCategoryName", headerName: "Tariff", width: 160 },
+      { field: "meterSerialNumber", headerName: "Meter", width: 130 },
+   
     ],
     []
   );

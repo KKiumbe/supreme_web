@@ -284,8 +284,8 @@ export default function AdjustmentsList() {
   const columns = [
     {
       field: "actions",
-      headerName: "",
-      width: 60,
+      headerName: "Approve|Reject",
+      width: 100,
       renderCell: ({ row }) => <AdjustmentActions row={row} />,
     },
     {
