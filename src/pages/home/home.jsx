@@ -269,7 +269,7 @@ const HomeScreen = () => {
             variant="body2"
             sx={{ color: theme.palette.text.secondary }}
           >
-            Here&apos;s what&apos;s happening with your water utility today
+            Here&apos;s what&apos;s happening today
           </Typography>
         </Box>
         <Tooltip title="Refresh Dashboard">
