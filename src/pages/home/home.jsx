@@ -297,6 +297,62 @@ const HomeScreen = () => {
       </Box>
 
       {/* ================================
+          SECTION: Monthly Operations (TOP PRIORITY)
+      =================================*/}
+
+      <Box sx={{ maxWidth: "1600px", mx: "auto", mb: 5 }}>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 3, gap: 1 }}>
+          <Receipt
+            sx={{
+              color:
+                theme.palette.blueAccent?.main || theme.palette.primary.main,
+              fontSize: 28,
+            }}
+          />
+          <Typography
+            variant="h5"
+            sx={{
+              fontWeight: "bold",
+              color: theme.palette.text.primary,
+            }}
+          >
+            Monthly Operations
+          </Typography>
+        </Box>
+
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "1fr",
+              sm: "1fr 1fr",
+              md: "repeat(3, 1fr)",
+            },
+            gap: 3,
+          }}
+        >
+          <StatCard
+            title="Meters Read This Month"
+            value={dashboardStats?.totalMetersReadThisMonth || 0}
+            icon={Water}
+            color="info"
+          />
+          <StatCard
+            title="Bills Generated"
+            value={dashboardStats?.totalBillsGeneratedThisMonth || 0}
+            icon={Receipt}
+            color="success"
+          />
+          <StatCard
+            title="Connections Not Read"
+            value={dashboardStats?.connectionsNotRead || 0}
+            icon={TrendingDown}
+            color="warning"
+          />
+        </Box>
+      </Box>
+
+      {/* ================================
           SECTION: Overview Cards
       =================================*/}
 
@@ -509,62 +565,6 @@ const HomeScreen = () => {
               open={dashboardStats?.pendingTasksThisMonth || 0}
             />
           </Box>
-        </Box>
-      </Box>
-
-      {/* ================================
-          SECTION: Operations Summary
-      =================================*/}
-
-      <Box sx={{ maxWidth: "1600px", mx: "auto", mb: 5 }}>
-        <Box sx={{ display: "flex", alignItems: "center", mb: 3, gap: 1 }}>
-          <Receipt
-            sx={{
-              color:
-                theme.palette.blueAccent?.main || theme.palette.primary.main,
-              fontSize: 28,
-            }}
-          />
-          <Typography
-            variant="h5"
-            sx={{
-              fontWeight: "bold",
-              color: theme.palette.text.primary,
-            }}
-          >
-            Monthly Operations
-          </Typography>
-        </Box>
-
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: {
-              xs: "1fr",
-              sm: "1fr 1fr",
-              md: "repeat(3, 1fr)",
-            },
-            gap: 3,
-          }}
-        >
-          <StatCard
-            title="Meters Read This Month"
-            value={dashboardStats?.totalMetersReadThisMonth || 0}
-            icon={Water}
-            color="info"
-          />
-          <StatCard
-            title="Bills Generated"
-            value={dashboardStats?.totalBillsGeneratedThisMonth || 0}
-            icon={Receipt}
-            color="success"
-          />
-          <StatCard
-            title="Connections Not Read"
-            value={dashboardStats?.connectionsNotRead || 0}
-            icon={TrendingDown}
-            color="warning"
-          />
         </Box>
       </Box>
 
