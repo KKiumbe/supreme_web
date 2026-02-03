@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import {
-  Box,
   Typography,
   Button,
   TextField,
@@ -13,6 +12,11 @@ import {
   Snackbar,
 } from "@mui/material";
 import axios from "axios";
+// @ts-ignore - permissionHelper is a .jsx file
+import {
+  PermissionDeniedUI,
+  isPermissionDenied,
+} from "../../utils/permissionHelper";
 
 const BASEURL = import.meta.env.VITE_BASE_URL;
 
@@ -25,6 +29,7 @@ export default function SmsScreen() {
   /* ───────── Data ───────── */
   const [schemes, setSchemes] = useState<Scheme[]>([]);
   const [selectedScheme, setSelectedScheme] = useState("");
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   /* ───────── Message ───────── */
   const [message, setMessage] = useState("");
@@ -40,8 +45,16 @@ export default function SmsScreen() {
   useEffect(() => {
     axios
       .get(`${BASEURL}/schemes`, { withCredentials: true })
-      .then((res) => setSchemes(res.data.data || []))
-      .catch(() => console.error("Failed to fetch schemes"));
+      .then((res) => {
+        setSchemes(res.data.data || []);
+        setPermissionDenied(false);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch schemes", err);
+        if (isPermissionDenied(err)) {
+          setPermissionDenied(true);
+        }
+      });
   }, []);
 
   /* ───────── Helpers ───────── */
@@ -63,21 +76,21 @@ export default function SmsScreen() {
       const res = await axios.post(
         `${BASEURL}${url}`,
         { message },
-        { withCredentials: true }
+        { withCredentials: true },
       );
 
       showMessage(
         `${res.data?.message || "SMS job queued"}${
           res.data?.jobId ? ` (Job ID: ${res.data.jobId})` : ""
         }. Messages are being sent in the background.`,
-        "success"
+        "success",
       );
 
       setMessage("");
     } catch (err: any) {
       showMessage(
         err?.response?.data?.message || "Failed to queue SMS messages",
-        "error"
+        "error",
       );
     } finally {
       setSubmitting(false);
@@ -87,90 +100,96 @@ export default function SmsScreen() {
   /* ───────── Render ───────── */
   return (
     <Container maxWidth="md" sx={{ mt: 6, minWidth: 600 }}>
-      <Paper elevation={3} sx={{ p: { xs: 2, sm: 4 } }}>
-        <Typography variant="h5" mb={1} fontWeight="bold">
-          Send Bulk SMS
-        </Typography>
+      {permissionDenied ? (
+        <PermissionDeniedUI permission={["sms:send", "schemes:view"]} />
+      ) : (
+        <>
+          <Paper elevation={3} sx={{ p: { xs: 2, sm: 4 } }}>
+            <Typography variant="h5" mb={1} fontWeight="bold">
+              Send Bulk SMS
+            </Typography>
 
-        <Typography variant="body2" color="text.secondary" mb={3}>
-          Messages are queued and sent asynchronously. You may continue using
-          the system after submission.
-        </Typography>
+            <Typography variant="body2" color="text.secondary" mb={3}>
+              Messages are queued and sent asynchronously. You may continue
+              using the system after submission.
+            </Typography>
 
-        <Stack spacing={3}>
-          {/* Scope */}
-          <TextField
-            select
-            size="small"
-            fullWidth
-            label="Choose Scheme"
-            value={selectedScheme}
-            onChange={(e) => setSelectedScheme(e.target.value)}
-            helperText={
-              selectedScheme
-                ? "SMS will be sent only to customers in this scheme"
-                : "SMS will be sent to all customers"
-            }
-          >
-            <MenuItem value="">All Customers</MenuItem>
-            {schemes.map((s) => (
-              <MenuItem key={s.id} value={s.id}>
-                {s.name}
-              </MenuItem>
-            ))}
-          </TextField>
-
-          {/* Message */}
-          <TextField
-            label="SMS Message"
-            multiline
-            minRows={4}
-            fullWidth
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Enter the SMS message to send to customers"
-          />
-
-          <Alert severity="info">
-            This action queues SMS messages for background processing.
-          </Alert>
-
-          {/* Actions */}
-          <Grid container spacing={2}>
-            <Grid item>
-              <Button
-                variant="contained"
-                disabled={submitting}
-                onClick={sendQueuedSMS}
+            <Stack spacing={3}>
+              {/* Scope */}
+              <TextField
+                select
+                size="small"
+                fullWidth
+                label="Choose Scheme"
+                value={selectedScheme}
+                onChange={(e) => setSelectedScheme(e.target.value)}
+                helperText={
+                  selectedScheme
+                    ? "SMS will be sent only to customers in this scheme"
+                    : "SMS will be sent to all customers"
+                }
               >
-                {selectedScheme ? "Send SMS (Scheme)" : "Send SMS (All)"}
-              </Button>
-            </Grid>
+                <MenuItem value="">All Customers</MenuItem>
+                {schemes.map((s) => (
+                  <MenuItem key={s.id} value={s.id}>
+                    {s.name}
+                  </MenuItem>
+                ))}
+              </TextField>
 
-            {selectedScheme && (
-              <Grid item>
-                <Button
-                  variant="outlined"
-                  onClick={() => setSelectedScheme("")}
-                >
-                  Switch to All Customers
-                </Button>
+              {/* Message */}
+              <TextField
+                label="SMS Message"
+                multiline
+                minRows={4}
+                fullWidth
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Enter the SMS message to send to customers"
+              />
+
+              <Alert severity="info">
+                This action queues SMS messages for background processing.
+              </Alert>
+
+              {/* Actions */}
+              <Grid container spacing={2}>
+                <Grid item>
+                  <Button
+                    variant="contained"
+                    disabled={submitting}
+                    onClick={sendQueuedSMS}
+                  >
+                    {selectedScheme ? "Send SMS (Scheme)" : "Send SMS (All)"}
+                  </Button>
+                </Grid>
+
+                {selectedScheme && (
+                  <Grid item>
+                    <Button
+                      variant="outlined"
+                      onClick={() => setSelectedScheme("")}
+                    >
+                      Switch to All Customers
+                    </Button>
+                  </Grid>
+                )}
               </Grid>
-            )}
-          </Grid>
-        </Stack>
-      </Paper>
+            </Stack>
+          </Paper>
 
-      <Snackbar
-        open={!!snack}
-        autoHideDuration={8000}
-        onClose={() => setSnack(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <Alert severity={snack?.type} variant="filled">
-          {snack?.msg}
-        </Alert>
-      </Snackbar>
+          <Snackbar
+            open={!!snack}
+            autoHideDuration={8000}
+            onClose={() => setSnack(null)}
+            anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+          >
+            <Alert severity={snack?.type} variant="filled">
+              {snack?.msg}
+            </Alert>
+          </Snackbar>
+        </>
+      )}
     </Container>
   );
 }

@@ -1,4 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
+// @ts-ignore
+import {
+  PermissionDeniedUI,
+  isPermissionDenied,
+} from "../../utils/permissionHelper";
 import {
   Box,
   Typography,
@@ -37,7 +42,9 @@ const BASEURL = import.meta.env.VITE_BASE_URL;
    PARAM NORMALIZER (DEFENSIVE)
 ---------------------------------- */
 function normalizeParams(params?: any) {
-  if (!Array.isArray(params)) return [];
+  if (!Array.isArray(params)) {
+    return [];
+  }
   return params.map((p) =>
     typeof p === "string"
       ? {
@@ -46,24 +53,22 @@ function normalizeParams(params?: any) {
           type: "date",
           optional: false,
         }
-      : p
+      : p,
   );
 }
 
 export default function ReportsPage() {
   /* ---------------- STATE ---------------- */
   const [jobs, setJobs] = useState<ReportJob[]>([]);
-  const [activeReport, setActiveReport] =
-    useState<ActiveReport | null>(null);
+  const [activeReport, setActiveReport] = useState<ActiveReport | null>(null);
 
-  const [params, setParams] =
-    useState<Record<string, any>>({});
+  const [params, setParams] = useState<Record<string, any>>({});
 
-  const [format, setFormat] =
-    useState<ReportFormat>("pdf");
+  const [format, setFormat] = useState<ReportFormat>("pdf");
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   const [billTypes, setBillTypes] = useState<BillType[]>([]);
   const [schemes, setSchemes] = useState<Scheme[]>([]);
@@ -72,20 +77,36 @@ export default function ReportsPage() {
 
   /* ---------------- LOAD LOOKUPS ---------------- */
   useEffect(() => {
-    fetchBillTypes().then(setBillTypes).catch(console.error);
-    fetchSchemes().then(setSchemes).catch(console.error);
+    const loadData = async () => {
+      try {
+        const [billTypesData, schemesData] = await Promise.all([
+          fetchBillTypes(),
+          fetchSchemes(),
+        ]);
+        setBillTypes(billTypesData);
+        setSchemes(schemesData);
+        setPermissionDenied(false);
+      } catch (err: any) {
+        if (isPermissionDenied(err)) {
+          setPermissionDenied(true);
+          setBillTypes([]);
+          setSchemes([]);
+        } else {
+          console.error(err);
+        }
+      }
+    };
+    loadData();
   }, []);
 
   /* ---------------- PARAMS ---------------- */
   const normalizedParams = useMemo(
     () => normalizeParams(activeReport?.params),
-    [activeReport]
+    [activeReport],
   );
 
   const missingRequiredParams = useMemo(() => {
-    return normalizedParams.filter(
-      (p) => !p.optional && !params[p.name]
-    );
+    return normalizedParams.filter((p) => !p.optional && !params[p.name]);
   }, [normalizedParams, params]);
 
   const canSubmit =
@@ -96,7 +117,9 @@ export default function ReportsPage() {
 
   /* ---------------- REQUEST REPORT ---------------- */
   async function handleRequestReport() {
-    if (!canSubmit || !activeReport) return;
+    if (!canSubmit || !activeReport) {
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
@@ -110,8 +133,14 @@ export default function ReportsPage() {
       setJobs((prev) => [job, ...prev]);
       setActiveReport(null);
       setParams({});
+      setPermissionDenied(false);
     } catch (err: any) {
-      setError(err.message ?? "Failed to request report");
+      if (isPermissionDenied(err)) {
+        setPermissionDenied(true);
+        setError("");
+      } else {
+        setError(err.message ?? "Failed to request report");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -120,25 +149,22 @@ export default function ReportsPage() {
   /* ---------------- POLLING ---------------- */
   useEffect(() => {
     const pending = jobs.filter(
-      (j) => j.status !== "COMPLETED" && j.status !== "FAILED"
+      (j) => j.status !== "COMPLETED" && j.status !== "FAILED",
     );
-    if (!pending.length) return;
+    if (!pending.length) {
+      return;
+    }
 
     const poll = async () => {
       try {
         const updates = await Promise.all(
-          pending.map((j) =>
-            fetchReportStatus(j.reportJobId)
-          )
+          pending.map((j) => fetchReportStatus(j.reportJobId)),
         );
 
         setJobs((prev) =>
           prev.map(
-            (j) =>
-              updates.find(
-                (u) => u.reportJobId === j.reportJobId
-              ) ?? j
-          )
+            (j) => updates.find((u) => u.reportJobId === j.reportJobId) ?? j,
+          ),
         );
       } catch (err) {
         console.error(err);
@@ -172,12 +198,13 @@ export default function ReportsPage() {
                 p.value === "COMPLETED"
                   ? "success"
                   : p.value === "FAILED"
-                  ? "error"
-                  : "warning"
+                    ? "error"
+                    : "warning"
               }
             />
-            {p.value !== "COMPLETED" &&
-              p.value !== "FAILED" && <LinearProgress />}
+            {p.value !== "COMPLETED" && p.value !== "FAILED" && (
+              <LinearProgress />
+            )}
           </Stack>
         ),
       },
@@ -190,8 +217,7 @@ export default function ReportsPage() {
             <Button
               size="small"
               onClick={() =>
-                (window.location.href =
-                  `${BASEURL}${p.row.downloadUrl}`)
+                (window.location.href = `${BASEURL}${p.row.downloadUrl}`)
               }
             >
               Download
@@ -201,16 +227,18 @@ export default function ReportsPage() {
           ),
       },
     ],
-    []
+    [],
   );
 
   /* ---------------- FILTER ---------------- */
   const filteredSections = useMemo(() => {
-    if (!search) return REPORT_SECTIONS;
+    if (!search) {
+      return REPORT_SECTIONS;
+    }
     return REPORT_SECTIONS.map((s) => ({
       ...s,
       reports: s.reports.filter((r) =>
-        r.label.toLowerCase().includes(search.toLowerCase())
+        r.label.toLowerCase().includes(search.toLowerCase()),
       ),
     })).filter((s) => s.reports.length > 0);
   }, [search]);
@@ -227,259 +255,205 @@ export default function ReportsPage() {
         minWidth: 1200,
       }}
     >
-      <Typography variant="h5" fontWeight={700}>
-        Reports
-      </Typography>
-
-      <Divider sx={{ my: 3 }} />
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
-      )}
-
-      {/* REPORT SELECTION */}
-      <Paper sx={{ p: 3, mb: 4 }}>
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          mb={2}
-        >
-          <Typography fontWeight={600}>
-            Select Report
+      {permissionDenied ? (
+        <PermissionDeniedUI permission="reports:view" />
+      ) : (
+        <>
+          <Typography variant="h5" fontWeight={700}>
+            Reports
           </Typography>
 
-          <TextField
-            size="small"
-            placeholder="Search report…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </Stack>
+          <Divider sx={{ my: 3 }} />
 
-        {filteredSections.map((section) => (
-          <Box key={section.section} mb={3}>
-            <Typography variant="subtitle2">
-              {section.section}
-            </Typography>
+          {error && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {error}
+            </Alert>
+          )}
 
-            <Grid container spacing={3} mt={1}>
-              {section.reports.map((r) => {
-                const isActive =
-                  activeReport?.key === r.key;
+          {/* REPORT SELECTION */}
+          <Paper sx={{ p: 3, mb: 4 }}>
+            <Stack direction="row" justifyContent="space-between" mb={2}>
+              <Typography fontWeight={600}>Select Report</Typography>
 
-                return (
-                  <Grid
-                    item
-                    xs={12}
-                    md={6}
-                    lg={4}
-                    key={r.key}
-                  >
-                    <Paper
-                      variant={
-                        isActive ? "elevation" : "outlined"
-                      }
-                      sx={{ p: 3 }}
-                    >
-                      <Box
-                        sx={{ cursor: "pointer" }}
-                        onClick={() => {
-                          setActiveReport(
-                            isActive ? null : r
-                          );
-                          setParams({});
-                          setError(null);
-                        }}
-                      >
-                        <Typography fontWeight={600}>
-                          {r.label}
-                        </Typography>
-                        {/* <Typography
+              <TextField
+                size="small"
+                placeholder="Search report…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </Stack>
+
+            {filteredSections.map((section) => (
+              <Box key={section.section} mb={3}>
+                <Typography variant="subtitle2">{section.section}</Typography>
+
+                <Grid container spacing={3} mt={1}>
+                  {section.reports.map((r) => {
+                    const isActive = activeReport?.key === r.key;
+
+                    return (
+                      <Grid item xs={12} md={6} lg={4} key={r.key}>
+                        <Paper
+                          variant={isActive ? "elevation" : "outlined"}
+                          sx={{ p: 3 }}
+                        >
+                          <Box
+                            sx={{ cursor: "pointer" }}
+                            onClick={() => {
+                              setActiveReport(isActive ? null : r);
+                              setParams({});
+                              setError(null);
+                            }}
+                          >
+                            <Typography fontWeight={600}>{r.label}</Typography>
+                            {/* <Typography
                             variant="caption"
                             color="text.secondary"
                           >
                             {r.description}
                           </Typography> */}
-                      </Box>
+                          </Box>
 
-                      {/* INLINE PARAMETERS */}
-                      <Collapse in={isActive}>
-                        <Box
-                          sx={{
-                            mt: 3,
-                            p: 2.5,
-                            borderRadius: 1.5,
-                            //bgcolor: "grey.50",
-                          }}
-                        >
-                          <Stack spacing={2.5}>
-                            <TextField
-                              select
-                              label="Report Format"
-                              value={format}
-                              onChange={(e) =>
-                                setFormat(
-                                  e.target
-                                    .value as ReportFormat
-                                )
-                              }
+                          {/* INLINE PARAMETERS */}
+                          <Collapse in={isActive}>
+                            <Box
+                              sx={{
+                                mt: 3,
+                                p: 2.5,
+                                borderRadius: 1.5,
+                                //bgcolor: "grey.50",
+                              }}
                             >
-                              <MenuItem value="pdf">
-                                PDF
-                              </MenuItem>
-                              <MenuItem value="excel">
-                                Excel
-                              </MenuItem>
-                            </TextField>
+                              <Stack spacing={2.5}>
+                                <TextField
+                                  select
+                                  label="Report Format"
+                                  value={format}
+                                  onChange={(e) =>
+                                    setFormat(e.target.value as ReportFormat)
+                                  }
+                                >
+                                  <MenuItem value="pdf">PDF</MenuItem>
+                                  <MenuItem value="excel">Excel</MenuItem>
+                                </TextField>
 
-                            {normalizeParams(
-                              r.params
-                            ).map((param) => {
-                              if (param.type === "date") {
-                                return (
-                                  <TextField
-                                    key={param.name}
-                                    type="date"
-                                    label={param.label}
-                                    required={!param.optional}
-                                    InputLabelProps={{
-                                      shrink: true,
-                                    }}
-                                    value={
-                                      params[param.name] ?? ""
-                                    }
-                                    onChange={(e) =>
-                                      setParams(
-                                        (prev) => ({
-                                          ...prev,
-                                          [param.name]:
-                                            e.target.value,
-                                        })
-                                      )
-                                    }
-                                  />
-                                );
-                              }
+                                {normalizeParams(r.params).map((param) => {
+                                  if (param.type === "date") {
+                                    return (
+                                      <TextField
+                                        key={param.name}
+                                        type="date"
+                                        label={param.label}
+                                        required={!param.optional}
+                                        InputLabelProps={{
+                                          shrink: true,
+                                        }}
+                                        value={params[param.name] ?? ""}
+                                        onChange={(e) =>
+                                          setParams((prev) => ({
+                                            ...prev,
+                                            [param.name]: e.target.value,
+                                          }))
+                                        }
+                                      />
+                                    );
+                                  }
 
-                              if (
-                                param.type === "select" &&
-                                param.source ===
-                                  "PAYMENT_MODES"
-                              ) {
-                                return (
-                                  <TextField
-                                    key={param.name}
-                                    select
-                                    label={param.label}
-                                    value={
-                                      params[param.name] ?? ""
-                                    }
-                                    onChange={(e) =>
-                                      setParams(
-                                        (prev) => ({
-                                          ...prev,
-                                          [param.name]:
-                                            e.target.value,
-                                        })
-                                      )
-                                    }
-                                  >
-                                    {PAYMENT_MODES.map(
-                                      (m) => (
-                                        <MenuItem
-                                          key={m}
-                                          value={m}
-                                        >
-                                          {m.replace(
-                                            "_",
-                                            " "
-                                          )}
-                                        </MenuItem>
-                                      )
-                                    )}
-                                  </TextField>
-                                );
-                              }
-
-                              if (
-                                param.type === "select" &&
-                                param.source ===
-                                  "BILL_TYPES"
-                              ) {
-                                return (
-                                  <TextField
-                                    key={param.name}
-                                    select
-                                    label={param.label}
-                                    value={
-                                      params[param.name] ?? ""
-                                    }
-                                    onChange={(e) =>
-                                      setParams(
-                                        (prev) => ({
-                                          ...prev,
-                                          [param.name]:
-                                            Number(
-                                              e.target.value
-                                            ),
-                                        })
-                                      )
-                                    }
-                                  >
-                                    {billTypes.map((bt) => (
-                                      <MenuItem
-                                        key={bt.id}
-                                        value={bt.id}
+                                  if (
+                                    param.type === "select" &&
+                                    param.source === "PAYMENT_MODES"
+                                  ) {
+                                    return (
+                                      <TextField
+                                        key={param.name}
+                                        select
+                                        label={param.label}
+                                        value={params[param.name] ?? ""}
+                                        onChange={(e) =>
+                                          setParams((prev) => ({
+                                            ...prev,
+                                            [param.name]: e.target.value,
+                                          }))
+                                        }
                                       >
-                                        {bt.name}
-                                      </MenuItem>
-                                    ))}
-                                  </TextField>
-                                );
-                              }
+                                        {PAYMENT_MODES.map((m) => (
+                                          <MenuItem key={m} value={m}>
+                                            {m.replace("_", " ")}
+                                          </MenuItem>
+                                        ))}
+                                      </TextField>
+                                    );
+                                  }
 
-                              return null;
-                            })}
+                                  if (
+                                    param.type === "select" &&
+                                    param.source === "BILL_TYPES"
+                                  ) {
+                                    return (
+                                      <TextField
+                                        key={param.name}
+                                        select
+                                        label={param.label}
+                                        value={params[param.name] ?? ""}
+                                        onChange={(e) =>
+                                          setParams((prev) => ({
+                                            ...prev,
+                                            [param.name]: Number(
+                                              e.target.value,
+                                            ),
+                                          }))
+                                        }
+                                      >
+                                        {billTypes.map((bt) => (
+                                          <MenuItem key={bt.id} value={bt.id}>
+                                            {bt.name}
+                                          </MenuItem>
+                                        ))}
+                                      </TextField>
+                                    );
+                                  }
 
-                            {submitting && (
-                              <LinearProgress />
-                            )}
+                                  return null;
+                                })}
 
-                            <Button
-                              variant="contained"
-                              disabled={!canSubmit}
-                              onClick={handleRequestReport}
-                            >
-                              Generate Report
-                            </Button>
-                          </Stack>
-                        </Box>
-                      </Collapse>
-                    </Paper>
-                  </Grid>
-                );
-              })}
-            </Grid>
-          </Box>
-        ))}
-      </Paper>
+                                {submitting && <LinearProgress />}
 
-      {/* JOBS */}
-      <Paper sx={{ p: 3 }}>
-        <Typography fontWeight={600} mb={2}>
-          Report Jobs
-        </Typography>
+                                <Button
+                                  variant="contained"
+                                  disabled={!canSubmit}
+                                  onClick={handleRequestReport}
+                                >
+                                  Generate Report
+                                </Button>
+                              </Stack>
+                            </Box>
+                          </Collapse>
+                        </Paper>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              </Box>
+            ))}
+          </Paper>
 
-        <DataGrid
-          rows={jobs}
-          columns={columns}
-          getRowId={(r) => r.reportJobId}
-          autoHeight
-          disableRowSelectionOnClick
-        />
-      </Paper>
+          {/* JOBS */}
+          <Paper sx={{ p: 3 }}>
+            <Typography fontWeight={600} mb={2}>
+              Report Jobs
+            </Typography>
+
+            <DataGrid
+              rows={jobs}
+              columns={columns}
+              getRowId={(r) => r.reportJobId}
+              autoHeight
+              disableRowSelectionOnClick
+            />
+          </Paper>
+        </>
+      )}
     </Box>
   );
 }

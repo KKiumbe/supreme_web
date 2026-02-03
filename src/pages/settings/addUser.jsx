@@ -1,5 +1,9 @@
 import React, { useState } from "react";
 import {
+  PermissionDeniedUI,
+  isPermissionDenied,
+} from "../../utils/permissionHelper";
+import {
   Box,
   TextField,
   Button,
@@ -47,6 +51,7 @@ const AddUser = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   const handleChange = (e) => {
     setUserData({ ...userData, [e.target.name]: e.target.value });
@@ -61,12 +66,18 @@ const AddUser = () => {
       await axios.post(
         `${BASEURL}/adduser`,
         { tenantId, ...userData },
-        { withCredentials: true }
+        { withCredentials: true },
       );
       alert("User added successfully!");
       navigate("/users"); // Redirect to user list
+      setPermissionDenied(false);
     } catch (err) {
-      setError("Failed to add user. Please try again.");
+      if (isPermissionDenied(err)) {
+        setPermissionDenied(true);
+        setError("");
+      } else {
+        setError("Failed to add user. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -80,121 +91,130 @@ const AddUser = () => {
         display: "flex",
         justifyContent: "center",
         minHeight: "100vh",
-       
       }}
     >
-      <StyledCard sx={{ maxWidth: 600, width: "100%" }}>
-        <CardContent>
-          <Typography variant="h5" sx={{ fontWeight: "bold", mb: 3 }}>
-            Add New User
-          </Typography>
+      {permissionDenied ? (
+        <PermissionDeniedUI permission="users:create" />
+      ) : (
+        <>
+          <StyledCard sx={{ maxWidth: 600, width: "100%" }}>
+            <CardContent>
+              <Typography variant="h5" sx={{ fontWeight: "bold", mb: 3 }}>
+                Add New User
+              </Typography>
 
-          {error && (
-            <Typography color="error" sx={{ mb: 2 }}>
-              {error}
-            </Typography>
-          )}
+              {error && (
+                <Typography color="error" sx={{ mb: 2 }}>
+                  {error}
+                </Typography>
+              )}
 
-          <form onSubmit={handleSubmit}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="First Name"
-                  name="firstName"
-                  value={userData.firstName}
-                  onChange={handleChange}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Last Name"
-                  name="lastName"
-                  value={userData.lastName}
-                  onChange={handleChange}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Email"
-                  name="email"
-                  type="email"
-                  value={userData.email}
-                  onChange={handleChange}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Phone Number"
-                  name="phoneNumber"
-                  value={userData.phoneNumber}
-                  onChange={handleChange}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  select
-                  fullWidth
-                  label="Gender"
-                  name="gender"
-                  value={userData.gender}
-                  onChange={handleChange}
-                  required
+              <form onSubmit={handleSubmit}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="First Name"
+                      name="firstName"
+                      value={userData.firstName}
+                      onChange={handleChange}
+                      required
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Last Name"
+                      name="lastName"
+                      value={userData.lastName}
+                      onChange={handleChange}
+                      required
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Email"
+                      name="email"
+                      type="email"
+                      value={userData.email}
+                      onChange={handleChange}
+                      required
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Phone Number"
+                      name="phoneNumber"
+                      value={userData.phoneNumber}
+                      onChange={handleChange}
+                      required
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      select
+                      fullWidth
+                      label="Gender"
+                      name="gender"
+                      value={userData.gender}
+                      onChange={handleChange}
+                      required
+                    >
+                      <MenuItem value="male">Male</MenuItem>
+                      <MenuItem value="female">Female</MenuItem>
+                      <MenuItem value="other">Other</MenuItem>
+                    </TextField>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="County"
+                      name="county"
+                      value={userData.county}
+                      onChange={handleChange}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Town"
+                      name="town"
+                      value={userData.town}
+                      onChange={handleChange}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Password"
+                      name="password"
+                      type="password"
+                      value={userData.password}
+                      onChange={handleChange}
+                      required
+                    />
+                  </Grid>
+                </Grid>
+
+                <StyledButton
+                  type="submit"
+                  variant="contained"
+                  sx={{ mt: 3, bgcolor: theme.palette.primary.main }}
+                  disabled={loading}
                 >
-                  <MenuItem value="male">Male</MenuItem>
-                  <MenuItem value="female">Female</MenuItem>
-                  <MenuItem value="other">Other</MenuItem>
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="County"
-                  name="county"
-                  value={userData.county}
-                  onChange={handleChange}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Town"
-                  name="town"
-                  value={userData.town}
-                  onChange={handleChange}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Password"
-                  name="password"
-                  type="password"
-                  value={userData.password}
-                  onChange={handleChange}
-                  required
-                />
-              </Grid>
-            </Grid>
-
-            <StyledButton
-              type="submit"
-              variant="contained"
-              sx={{ mt: 3, bgcolor: theme.palette.primary.main }}
-              disabled={loading}
-            >
-              {loading ? <CircularProgress size={24} sx={{ color: "white" }} /> : "Add User"}
-            </StyledButton>
-          </form>
-        </CardContent>
-      </StyledCard>
+                  {loading ? (
+                    <CircularProgress size={24} sx={{ color: "white" }} />
+                  ) : (
+                    "Add User"
+                  )}
+                </StyledButton>
+              </form>
+            </CardContent>
+          </StyledCard>
+        </>
+      )}
     </Box>
   );
 };

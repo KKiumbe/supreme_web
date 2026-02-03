@@ -1,4 +1,3 @@
-
 const BASEURL = import.meta.env.VITE_BASE_URL;
 
 export type ReportKey =
@@ -12,8 +11,7 @@ export type ReportKey =
   | "DISCONNECTED_CONNECTIONS_REPORT"
   | "BILLS_BY_CUSTOMER"
   | "CUSTOMERS_REPORT1"
-  |"PAYMENTS_REPORT1"
-
+  | "PAYMENTS_REPORT1"
   | "METER_READINGS";
 
 export const PAYMENT_MODES = [
@@ -25,7 +23,7 @@ export const PAYMENT_MODES = [
   "AIRTELMONEY",
 ] as const;
 
-    export interface BillType {
+export interface BillType {
   id: number;
   name: string;
 }
@@ -46,7 +44,7 @@ export const REPORT_SECTIONS: ReportSection[] = [
           { name: "endDate", label: "End Date", type: "date" },
         ],
       },
-        {
+      {
         key: "CUSTOMERS_REPORT1",
         label: "Customers Report(coming)",
         params: [],
@@ -76,7 +74,7 @@ export const REPORT_SECTIONS: ReportSection[] = [
           },
         ],
       },
-        {
+      {
         key: "BILLS_BY_CUSTOMER",
         label: " All Bills:Detailed",
         params: [
@@ -113,7 +111,7 @@ export const REPORT_SECTIONS: ReportSection[] = [
           { name: "endDate", label: "End Date", type: "date" },
         ],
       },
-       {
+      {
         key: "METER_READINGS",
         label: "Meter Readings",
         params: [
@@ -137,18 +135,18 @@ export const REPORT_SECTIONS: ReportSection[] = [
       },
 
       {
-  key: "PAYMENTS_PER_MODE_CURRENT_PERIOD",
-  label: "Payments per Mode (Current Period)",
-  params: [
-    {
-      name: "mode",
-      label: "Mode of Payment",
-      type: "select",
-      source: "PAYMENT_MODES",
-    },
-  ],
-},
-    {
+        key: "PAYMENTS_PER_MODE_CURRENT_PERIOD",
+        label: "Payments per Mode (Current Period)",
+        params: [
+          {
+            name: "mode",
+            label: "Mode of Payment",
+            type: "select",
+            source: "PAYMENT_MODES",
+          },
+        ],
+      },
+      {
         key: "PAYMENTS_REPORT1",
         label: "Payments Report(coming)",
         params: [
@@ -156,18 +154,11 @@ export const REPORT_SECTIONS: ReportSection[] = [
           { name: "endDate", label: "End Date", type: "date" },
         ],
       },
-
-     
     ],
   },
 ];
 
-
-export type ReportStatus =
-  | "PENDING"
-  | "PROCESSING"
-  | "COMPLETED"
-  | "FAILED";
+export type ReportStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
 
 export type ReportFormat = "pdf" | "excel";
 
@@ -182,9 +173,7 @@ export interface ReportJob {
   completedAt?: string | null;
 }
 
-export type ReportParamType =
-  | "date"
-  | "select";
+export type ReportParamType = "date" | "select";
 
 export type ReportParam =
   | {
@@ -212,14 +201,11 @@ export interface ReportSection {
   reports: ReportDefinition[];
 }
 
-
 export interface ActiveReport {
   key: string;
   label: string;
   params: ReportParam[];
 }
-
-
 
 export async function requestReportJob(payload: {
   reportType: string;
@@ -233,27 +219,27 @@ export async function requestReportJob(payload: {
   });
 
   if (!res.ok) {
-    throw new Error("Failed to request report");
+    const error: any = new Error("Failed to request report");
+    error.response = { status: res.status };
+    throw error;
   }
 
   return res.json();
 }
 
-export async function fetchReportStatus(
-  jobId: string
-): Promise<ReportJob> {
-  const res = await fetch(
-    `${BASEURL}/reports/${jobId}/status`,
-    { credentials: "include" }
-  );
+export async function fetchReportStatus(jobId: string): Promise<ReportJob> {
+  const res = await fetch(`${BASEURL}/reports/${jobId}/status`, {
+    credentials: "include",
+  });
 
   if (!res.ok) {
-    throw new Error("Failed to fetch job status");
+    const error: any = new Error("Failed to fetch job status");
+    error.response = { status: res.status };
+    throw error;
   }
 
   return res.json();
 }
-
 
 export async function fetchBillTypes(): Promise<BillType[]> {
   const res = await fetch(`${BASEURL}/get-bill-types`, {
@@ -261,13 +247,14 @@ export async function fetchBillTypes(): Promise<BillType[]> {
   });
 
   if (!res.ok) {
-    throw new Error("Failed to load bill types");
+    const error: any = new Error("Failed to load bill types");
+    error.response = { status: res.status };
+    throw error;
   }
 
   const json = await res.json();
   return json.data;
 }
-
 
 export interface Scheme {
   id: number;
@@ -280,7 +267,9 @@ export async function fetchSchemes(): Promise<Scheme[]> {
   });
 
   if (!res.ok) {
-    throw new Error("Failed to fetch schemes");
+    const error: any = new Error("Failed to fetch schemes");
+    error.response = { status: res.status };
+    throw error;
   }
 
   const json = await res.json();

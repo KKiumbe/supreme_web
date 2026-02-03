@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
+  PermissionDeniedUI,
+  isPermissionDenied,
+} from "../../utils/permissionHelper";
+import {
   Box,
   Typography,
   Paper,
@@ -24,7 +28,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import CustomerDetails from "../../components/customers/customerDetail";
 import EditCustomerModal from "../../components/customers/edit";
-import EditIcon from '@mui/icons-material/Edit';
+import EditIcon from "@mui/icons-material/Edit";
 // Debounce hook
 const useDebounce = (value, delay = 500) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -53,6 +57,7 @@ const CustomersScreen = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
 
   // Dropdowns
@@ -85,7 +90,7 @@ const CustomersScreen = () => {
           (tariffsRes.data.data || []).reduce((acc, t) => {
             acc[t.category.id] = t.category;
             return acc;
-          }, {})
+          }, {}),
         );
         setTariffCategories(uniqueCats);
       } catch (err) {
@@ -104,7 +109,9 @@ const CustomersScreen = () => {
     }
     const fetchZones = async () => {
       try {
-        const res = await axios.get(`${BASEURL}/schemes/${schemeId}`, { withCredentials: true });
+        const res = await axios.get(`${BASEURL}/schemes/${schemeId}`, {
+          withCredentials: true,
+        });
         setZones(res.data.data.zones || []);
       } catch {
         setZones([]);
@@ -121,7 +128,9 @@ const CustomersScreen = () => {
     }
     const fetchRoutes = async () => {
       try {
-        const res = await axios.get(`${BASEURL}/zones/${zoneId}/routes`, { withCredentials: true });
+        const res = await axios.get(`${BASEURL}/zones/${zoneId}/routes`, {
+          withCredentials: true,
+        });
         setRoutes(res.data.data || []);
       } catch {
         setRoutes([]);
@@ -140,8 +149,8 @@ const CustomersScreen = () => {
         limit: pagination.limit.toString(),
         ...(debouncedSearch && { search: debouncedSearch }),
         ...(Number.isFinite(Number(debouncedSearch)) && {
-        connectionNumber: debouncedSearch,
-      }),
+          connectionNumber: debouncedSearch,
+        }),
         ...(schemeId && { schemeId }),
         ...(zoneId && { zoneId }),
         ...(routeId && { routeId }),
@@ -149,7 +158,9 @@ const CustomersScreen = () => {
         ...(status && { status }),
       });
 
-      const res = await axios.get(`${BASEURL}/customers?${params}`, { withCredentials: true });
+      const res = await axios.get(`${BASEURL}/customers?${params}`, {
+        withCredentials: true,
+      });
       const { customers, pagination: pag } = res.data.data || {};
 
       setRawCustomers(customers || []);
@@ -161,10 +172,24 @@ const CustomersScreen = () => {
         hasNext: pag?.hasNext || false,
         hasPrev: pag?.hasPrev || false,
       });
+      setPermissionDenied(false);
     } catch (err) {
       console.error("Failed to fetch customers:", err);
-      setError(err.response?.data?.message || "Failed to load customers");
-      setRawCustomers([]);
+      if (isPermissionDenied(err)) {
+        setPermissionDenied(true);
+        setRawCustomers([]);
+        setPagination({
+          page: 1,
+          limit: 20,
+          total: 0,
+          totalPages: 1,
+          hasNext: false,
+          hasPrev: false,
+        });
+      } else {
+        setError(err.response?.data?.message || "Failed to load customers");
+        setRawCustomers([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -211,35 +236,42 @@ const CustomersScreen = () => {
   };
 
   const handleOpenEdit = (customerId) => {
-  setEditCustomerId(customerId);
-};
+    setEditCustomerId(customerId);
+  };
 
-const handleCloseEdit = () => {
-  setEditCustomerId(null);
-};
+  const handleCloseEdit = () => {
+    setEditCustomerId(null);
+  };
 
-// Optional: refresh list after update
-const handleCustomerUpdated = () => {
-  fetchCustomers(); // your existing fetch function
-};
+  // Optional: refresh list after update
+  const handleCustomerUpdated = () => {
+    fetchCustomers(); // your existing fetch function
+  };
 
   // Normalize data
   const normalizedCustomers = useMemo(() => {
     return rawCustomers.map((c) => {
       const connections = c.connections || [];
-      const connectionNumbers = connections
-        .map((conn) => conn.connectionNumber)
-        .filter(Boolean)
-        .join(", ") || "-";
-      const schemeName = connections.find((conn) => conn.scheme)?.scheme?.name || "-";
+      const connectionNumbers =
+        connections
+          .map((conn) => conn.connectionNumber)
+          .filter(Boolean)
+          .join(", ") || "-";
+      const schemeName =
+        connections.find((conn) => conn.scheme)?.scheme?.name || "-";
       const zoneName = connections.find((conn) => conn.zone)?.zone?.name || "-";
-      const routeName = connections.find((conn) => conn.route)?.route?.name || "-";
-      const tariffName = connections.find((conn) => conn.tariffCategory)?.tariffCategory?.name || "-";
-      const meterSerials = connections
-        .map((conn) => conn.meter?.serialNumber)
-        .filter(Boolean)
-        .join(", ") || "-";
-      const firstMeterModel = connections.find((conn) => conn.meter)?.meter?.model || "-";
+      const routeName =
+        connections.find((conn) => conn.route)?.route?.name || "-";
+      const tariffName =
+        connections.find((conn) => conn.tariffCategory)?.tariffCategory?.name ||
+        "-";
+      const meterSerials =
+        connections
+          .map((conn) => conn.meter?.serialNumber)
+          .filter(Boolean)
+          .join(", ") || "-";
+      const firstMeterModel =
+        connections.find((conn) => conn.meter)?.meter?.model || "-";
       const firstReading = connections
         .flatMap((conn) => conn.meter?.meterReadings || [])
         .sort((a, b) => new Date(b.readingDate) - new Date(a.readingDate))[0];
@@ -248,7 +280,9 @@ const handleCustomerUpdated = () => {
         id: c.id || "",
         accountNumber: c.accountNumber || "-",
         customerName: c.customerName || "-",
-        customerBalance: c.closingBalance ? `KES ${parseFloat(c.closingBalance).toFixed(2)}` : "-",
+        customerBalance: c.closingBalance
+          ? `KES ${parseFloat(c.closingBalance).toFixed(2)}`
+          : "-",
         phoneNumber: c.phoneNumber || "-",
         email: c.email || "-",
         customerIdNo: c.customerIdNo || "-",
@@ -257,7 +291,9 @@ const handleCustomerUpdated = () => {
         hasWater: c.hasWater ? "Yes" : "No",
         hasSewer: c.hasSewer ? "Yes" : "No",
         customerDiscoType: c.customerDiscoType || "-",
-        customerDob: c.customerDob ? new Date(c.customerDob).toLocaleDateString() : "-",
+        customerDob: c.customerDob
+          ? new Date(c.customerDob).toLocaleDateString()
+          : "-",
         schemeName: schemeName || "-",
         zoneName: zoneName || "-",
         routeName: routeName || "-",
@@ -265,9 +301,15 @@ const handleCustomerUpdated = () => {
         connectionNumbers,
         meterSerials,
         firstMeterModel,
-        previousReading: firstReading?.currentReading ? `${firstReading.currentReading}` : "-",
-        currentReading: firstReading?.currentReading ? `${firstReading.currentReading}` : "-",
-        consumption: firstReading?.consumption ? `${firstReading.consumption}` : "-",
+        previousReading: firstReading?.currentReading
+          ? `${firstReading.currentReading}`
+          : "-",
+        currentReading: firstReading?.currentReading
+          ? `${firstReading.currentReading}`
+          : "-",
+        consumption: firstReading?.consumption
+          ? `${firstReading.consumption}`
+          : "-",
         latestReadingDate: firstReading
           ? `(${new Date(firstReading.readingDate).toLocaleDateString()})`
           : "",
@@ -297,36 +339,36 @@ const handleCustomerUpdated = () => {
     // },
 
     {
+      field: "actions",
+      headerName: "Action",
+      width: 140,
+      align: "center",
+      renderCell: (params) => (
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <IconButton
+            color="theme.palette.primary.contrastText"
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleSelectCustomer(params.row.id);
+            }}
+          >
+            <Visibility />
+          </IconButton>
 
-    field: "actions",
-  headerName: "Action",
-  width: 140,
-  align: "center",
-  renderCell: (params) => (
-    <Box sx={{ display: 'flex', gap: 1 }}>
-      <IconButton
-        color="theme.palette.primary.contrastText"
-        size="small"
-        onClick={(e) => {
-          e.stopPropagation();
-          handleSelectCustomer(params.row.id);
-        }}
-      >
-        <Visibility />
-      </IconButton>
-
-      <IconButton
-        color="theme.palette.primary.contrastText"
-        size="small"
-        onClick={(e) => {
-          e.stopPropagation();
-          handleOpenEdit(params.row.id);
-        }}
-      >
-        <EditIcon />
-      </IconButton>
-    </Box>
-  )},
+          <IconButton
+            color="theme.palette.primary.contrastText"
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenEdit(params.row.id);
+            }}
+          >
+            <EditIcon />
+          </IconButton>
+        </Box>
+      ),
+    },
     { field: "accountNumber", headerName: "Account #", width: 130 },
     {
       field: "status",
@@ -335,7 +377,13 @@ const handleCustomerUpdated = () => {
       renderCell: (params) => (
         <Chip
           label={params?.value}
-          color={params?.value === "ACTIVE" ? "success" : params?.value === "NEW" ? "warning" : "default"}
+          color={
+            params?.value === "ACTIVE"
+              ? "success"
+              : params?.value === "NEW"
+                ? "warning"
+                : "default"
+          }
           size="small"
         />
       ),
@@ -369,7 +417,11 @@ const handleCustomerUpdated = () => {
       renderCell: (params) => (
         <span>
           {params?.value}
-          <Typography component="span" color="text.secondary" fontSize="0.75rem">
+          <Typography
+            component="span"
+            color="text.secondary"
+            fontSize="0.75rem"
+          >
             {params?.row?.latestReadingDate}
           </Typography>
         </span>
@@ -382,7 +434,11 @@ const handleCustomerUpdated = () => {
       renderCell: (params) => (
         <span>
           {params?.value}
-          <Typography component="span" color="text.secondary" fontSize="0.75rem">
+          <Typography
+            component="span"
+            color="text.secondary"
+            fontSize="0.75rem"
+          >
             {params?.row?.latestReadingDate}
           </Typography>
         </span>
@@ -400,199 +456,224 @@ const handleCustomerUpdated = () => {
   }
 
   return (
-    <Box sx={{
+    <Box
+      sx={{
         p: 3,
         display: isMobile ? "block" : "flex",
         gap: 2,
         height: "calc(100vh - 64px)",
         overflow: "auto",
-        maxWidth: "100vw"
-    }}>
-      {/* Main Content */}
-      <Box sx={{ flex: isMobile ? "1" : selectedCustomerId ? "0 0 50%" : "1",
-          transition: "flex 0.3s ease",
-          overflow: "auto",
-          mb: isMobile && selectedCustomerId ? 2 : 0, }}>
-        {/* Header */}
-        <Grid container justifyContent="space-between" alignItems="center" mb={3}>
-          <Typography variant="h5" fontWeight="bold">
-            Customers
-          </Typography>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddCustomer}>
-            Add Customer
-          </Button>
-        </Grid>
+        maxWidth: "100vw",
+      }}
+    >
+      {permissionDenied ? (
+        <PermissionDeniedUI permission="customers:view" />
+      ) : (
+        <>
+          {/* Main Content */}
+          <Box
+            sx={{
+              flex: isMobile ? "1" : selectedCustomerId ? "0 0 50%" : "1",
+              transition: "flex 0.3s ease",
+              overflow: "auto",
+              mb: isMobile && selectedCustomerId ? 2 : 0,
+            }}
+          >
+            {/* Header */}
+            <Grid
+              container
+              justifyContent="space-between"
+              alignItems="center"
+              mb={3}
+            >
+              <Typography variant="h5" fontWeight="bold">
+                Customers
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={handleAddCustomer}
+              >
+                Add Customer
+              </Button>
+            </Grid>
 
-        {/* Filters */}
-        <Paper sx={{ p: 2, mb: 3 }}>
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={3}>
-              <TextField
-                fullWidth
-                size="small"
-                placeholder="Search..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                InputProps={{
-                  startAdornment: <SearchIcon sx={{ mr: 1, color: "text.secondary" }} />,
+            {/* Filters */}
+            <Paper sx={{ p: 2, mb: 3 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="Search..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <SearchIcon sx={{ mr: 1, color: "text.secondary" }} />
+                      ),
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={2}>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    label="Scheme"
+                    value={schemeId}
+                    onChange={(e) => {
+                      setSchemeId(e.target.value);
+                      setZoneId("");
+                      setRouteId("");
+                    }}
+                  >
+                    <MenuItem value="">All</MenuItem>
+                    {schemes.map((s) => (
+                      <MenuItem key={s.id} value={s.id}>
+                        {s.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} md={2}>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    label="Zone"
+                    value={zoneId}
+                    onChange={(e) => {
+                      setZoneId(e.target.value);
+                      setRouteId("");
+                    }}
+                    disabled={!schemeId}
+                  >
+                    <MenuItem value="">All</MenuItem>
+                    {zones.map((z) => (
+                      <MenuItem key={z.id} value={z.id}>
+                        {z.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} md={2}>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    label="Route"
+                    value={routeId}
+                    onChange={(e) => setRouteId(e.target.value)}
+                    disabled={!zoneId}
+                  >
+                    <MenuItem value="">All</MenuItem>
+                    {routes.map((r) => (
+                      <MenuItem key={r.id} value={r.id}>
+                        {r.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} md={2}>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    label="Tariff"
+                    value={tariffCategoryId}
+                    onChange={(e) => setTariffCategoryId(e.target.value)}
+                  >
+                    <MenuItem value="">All</MenuItem>
+                    {tariffCategories.map((t) => (
+                      <MenuItem key={t.id} value={t.id}>
+                        {t.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} md={1}>
+                  <Tooltip title="Reset Filters">
+                    <IconButton onClick={handleReset}>
+                      <RefreshIcon />
+                    </IconButton>
+                  </Tooltip>
+                </Grid>
+              </Grid>
+            </Paper>
+
+            {/* DataGrid */}
+            <Paper sx={{ height: 680, overflowX: "auto" }}>
+              <DataGrid
+                rows={normalizedCustomers}
+                getRowId={(row) => row?.id}
+                columns={columns}
+                loading={loading}
+                pagination
+                paginationMode="server"
+                rowCount={pagination.total}
+                pageSizeOptions={[10, 20, 50]}
+                paginationModel={{
+                  page: pagination.page - 1,
+                  pageSize: pagination.limit,
+                }}
+                onPaginationModelChange={(model) =>
+                  setPagination({
+                    ...pagination,
+                    page: model.page + 1,
+                    limit: model.pageSize,
+                  })
+                }
+                disableRowSelectionOnClick // Prevent row selection on click
+                slots={{
+                  noRowsOverlay: () => (
+                    <Box
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="center"
+                      height="100%"
+                    >
+                      <Typography color="text.secondary">
+                        {error || "No customers found"}
+                      </Typography>
+                    </Box>
+                  ),
                 }}
               />
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                label="Scheme"
-                value={schemeId}
-                onChange={(e) => {
-                  setSchemeId(e.target.value);
-                  setZoneId("");
-                  setRouteId("");
-                }}
-              >
-                <MenuItem value="">All</MenuItem>
-                {schemes.map((s) => (
-                  <MenuItem key={s.id} value={s.id}>
-                    {s.name}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                label="Zone"
-                value={zoneId}
-                onChange={(e) => {
-                  setZoneId(e.target.value);
-                  setRouteId("");
-                }}
-                disabled={!schemeId}
-              >
-                <MenuItem value="">All</MenuItem>
-                {zones.map((z) => (
-                  <MenuItem key={z.id} value={z.id}>
-                    {z.name}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                label="Route"
-                value={routeId}
-                onChange={(e) => setRouteId(e.target.value)}
-                disabled={!zoneId}
-              >
-                <MenuItem value="">All</MenuItem>
-                {routes.map((r) => (
-                  <MenuItem key={r.id} value={r.id}>
-                    {r.name}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                label="Tariff"
-                value={tariffCategoryId}
-                onChange={(e) => setTariffCategoryId(e.target.value)}
-              >
-                <MenuItem value="">All</MenuItem>
-                {tariffCategories.map((t) => (
-                  <MenuItem key={t.id} value={t.id}>
-                    {t.name}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={1}>
-              <Tooltip title="Reset Filters">
-                <IconButton onClick={handleReset}>
-                  <RefreshIcon />
-                </IconButton>
-              </Tooltip>
-            </Grid>
-          </Grid>
-        </Paper>
-
-        {/* DataGrid */}
-        <Paper sx={{ height: 680, overflowX: "auto" }}>
-          <DataGrid
-            rows={normalizedCustomers}
-            getRowId={(row) => row?.id}
-            columns={columns}
-            loading={loading}
-            pagination
-            paginationMode="server"
-            rowCount={pagination.total}
-            pageSizeOptions={[10, 20, 50]}
-            paginationModel={{
-              page: pagination.page - 1,
-              pageSize: pagination.limit,
-            }}
-            onPaginationModelChange={(model) =>
-              setPagination({
-                ...pagination,
-                page: model.page + 1,
-                limit: model.pageSize,
-              })
-            }
-            disableRowSelectionOnClick // Prevent row selection on click
-            slots={{
-              noRowsOverlay: () => (
-                <Box
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="center"
-                  height="100%"
-                >
-                  <Typography color="text.secondary">
-                    {error || "No customers found"}
-                  </Typography>
-                </Box>
-              ),
-            }}
-          />
-        </Paper>
-      </Box>
-
-      {/* Customer Details Panel */}
-      <Box
-        sx={{
-          flex: isMobile ? "1" : selectedCustomerId ? "0 0 400px" : "0 0 0",
-          transition: "flex 0.3s ease",
-          overflow: "auto",
-          display: selectedCustomerId || isMobile ? "block" : "none",
-        }}
-      >
-        {selectedCustomerId ? (
-          <CustomerDetails customerId={selectedCustomerId} onClose={handleCloseDetails} />
-        ) : (
-          <Box sx={{ p: 3 }}>
-            <Typography>Select a customer to view details</Typography>
+            </Paper>
           </Box>
-        )}
-      </Box>
 
-      {editCustomerId && (
-  <EditCustomerModal
-    open={!!editCustomerId}
-    onClose={handleCloseEdit}
-    customerId={editCustomerId}
-    
-    onCustomerUpdated={handleCustomerUpdated}
-  />
-)}
+          {/* Customer Details Panel */}
+          <Box
+            sx={{
+              flex: isMobile ? "1" : selectedCustomerId ? "0 0 400px" : "0 0 0",
+              transition: "flex 0.3s ease",
+              overflow: "auto",
+              display: selectedCustomerId || isMobile ? "block" : "none",
+            }}
+          >
+            {selectedCustomerId ? (
+              <CustomerDetails
+                customerId={selectedCustomerId}
+                onClose={handleCloseDetails}
+              />
+            ) : (
+              <Box sx={{ p: 3 }}>
+                <Typography>Select a customer to view details</Typography>
+              </Box>
+            )}
+          </Box>
+
+          {editCustomerId && (
+            <EditCustomerModal
+              open={!!editCustomerId}
+              onClose={handleCloseEdit}
+              customerId={editCustomerId}
+              onCustomerUpdated={handleCustomerUpdated}
+            />
+          )}
+        </>
+      )}
     </Box>
   );
 };

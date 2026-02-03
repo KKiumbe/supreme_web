@@ -1,5 +1,9 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
+  PermissionDeniedUI,
+  isPermissionDenied,
+} from "../../utils/permissionHelper";
+import {
   Box,
   Paper,
   TextField,
@@ -17,14 +21,15 @@ import {
   Download,
 } from "@mui/icons-material";
 import axios from "axios";
-import { useAuthStore, useThemeStore } from "../../store/authStore";
+import { useAuthStore } from "../../store/authStore";
+import { useThemeStore } from "../../store/theme";
 import { useNavigate } from "react-router-dom";
 import ImageIcon from "@mui/icons-material/Image";
 import CircularProgress from "@mui/material/CircularProgress";
 
 import EditAbnormalReadingModal from "../../components/meterReading/abnornal/edit";
 import MeterReadingDetails from "../../components/meterReading/abnornal/viewAbnormalReading";
-  import PropTypes from "prop-types";
+import PropTypes from "prop-types";
 
 const BASEURL = import.meta.env.VITE_BASE_URL;
 
@@ -39,9 +44,10 @@ export default function AbnormalMeterReadingsList() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   const [pagination, setPagination] = useState({
-    page: 0,       // DataGrid uses 0-based index
+    page: 0, // DataGrid uses 0-based index
     pageSize: 20,
     total: 0,
   });
@@ -62,7 +68,9 @@ export default function AbnormalMeterReadingsList() {
      AUTH GUARD
   ----------------------------- */
   useEffect(() => {
-    if (!currentUser) navigate("/login");
+    if (!currentUser) {
+      navigate("/login");
+    }
   }, [currentUser, navigate]);
 
   /* -----------------------------
@@ -80,24 +88,21 @@ export default function AbnormalMeterReadingsList() {
 
       const res = await axios.get(
         `${BASEURL}/get-abnormal-readings?${params.toString()}`,
-        { withCredentials: true }
+        { withCredentials: true },
       );
 
       const normalized = (res.data.data || []).map((item) => ({
         id: item.id,
         meterId: item.meterId,
 
-        connectionNumber:
-          item.meter?.connection?.connectionNumber ?? "-",
+        connectionNumber: item.meter?.connection?.connectionNumber ?? "-",
 
         serialNumber: item.meter?.serialNumber ?? "-",
         model: item.meter?.model ?? "-",
 
-        customerName:
-          item.meter?.connection?.customer?.customerName ?? "-",
+        customerName: item.meter?.connection?.customer?.customerName ?? "-",
 
-        phoneNumber:
-          item.meter?.connection?.customer?.phoneNumber ?? "-",
+        phoneNumber: item.meter?.connection?.customer?.phoneNumber ?? "-",
 
         previousReading: item.previousReading ?? "-",
         currentReading: item.currentReading ?? "-",
@@ -114,9 +119,19 @@ export default function AbnormalMeterReadingsList() {
         ...prev,
         total: res.data.pagination?.total || 0,
       }));
+      setPermissionDenied(false);
     } catch (err) {
       console.error(err);
-      alert("Failed to load abnormal meter readings");
+      if (isPermissionDenied(err)) {
+        setPermissionDenied(true);
+        setRows([]);
+        setPagination((prev) => ({
+          ...prev,
+          total: 0,
+        }));
+      } else {
+        alert("Failed to load abnormal meter readings");
+      }
     } finally {
       setLoading(false);
     }
@@ -129,18 +144,15 @@ export default function AbnormalMeterReadingsList() {
   /* -----------------------------
      MODALS
   ----------------------------- */
-  const openDetails = (id) =>
-    setDetailsModal({ open: true, readingId: id });
+  const openDetails = (id) => setDetailsModal({ open: true, readingId: id });
 
-  const closeDetails = () =>
-    setDetailsModal({ open: false, readingId: null });
+  const closeDetails = () => setDetailsModal({ open: false, readingId: null });
 
   const openEditModal = async (row) => {
     try {
-      const res = await axios.get(
-        `${BASEURL}/get-abnormal-reading/${row.id}`,
-        { withCredentials: true }
-      );
+      const res = await axios.get(`${BASEURL}/get-abnormal-reading/${row.id}`, {
+        withCredentials: true,
+      });
 
       setAverageReading(res.data.data.average);
       setEditModal({
@@ -154,42 +166,40 @@ export default function AbnormalMeterReadingsList() {
   };
 
   const handleDownloadAbnormalReport = async () => {
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const res = await axios.get(
-      `${BASEURL}/reports/abnormal-meter-readings`,
-      {
-        withCredentials: true,
-        responseType: "blob", // ✅ VERY IMPORTANT
-      }
-    );
+      const res = await axios.get(
+        `${BASEURL}/reports/abnormal-meter-readings`,
+        {
+          withCredentials: true,
+          responseType: "blob", // ✅ VERY IMPORTANT
+        },
+      );
 
-    // Create blob URL
-    const blob = new Blob([res.data], { type: "application/pdf" });
-    const url = window.URL.createObjectURL(blob);
+      // Create blob URL
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
 
-    // Trigger download
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "Abnormal-Meter-Readings.pdf";
-    document.body.appendChild(link);
-    link.click();
+      // Trigger download
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "Abnormal-Meter-Readings.pdf";
+      document.body.appendChild(link);
+      link.click();
 
-    // Cleanup
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-  } catch (err) {
-    console.error(err);
-    alert("Failed to download abnormal readings report");
-  } finally {
-    setLoading(false);
-  }
-};
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to download abnormal readings report");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-
-  const closeEditModal = () =>
-    setEditModal({ open: false, reading: null });
+  const closeEditModal = () => setEditModal({ open: false, reading: null });
 
   /* -----------------------------
      IMAGE CELL
@@ -199,7 +209,9 @@ export default function AbnormalMeterReadingsList() {
     const [loaded, setLoaded] = useState(false);
     const [error, setError] = useState(false);
 
-    if (!src) return <Typography variant="caption">-</Typography>;
+    if (!src) {
+      return <Typography variant="caption">-</Typography>;
+    }
 
     return (
       <Box
@@ -259,10 +271,7 @@ export default function AbnormalMeterReadingsList() {
       width: 60,
       renderCell: (params) => (
         <Tooltip title="View Details">
-          <IconButton
-            size="small"
-            onClick={() => openDetails(params.row.id)}
-          >
+          <IconButton size="small" onClick={() => openDetails(params.row.id)}>
             <Visibility fontSize="small" />
           </IconButton>
         </Tooltip>
@@ -274,10 +283,7 @@ export default function AbnormalMeterReadingsList() {
       width: 60,
       renderCell: (params) => (
         <Tooltip title="Correct Reading">
-          <IconButton
-            size="small"
-            onClick={() => openEditModal(params.row)}
-          >
+          <IconButton size="small" onClick={() => openEditModal(params.row)}>
             <EditIcon fontSize="small" />
           </IconButton>
         </Tooltip>
@@ -328,100 +334,94 @@ export default function AbnormalMeterReadingsList() {
   ----------------------------- */
   return (
     <Box p={3}>
-   
-   <Grid
-  container
-  justifyContent="space-between"
-  alignItems="center"
-  mb={2}
->
-  <Typography variant="h6">
-    Abnormal Meter Readings
-  </Typography>
+      {permissionDenied ? (
+        <PermissionDeniedUI permission="meter-readings:view" />
+      ) : (
+        <>
+          <Grid
+            container
+            justifyContent="space-between"
+            alignItems="center"
+            mb={2}
+          >
+            <Typography variant="h6">Abnormal Meter Readings</Typography>
 
-  <Box display="flex" gap={2}>
+            <Box display="flex" gap={2}>
+              <Tooltip title="Download PDF report">
+                <span>
+                  <IconButton
+                    color="primary"
+                    onClick={handleDownloadAbnormalReport}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <CircularProgress size={12} />
+                    ) : (
+                      <Download fontSize="large" color="action" /> // or Download icon if you prefer
+                    )}
+                  </IconButton>
+                </span>
+              </Tooltip>
 
-     <Tooltip title="Download PDF report">
-      <span>
-        <IconButton
-          color="primary"
-          onClick={handleDownloadAbnormalReport}
-          disabled={loading}
-        >
-          {loading ? (
-            <CircularProgress size={12} />
-          ) : (
-            <Download fontSize="large"  color="action"/> // or Download icon if you prefer
+              <TextField
+                size="small"
+                placeholder="Search meter / customer..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPagination((p) => ({ ...p, page: 0 }));
+                }}
+                InputProps={{
+                  startAdornment: <SearchIcon sx={{ mr: 1 }} />,
+                }}
+                sx={{ width: 320 }}
+              />
+            </Box>
+          </Grid>
+
+          <Paper sx={{ height: 700 }}>
+            <DataGrid
+              rows={rows}
+              columns={columns}
+              loading={loading}
+              paginationMode="server"
+              rowCount={pagination.total}
+              paginationModel={{
+                page: pagination.page,
+                pageSize: pagination.pageSize,
+              }}
+              onPaginationModelChange={(model) => {
+                setPagination((prev) => ({
+                  ...prev,
+                  page: model.page,
+                  pageSize: model.pageSize,
+                }));
+              }}
+              pageSizeOptions={[10, 20, 50]}
+              getRowId={(row) => row.id}
+            />
+          </Paper>
+
+          {/* MODALS */}
+          <EditAbnormalReadingModal
+            open={editModal.open}
+            onClose={closeEditModal}
+            reading={editModal.reading}
+            average={averageReading}
+            onSuccess={() => {
+              closeEditModal();
+              fetchReadings();
+            }}
+          />
+
+          {detailsModal.open && (
+            <MeterReadingDetails
+              readingId={detailsModal.readingId}
+              onClose={closeDetails}
+              onResolve={(reading) => openEditModal(reading)}
+            />
           )}
-        </IconButton>
-      </span>
-    </Tooltip>
-
-
-    <TextField
-      size="small"
-      placeholder="Search meter / customer..."
-      value={search}
-      onChange={(e) => {
-        setSearch(e.target.value);
-        setPagination((p) => ({ ...p, page: 0 }));
-      }}
-      InputProps={{
-        startAdornment: <SearchIcon sx={{ mr: 1 }} />,
-      }}
-      sx={{ width: 320 }}
-    />
-
-   
-  </Box>
-</Grid>
-
-
-      <Paper sx={{ height: 700 }}>
-        <DataGrid
-  rows={rows}
-  columns={columns}
-  loading={loading}
-  paginationMode="server"
-  rowCount={pagination.total}
-
-  paginationModel={{
-    page: pagination.page,
-    pageSize: pagination.pageSize,
-  }}
-
-  onPaginationModelChange={(model) => {
-    setPagination((prev) => ({
-      ...prev,
-      page: model.page,
-      pageSize: model.pageSize,
-    }));
-  }}
-
-  pageSizeOptions={[10, 20, 50]}
-  getRowId={(row) => row.id}
-/>
-
-      </Paper>
-
-      {/* MODALS */}
-      <EditAbnormalReadingModal
-        open={editModal.open}
-        onClose={closeEditModal}
-        reading={editModal.reading}
-        average={averageReading}
-        onSuccess={() => {
-          closeEditModal();
-          fetchReadings();
-        }}
-      />
-
-      {detailsModal.open && (
-        <MeterReadingDetails
-          readingId={detailsModal.readingId}
-          onClose={closeDetails}
-          onResolve={(reading) => openEditModal(reading)}
-        />
+        </>
       )}
     </Box>
   );

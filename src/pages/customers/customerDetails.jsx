@@ -1,6 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
+  PermissionDeniedUI,
+  isPermissionDenied,
+} from "../../utils/permissionHelper";
+import {
   Container,
   Typography,
   Tabs,
@@ -56,6 +60,7 @@ const CustomerDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const [openModal, setOpenModal] = useState(false);
   const [smsMessage, setSmsMessage] = useState("");
   const [sending, setSending] = useState(false);
@@ -82,9 +87,17 @@ const CustomerDetails = () => {
       });
       console.log("Customer response:", JSON.stringify(response.data, null, 2));
       setCustomer(response.data);
+      setPermissionDenied(false);
     } catch (err) {
       console.error("Error fetching customer details:", err);
-      setError(err.response?.data?.message || "Failed to load customer details.");
+      if (isPermissionDenied(err)) {
+        setPermissionDenied(true);
+        setCustomer(null);
+      } else {
+        setError(
+          err.response?.data?.message || "Failed to load customer details.",
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -106,7 +119,7 @@ const CustomerDetails = () => {
       await axios.post(
         `${BASEURL}/send-sms`,
         { mobile: customer?.phoneNumber, message: smsMessage },
-        { withCredentials: true }
+        { withCredentials: true },
       );
       setSuccess("SMS sent successfully");
       setOpenModal(false);
@@ -126,7 +139,7 @@ const CustomerDetails = () => {
       await axios.post(
         `${BASEURL}/send-bill`,
         { customerId: customer?.id },
-        { withCredentials: true }
+        { withCredentials: true },
       );
       setSuccess("Invoice sent successfully");
     } catch (err) {
@@ -162,14 +175,16 @@ const CustomerDetails = () => {
       await axios.post(
         `${BASEURL}/active-customer`,
         { customerId: customer?.id },
-        { withCredentials: true }
+        { withCredentials: true },
       );
       setCustomer((prev) => ({ ...prev, status: "ACTIVE" }));
       setSuccess("Customer status updated to ACTIVE");
       setOpenStatusModal(false);
     } catch (err) {
       console.error("Error updating customer status:", err);
-      setError(err.response?.data?.message || "Failed to update customer status.");
+      setError(
+        err.response?.data?.message || "Failed to update customer status.",
+      );
     } finally {
       setSending(false);
     }
@@ -207,7 +222,9 @@ const CustomerDetails = () => {
       setOpenLeaseModal(false);
     } catch (err) {
       console.error("Error uploading lease:", err);
-      setError(err.response?.data?.message || "Failed to upload lease agreement.");
+      setError(
+        err.response?.data?.message || "Failed to upload lease agreement.",
+      );
     } finally {
       setSending(false);
     }
@@ -224,7 +241,10 @@ const CustomerDetails = () => {
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `lease_${customer?.firstName}_${customer?.lastName}.pdf`);
+      link.setAttribute(
+        "download",
+        `lease_${customer?.firstName}_${customer?.lastName}.pdf`,
+      );
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -232,7 +252,9 @@ const CustomerDetails = () => {
       setSuccess("Lease downloaded successfully");
     } catch (err) {
       console.error("Error downloading lease:", err);
-      setError(err.response?.data?.message || "Failed to download lease agreement.");
+      setError(
+        err.response?.data?.message || "Failed to download lease agreement.",
+      );
     } finally {
       setSending(false);
     }
@@ -246,7 +268,11 @@ const CustomerDetails = () => {
   const confirmTerminateLease = async () => {
     setSending(true);
     try {
-      await axios.post(`${BASEURL}/terminate-lease/${id}`, {}, { withCredentials: true });
+      await axios.post(
+        `${BASEURL}/terminate-lease/${id}`,
+        {},
+        { withCredentials: true },
+      );
       setCustomer((prev) => ({
         ...prev,
         leaseFileUrl: null,
@@ -330,21 +356,35 @@ const CustomerDetails = () => {
         </IconButton>
       ),
     },
-    { field: "paymentNumber", headerName: "Payment #", width: 150, valueGetter: () => "N/A" }, // Adjust based on actual payment data
-    { field: "amount", headerName: "Amount (KES)", width: 120, valueGetter: () => "N/A" },
+    {
+      field: "paymentNumber",
+      headerName: "Payment #",
+      width: 150,
+      valueGetter: () => "N/A",
+    }, // Adjust based on actual payment data
+    {
+      field: "amount",
+      headerName: "Amount (KES)",
+      width: 120,
+      valueGetter: () => "N/A",
+    },
     {
       field: "modeOfPayment",
       headerName: "Payment Mode",
       width: 150,
       valueGetter: () => "N/A",
     },
-    { field: "paidBy", headerName: "Paid By", width: 150, valueGetter: () => "N/A" },
+    {
+      field: "paidBy",
+      headerName: "Paid By",
+      width: 150,
+      valueGetter: () => "N/A",
+    },
     {
       field: "createdAt",
       headerName: "Date",
       width: 180,
-      renderCell: () =>
-        "N/A", // Adjust when payment data is available
+      renderCell: () => "N/A", // Adjust when payment data is available
     },
     {
       field: "transactionCode",
@@ -362,7 +402,10 @@ const CustomerDetails = () => {
       headerName: "Period",
       width: 150,
       renderCell: (params) =>
-        new Date(params.value).toLocaleString(undefined, { year: "numeric", month: "short" }),
+        new Date(params.value).toLocaleString(undefined, {
+          year: "numeric",
+          month: "short",
+        }),
     },
     { field: "consumption", headerName: "Consumption (m³)", width: 150 },
     {
@@ -398,7 +441,10 @@ const CustomerDetails = () => {
       headerName: "Period",
       width: 150,
       renderCell: (params) =>
-        new Date(params.value).toLocaleString(undefined, { year: "numeric", month: "short" }),
+        new Date(params.value).toLocaleString(undefined, {
+          year: "numeric",
+          month: "short",
+        }),
     },
     { field: "reading", headerName: "Reading (m³)", width: 150 },
     { field: "consumption", headerName: "Consumption (m³)", width: 150 },
@@ -419,7 +465,8 @@ const CustomerDetails = () => {
       field: "abnormalReading",
       headerName: "Abnormal",
       width: 120,
-      renderCell: (params) => (params.row.AbnormalWaterReading?.length > 0 ? "Yes" : "No"),
+      renderCell: (params) =>
+        params.row.AbnormalWaterReading?.length > 0 ? "Yes" : "No",
     },
   ];
 
@@ -429,433 +476,544 @@ const CustomerDetails = () => {
         Customer Details
       </Typography>
 
-      {loading && (
-        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "80vh" }}>
-          <CircularProgress color="primary" size={50} />
-        </Box>
-      )}
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-      {success && (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
-          {success}
-        </Alert>
-      )}
-
-      {customer && (
+      {permissionDenied ? (
+        <PermissionDeniedUI permission="customers:view" />
+      ) : (
         <>
-          <Box sx={{ p: 3, bgcolor: theme.palette.background.paper, borderRadius: 2, boxShadow: 1 }}>
-            <Stack direction="row" alignItems="center" mb={2}>
-              <IconButton onClick={handleBack} sx={{ color: theme.palette.greenAccent.main, mr: 2 }}>
-                <ArrowBackIcon sx={{ fontSize: 30 }} />
-              </IconButton>
-              <Typography variant="h5">{customer.fullName || "N/A"}</Typography>
-            </Stack>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <Typography>
-                  <strong>Email:</strong> {customer.email || "N/A"}
-                </Typography>
-                <Typography>
-                  <strong>Phone:</strong> {customer.phoneNumber || "N/A"}
-                </Typography>
-                <Typography>
-                  <strong>Secondary Phone:</strong> {customer.secondaryPhoneNumber || "N/A"}
-                </Typography>
-                <Typography>
-                  <strong>National ID:</strong> {customer.nationalId || "N/A"}
-                </Typography>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="subtitle1" gutterBottom>
-                  <strong>Units:</strong>
-                </Typography>
-                {customer.units?.length > 0 ? (
-                  <List dense>
-                    {customer.units.map((unit) => (
-                      <ListItem key={unit.id}>
-                        <ListItemText
-                          primary={`Unit ${unit.unitNumber}`}
-                          secondary={
-                            <>
-                              Building: {unit.building?.name || "N/A"}
-                              <br />
-                              Rent: {unit.monthlyCharge} KES
-                              <br />
-                              Status: {unit.status}
-                              <br />
-                              Landlord: {unit.building?.landlord ? `${unit.building.landlord.firstName} ${unit.building.landlord.lastName}` : "N/A"}
-                            </>
-                          }
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                ) : (
-                  <Typography>Not Assigned</Typography>
-                )}
-                <Typography>
-                  <strong>Lease:</strong> {customer.leaseFileUrl ? `Active (Started: ${new Date(customer.leaseStartDate).toLocaleDateString()})` : "No Lease"}
-                </Typography>
-                <Typography>
-                  <strong>Closing Balance:</strong> {customer.closingBalance || 0} KES
-                </Typography>
-                <Typography>
-                  <strong>Status:</strong> {customer.status || "N/A"}
-                  {customer.status === "PENDING" && (
-                    <IconButton
-                      onClick={() => setOpenStatusModal(true)}
-                      sx={{ ml: 1, color: theme.palette.greenAccent.main }}
-                    >
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                  )}
-                </Typography>
-              </Grid>
-            </Grid>
-
-            <Stack direction="row" spacing={2} mt={3}>
-              <Button
-                variant="contained"
-                sx={{ backgroundColor: theme.palette.greenAccent.main }}
-                onClick={() => setOpenModal(true)}
-                disabled={sending || !customer.phoneNumber}
-              >
-                {sending ? "Sending..." : `SMS ${customer.firstName}`}
-              </Button>
-              <Button
-                variant="contained"
-                sx={{ backgroundColor: theme.palette.greenAccent.main }}
-                onClick={sendBill}
-                disabled={sending}
-              >
-                {sending ? "Sending..." : `Send Invoice to ${customer.firstName}`}
-              </Button>
-              <Button
-                variant="contained"
-                onClick={handleEditCustomer}
-                disabled={sending}
-                startIcon={<EditIcon />}
-                sx={{ backgroundColor: theme.palette.greenAccent.main }}
-              >
-                {sending ? "Processing..." : "Edit Customer"}
-              </Button>
-              <Button
-                variant="contained"
-                onClick={() => setOpenLeaseModal(true)}
-                disabled={sending}
-                sx={{ backgroundColor: theme.palette.greenAccent.main }}
-              >
-                {sending ? "Processing..." : "Manage Lease"}
-              </Button>
-              <Button
-                variant="contained"
-                color="error"
-                onClick={() => setOpenDeleteDialog(true)}
-                disabled={sending}
-              >
-                {sending ? "Deleting..." : "Delete Customer"}
-              </Button>
-            </Stack>
-          </Box>
-
-          <Dialog open={openDeleteDialog} onClose={() => setOpenDeleteDialog(false)}>
-            <DialogTitle>Confirm Delete</DialogTitle>
-            <DialogContent>
-              <DialogContentText>
-                Are you sure you want to delete {customer.fullName || "this customer"}? This action cannot be undone.
-              </DialogContentText>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setOpenDeleteDialog(false)} color="primary">
-                Cancel
-              </Button>
-              <Button
-                onClick={deleteCustomer}
-                color="error"
-                variant="contained"
-                disabled={sending}
-              >
-                {sending ? "Deleting..." : "Delete"}
-              </Button>
-            </DialogActions>
-          </Dialog>
-
-          <Modal open={openModal} onClose={() => setOpenModal(false)}>
+          {loading && (
             <Box
               sx={{
-                p: 4,
-                bgcolor: theme.palette.background.paper,
-                borderRadius: 2,
-                width: 400,
-                mx: "auto",
-                mt: "10%",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                height: "80vh",
               }}
             >
-              <Typography variant="h6" gutterBottom>
-                Send SMS
-              </Typography>
-              <TextField
-                fullWidth
-                label="Message"
-                multiline
-                rows={4}
-                value={smsMessage}
-                onChange={(e) => setSmsMessage(e.target.value)}
-                sx={{ mb: 2 }}
-              />
-              <Stack direction="row" spacing={2}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={sendSMS}
-                  disabled={sending}
-                >
-                  {sending ? "Sending..." : "Send"}
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() => setOpenModal(false)}
-                  disabled={sending}
-                >
-                  Cancel
-                </Button>
-              </Stack>
+              <CircularProgress color="primary" size={50} />
             </Box>
-          </Modal>
-
-          <Modal open={openLeaseModal} onClose={() => setOpenLeaseModal(false)}>
-            <Box
-              sx={{
-                p: 4,
-                bgcolor: theme.palette.background.paper,
-                borderRadius: 2,
-                width: 400,
-                mx: "auto",
-                mt: "10%",
-              }}
+          )}
+          {error && (
+            <Alert
+              severity="error"
+              sx={{ mb: 2 }}
+              onClose={() => setError(null)}
             >
-              <Typography variant="h6" gutterBottom>
-                Manage Lease
-              </Typography>
-              {error && openLeaseModal && (
-                <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-                  {error}
-                </Alert>
-              )}
-              {success && openLeaseModal && (
-                <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
-                  {success}
-                </Alert>
-              )}
-              {sending && <LinearProgress sx={{ mb: 2 }} />}
-              {!customer.leaseFileUrl ? (
-                <>
-                  <Typography variant="body1" mb={2}>
-                    No lease agreement found. Upload a new lease agreement (PDF only, max 5MB).
+              {error}
+            </Alert>
+          )}
+          {success && (
+            <Alert
+              severity="success"
+              sx={{ mb: 2 }}
+              onClose={() => setSuccess(null)}
+            >
+              {success}
+            </Alert>
+          )}
+
+          {customer && (
+            <>
+              <Box
+                sx={{
+                  p: 3,
+                  bgcolor: theme.palette.background.paper,
+                  borderRadius: 2,
+                  boxShadow: 1,
+                }}
+              >
+                <Stack direction="row" alignItems="center" mb={2}>
+                  <IconButton
+                    onClick={handleBack}
+                    sx={{ color: theme.palette.greenAccent.main, mr: 2 }}
+                  >
+                    <ArrowBackIcon sx={{ fontSize: 30 }} />
+                  </IconButton>
+                  <Typography variant="h5">
+                    {customer.fullName || "N/A"}
                   </Typography>
-                  <FormControl fullWidth sx={{ mb: 2 }}>
-                    <InputLabel shrink htmlFor="lease-upload">
-                      Upload Lease Agreement
-                    </InputLabel>
-                    <input
-                      type="file"
-                      accept=".pdf"
-                      onChange={(e) => setLeaseFile(e.target.files[0])}
-                      id="lease-upload"
-                      style={{ marginTop: "16px" }}
-                    />
-                  </FormControl>
+                </Stack>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <Typography>
+                      <strong>Email:</strong> {customer.email || "N/A"}
+                    </Typography>
+                    <Typography>
+                      <strong>Phone:</strong> {customer.phoneNumber || "N/A"}
+                    </Typography>
+                    <Typography>
+                      <strong>Secondary Phone:</strong>{" "}
+                      {customer.secondaryPhoneNumber || "N/A"}
+                    </Typography>
+                    <Typography>
+                      <strong>National ID:</strong>{" "}
+                      {customer.nationalId || "N/A"}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      <strong>Units:</strong>
+                    </Typography>
+                    {customer.units?.length > 0 ? (
+                      <List dense>
+                        {customer.units.map((unit) => (
+                          <ListItem key={unit.id}>
+                            <ListItemText
+                              primary={`Unit ${unit.unitNumber}`}
+                              secondary={
+                                <>
+                                  Building: {unit.building?.name || "N/A"}
+                                  <br />
+                                  Rent: {unit.monthlyCharge} KES
+                                  <br />
+                                  Status: {unit.status}
+                                  <br />
+                                  Landlord:{" "}
+                                  {unit.building?.landlord
+                                    ? `${unit.building.landlord.firstName} ${unit.building.landlord.lastName}`
+                                    : "N/A"}
+                                </>
+                              }
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
+                    ) : (
+                      <Typography>Not Assigned</Typography>
+                    )}
+                    <Typography>
+                      <strong>Lease:</strong>{" "}
+                      {customer.leaseFileUrl
+                        ? `Active (Started: ${new Date(customer.leaseStartDate).toLocaleDateString()})`
+                        : "No Lease"}
+                    </Typography>
+                    <Typography>
+                      <strong>Closing Balance:</strong>{" "}
+                      {customer.closingBalance || 0} KES
+                    </Typography>
+                    <Typography>
+                      <strong>Status:</strong> {customer.status || "N/A"}
+                      {customer.status === "PENDING" && (
+                        <IconButton
+                          onClick={() => setOpenStatusModal(true)}
+                          sx={{ ml: 1, color: theme.palette.greenAccent.main }}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                    </Typography>
+                  </Grid>
+                </Grid>
+
+                <Stack direction="row" spacing={2} mt={3}>
+                  <Button
+                    variant="contained"
+                    sx={{ backgroundColor: theme.palette.greenAccent.main }}
+                    onClick={() => setOpenModal(true)}
+                    disabled={sending || !customer.phoneNumber}
+                  >
+                    {sending ? "Sending..." : `SMS ${customer.firstName}`}
+                  </Button>
+                  <Button
+                    variant="contained"
+                    sx={{ backgroundColor: theme.palette.greenAccent.main }}
+                    onClick={sendBill}
+                    disabled={sending}
+                  >
+                    {sending
+                      ? "Sending..."
+                      : `Send Invoice to ${customer.firstName}`}
+                  </Button>
+                  <Button
+                    variant="contained"
+                    onClick={handleEditCustomer}
+                    disabled={sending}
+                    startIcon={<EditIcon />}
+                    sx={{ backgroundColor: theme.palette.greenAccent.main }}
+                  >
+                    {sending ? "Processing..." : "Edit Customer"}
+                  </Button>
+                  <Button
+                    variant="contained"
+                    onClick={() => setOpenLeaseModal(true)}
+                    disabled={sending}
+                    sx={{ backgroundColor: theme.palette.greenAccent.main }}
+                  >
+                    {sending ? "Processing..." : "Manage Lease"}
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="error"
+                    onClick={() => setOpenDeleteDialog(true)}
+                    disabled={sending}
+                  >
+                    {sending ? "Deleting..." : "Delete Customer"}
+                  </Button>
+                </Stack>
+              </Box>
+
+              <Dialog
+                open={openDeleteDialog}
+                onClose={() => setOpenDeleteDialog(false)}
+              >
+                <DialogTitle>Confirm Delete</DialogTitle>
+                <DialogContent>
+                  <DialogContentText>
+                    Are you sure you want to delete{" "}
+                    {customer.fullName || "this customer"}? This action cannot
+                    be undone.
+                  </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                  <Button
+                    onClick={() => setOpenDeleteDialog(false)}
+                    color="primary"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={deleteCustomer}
+                    color="error"
+                    variant="contained"
+                    disabled={sending}
+                  >
+                    {sending ? "Deleting..." : "Delete"}
+                  </Button>
+                </DialogActions>
+              </Dialog>
+
+              <Modal open={openModal} onClose={() => setOpenModal(false)}>
+                <Box
+                  sx={{
+                    p: 4,
+                    bgcolor: theme.palette.background.paper,
+                    borderRadius: 2,
+                    width: 400,
+                    mx: "auto",
+                    mt: "10%",
+                  }}
+                >
+                  <Typography variant="h6" gutterBottom>
+                    Send SMS
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    label="Message"
+                    multiline
+                    rows={4}
+                    value={smsMessage}
+                    onChange={(e) => setSmsMessage(e.target.value)}
+                    sx={{ mb: 2 }}
+                  />
                   <Stack direction="row" spacing={2}>
                     <Button
                       variant="contained"
                       color="primary"
-                      onClick={handleLeaseUpload}
-                      disabled={sending || !leaseFile}
+                      onClick={sendSMS}
+                      disabled={sending}
                     >
-                      {sending ? "Uploading..." : "Upload Lease"}
+                      {sending ? "Sending..." : "Send"}
                     </Button>
                     <Button
                       variant="outlined"
-                      onClick={() => setOpenLeaseModal(false)}
+                      onClick={() => setOpenModal(false)}
                       disabled={sending}
-                      sx={{ color: theme.palette.secondary.contrastText }}
                     >
                       Cancel
                     </Button>
                   </Stack>
-                </>
-              ) : (
-                <>
-                  <Typography variant="body1" mb={2}>
-                    Lease agreement exists. You can download it here.
+                </Box>
+              </Modal>
+
+              <Modal
+                open={openLeaseModal}
+                onClose={() => setOpenLeaseModal(false)}
+              >
+                <Box
+                  sx={{
+                    p: 4,
+                    bgcolor: theme.palette.background.paper,
+                    borderRadius: 2,
+                    width: 400,
+                    mx: "auto",
+                    mt: "10%",
+                  }}
+                >
+                  <Typography variant="h6" gutterBottom>
+                    Manage Lease
                   </Typography>
-                  <Stack direction="row" spacing={2}>
-                    <Button
-                      variant="contained"
-                      sx={{ backgroundColor: theme.palette.greenAccent.main }}
-                      onClick={handleLeaseDownload}
-                      disabled={sending}
+                  {error && openLeaseModal && (
+                    <Alert
+                      severity="error"
+                      sx={{ mb: 2 }}
+                      onClose={() => setError(null)}
                     >
-                      {sending ? "Downloading..." : "Download Lease"}
-                    </Button>
-                    <Button
-                      variant="contained"
-                      color="error"
-                      onClick={handleTerminateLease}
-                      disabled={sending}
+                      {error}
+                    </Alert>
+                  )}
+                  {success && openLeaseModal && (
+                    <Alert
+                      severity="success"
+                      sx={{ mb: 2 }}
+                      onClose={() => setSuccess(null)}
                     >
-                      {sending ? "Processing..." : "Terminate Lease"}
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      onClick={() => setOpenLeaseModal(false)}
-                      disabled={sending}
-                      sx={{ color: theme.palette.secondary.contrastText }}
-                    >
-                      Cancel
-                    </Button>
-                  </Stack>
-                </>
-              )}
-            </Box>
-          </Modal>
+                      {success}
+                    </Alert>
+                  )}
+                  {sending && <LinearProgress sx={{ mb: 2 }} />}
+                  {!customer.leaseFileUrl ? (
+                    <>
+                      <Typography variant="body1" mb={2}>
+                        No lease agreement found. Upload a new lease agreement
+                        (PDF only, max 5MB).
+                      </Typography>
+                      <FormControl fullWidth sx={{ mb: 2 }}>
+                        <InputLabel shrink htmlFor="lease-upload">
+                          Upload Lease Agreement
+                        </InputLabel>
+                        <input
+                          type="file"
+                          accept=".pdf"
+                          onChange={(e) => setLeaseFile(e.target.files[0])}
+                          id="lease-upload"
+                          style={{ marginTop: "16px" }}
+                        />
+                      </FormControl>
+                      <Stack direction="row" spacing={2}>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          onClick={handleLeaseUpload}
+                          disabled={sending || !leaseFile}
+                        >
+                          {sending ? "Uploading..." : "Upload Lease"}
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          onClick={() => setOpenLeaseModal(false)}
+                          disabled={sending}
+                          sx={{ color: theme.palette.secondary.contrastText }}
+                        >
+                          Cancel
+                        </Button>
+                      </Stack>
+                    </>
+                  ) : (
+                    <>
+                      <Typography variant="body1" mb={2}>
+                        Lease agreement exists. You can download it here.
+                      </Typography>
+                      <Stack direction="row" spacing={2}>
+                        <Button
+                          variant="contained"
+                          sx={{
+                            backgroundColor: theme.palette.greenAccent.main,
+                          }}
+                          onClick={handleLeaseDownload}
+                          disabled={sending}
+                        >
+                          {sending ? "Downloading..." : "Download Lease"}
+                        </Button>
+                        <Button
+                          variant="contained"
+                          color="error"
+                          onClick={handleTerminateLease}
+                          disabled={sending}
+                        >
+                          {sending ? "Processing..." : "Terminate Lease"}
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          onClick={() => setOpenLeaseModal(false)}
+                          disabled={sending}
+                          sx={{ color: theme.palette.secondary.contrastText }}
+                        >
+                          Cancel
+                        </Button>
+                      </Stack>
+                    </>
+                  )}
+                </Box>
+              </Modal>
 
-          <Dialog open={openTerminateDialog} onClose={() => setOpenTerminateDialog(false)}>
-            <DialogTitle>Confirm Lease Termination</DialogTitle>
-            <DialogContent>
-              <DialogContentText>
-                Are you sure you want to terminate the lease for {customer.fullName || "this customer"}?
-              </DialogContentText>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setOpenTerminateDialog(false)} disabled={sending}>
-                Cancel
-              </Button>
-              <Button
-                onClick={confirmTerminateLease}
-                color="error"
-                disabled={sending}
+              <Dialog
+                open={openTerminateDialog}
+                onClose={() => setOpenTerminateDialog(false)}
               >
-                {sending ? "Terminating..." : "Terminate"}
-              </Button>
-            </DialogActions>
-          </Dialog>
+                <DialogTitle>Confirm Lease Termination</DialogTitle>
+                <DialogContent>
+                  <DialogContentText>
+                    Are you sure you want to terminate the lease for{" "}
+                    {customer.fullName || "this customer"}?
+                  </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                  <Button
+                    onClick={() => setOpenTerminateDialog(false)}
+                    disabled={sending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={confirmTerminateLease}
+                    color="error"
+                    disabled={sending}
+                  >
+                    {sending ? "Terminating..." : "Terminate"}
+                  </Button>
+                </DialogActions>
+              </Dialog>
 
-          <Dialog open={openStatusModal} onClose={() => setOpenStatusModal(false)}>
-            <DialogTitle>Confirm Customer Activation</DialogTitle>
-            <DialogContent>
-              <DialogContentText>
-                Are you sure you want to activate customer {customer.fullName || "this customer"}? Make sure invoices for rent and deposits are paid.
-              </DialogContentText>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setOpenStatusModal(false)} color="primary" disabled={sending}>
-                Cancel
-              </Button>
-              <Button
-                onClick={updateCustomerStatus}
-                color="primary"
-                variant="contained"
-                disabled={sending}
+              <Dialog
+                open={openStatusModal}
+                onClose={() => setOpenStatusModal(false)}
               >
-                {sending ? "Activating..." : "Activate"}
-              </Button>
-            </DialogActions>
-          </Dialog>
+                <DialogTitle>Confirm Customer Activation</DialogTitle>
+                <DialogContent>
+                  <DialogContentText>
+                    Are you sure you want to activate customer{" "}
+                    {customer.fullName || "this customer"}? Make sure invoices
+                    for rent and deposits are paid.
+                  </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                  <Button
+                    onClick={() => setOpenStatusModal(false)}
+                    color="primary"
+                    disabled={sending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={updateCustomerStatus}
+                    color="primary"
+                    variant="contained"
+                    disabled={sending}
+                  >
+                    {sending ? "Activating..." : "Activate"}
+                  </Button>
+                </DialogActions>
+              </Dialog>
 
-          <Tabs
-            value={tabIndex}
-            onChange={handleTabChange}
-            sx={{ mt: 2, "& .MuiTab-root": { color: theme.palette.greenAccent.main } }}
-          >
-            <Tab label="Invoices" />
-            <Tab label="Payments" />
-            <Tab label="Gas Consumption" />
-            <Tab label="Water Consumption" />
-          </Tabs>
+              <Tabs
+                value={tabIndex}
+                onChange={handleTabChange}
+                sx={{
+                  mt: 2,
+                  "& .MuiTab-root": { color: theme.palette.greenAccent.main },
+                }}
+              >
+                <Tab label="Invoices" />
+                <Tab label="Payments" />
+                <Tab label="Gas Consumption" />
+                <Tab label="Water Consumption" />
+              </Tabs>
 
-          <Box hidden={tabIndex !== 0} sx={{ mt: 2, ml: 2 }}>
-            <Typography variant="h6" mb={2}>
-              Invoices
-            </Typography>
-            {customer.invoices?.length === 0 ? (
-              <Typography sx={{ color: theme.palette.grey[100], textAlign: "center", mt: 2 }}>
-                No invoices found.
-              </Typography>
-            ) : (
-              <DataGrid
-                rows={customer.invoices.map((invoice) => ({
-                  ...invoice,
-                  items: invoice.InvoiceItem || [], // Map InvoiceItem to items for DataGrid
-                })) || []}
-                columns={invoiceColumns}
-                pageSizeOptions={[5]}
-                getRowId={(row) => row.id}
-                autoHeight
-              />
-            )}
-          </Box>
+              <Box hidden={tabIndex !== 0} sx={{ mt: 2, ml: 2 }}>
+                <Typography variant="h6" mb={2}>
+                  Invoices
+                </Typography>
+                {customer.invoices?.length === 0 ? (
+                  <Typography
+                    sx={{
+                      color: theme.palette.grey[100],
+                      textAlign: "center",
+                      mt: 2,
+                    }}
+                  >
+                    No invoices found.
+                  </Typography>
+                ) : (
+                  <DataGrid
+                    rows={
+                      customer.invoices.map((invoice) => ({
+                        ...invoice,
+                        items: invoice.InvoiceItem || [], // Map InvoiceItem to items for DataGrid
+                      })) || []
+                    }
+                    columns={invoiceColumns}
+                    pageSizeOptions={[5]}
+                    getRowId={(row) => row.id}
+                    autoHeight
+                  />
+                )}
+              </Box>
 
-          <Box hidden={tabIndex !== 1} sx={{ mt: 2, ml: 2 }}>
-            <Typography variant="h6" mb={2}>
-              Payments
-            </Typography>
-            {customer.payments?.length === 0 ? (
-              <Typography sx={{ color: theme.palette.grey[100], textAlign: "center", mt: 2 }}>
-                No payment records found.
-              </Typography>
-            ) : (
-              <DataGrid
-                rows={customer.payments || []}
-                columns={paymentColumns}
-                pageSizeOptions={[5]}
-                getRowId={(row) => row.id}
-                autoHeight
-              />
-            )}
-          </Box>
+              <Box hidden={tabIndex !== 1} sx={{ mt: 2, ml: 2 }}>
+                <Typography variant="h6" mb={2}>
+                  Payments
+                </Typography>
+                {customer.payments?.length === 0 ? (
+                  <Typography
+                    sx={{
+                      color: theme.palette.grey[100],
+                      textAlign: "center",
+                      mt: 2,
+                    }}
+                  >
+                    No payment records found.
+                  </Typography>
+                ) : (
+                  <DataGrid
+                    rows={customer.payments || []}
+                    columns={paymentColumns}
+                    pageSizeOptions={[5]}
+                    getRowId={(row) => row.id}
+                    autoHeight
+                  />
+                )}
+              </Box>
 
-          <Box hidden={tabIndex !== 2} sx={{ mt: 2, ml: 2 }}>
-            <Typography variant="h6" mb={2}>
-              Gas Consumption
-            </Typography>
-            {customer.gasConsumptions?.length === 0 ? (
-              <Typography sx={{ color: theme.palette.grey[100], textAlign: "center", mt: 2 }}>
-                No gas consumption records found.
-              </Typography>
-            ) : (
-              <DataGrid
-                rows={customer.gasConsumptions || []}
-                columns={gasConsumptionColumns}
-                pageSizeOptions={[5]}
-                getRowId={(row) => row.id}
-                autoHeight
-              />
-            )}
-          </Box>
+              <Box hidden={tabIndex !== 2} sx={{ mt: 2, ml: 2 }}>
+                <Typography variant="h6" mb={2}>
+                  Gas Consumption
+                </Typography>
+                {customer.gasConsumptions?.length === 0 ? (
+                  <Typography
+                    sx={{
+                      color: theme.palette.grey[100],
+                      textAlign: "center",
+                      mt: 2,
+                    }}
+                  >
+                    No gas consumption records found.
+                  </Typography>
+                ) : (
+                  <DataGrid
+                    rows={customer.gasConsumptions || []}
+                    columns={gasConsumptionColumns}
+                    pageSizeOptions={[5]}
+                    getRowId={(row) => row.id}
+                    autoHeight
+                  />
+                )}
+              </Box>
 
-          <Box hidden={tabIndex !== 3} sx={{ mt: 2, ml: 2 }}>
-            <Typography variant="h6" mb={2}>
-              Water Consumption
-            </Typography>
-            {customer.waterConsumptions?.length === 0 ? (
-              <Typography sx={{ color: theme.palette.grey[100], textAlign: "center", mt: 2 }}>
-                No water readings found.
-              </Typography>
-            ) : (
-              <DataGrid
-                rows={customer.waterConsumptions || []}
-                columns={waterConsumptionColumns}
-                pageSizeOptions={[5, 10, 20]}
-                getRowId={(row) => row.id}
-                autoHeight
-              />
-            )}
-          </Box>
+              <Box hidden={tabIndex !== 3} sx={{ mt: 2, ml: 2 }}>
+                <Typography variant="h6" mb={2}>
+                  Water Consumption
+                </Typography>
+                {customer.waterConsumptions?.length === 0 ? (
+                  <Typography
+                    sx={{
+                      color: theme.palette.grey[100],
+                      textAlign: "center",
+                      mt: 2,
+                    }}
+                  >
+                    No water readings found.
+                  </Typography>
+                ) : (
+                  <DataGrid
+                    rows={customer.waterConsumptions || []}
+                    columns={waterConsumptionColumns}
+                    pageSizeOptions={[5, 10, 20]}
+                    getRowId={(row) => row.id}
+                    autoHeight
+                  />
+                )}
+              </Box>
+            </>
+          )}
         </>
       )}
     </Container>

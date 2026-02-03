@@ -29,12 +29,15 @@ const AddMeterModal = ({ open, onClose, onSaved }) => {
   const [connections, setConnections] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingConnections, setLoadingConnections] = useState(true);
+  const [error, setError] = useState("");
 
   // Fetch connections
   useEffect(() => {
     const fetchConnections = async () => {
       try {
-        const res = await axios.get(`${BASEURL}/connections`, { withCredentials: true });
+        const res = await axios.get(`${BASEURL}/connections`, {
+          withCredentials: true,
+        });
         setConnections(res.data || []);
       } catch (err) {
         console.error("Failed to fetch connections", err);
@@ -47,19 +50,20 @@ const AddMeterModal = ({ open, onClose, onSaved }) => {
   }, [BASEURL]);
 
   const handleSave = async () => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      return;
+    }
 
-    // Validation
     if (!serialNumber) {
-      alert("Serial Number is required");
+      setError("Serial Number is required");
       return;
     }
     if (!status) {
-      alert("Status is required");
+      setError("Status is required");
       return;
     }
-
     setLoading(true);
+    setError("");
     try {
       await axios.post(
         `${BASEURL}/meter`,
@@ -72,7 +76,7 @@ const AddMeterModal = ({ open, onClose, onSaved }) => {
           meterSize: meterSize === "" ? undefined : Number(meterSize),
           connectionId: connectionId === "" ? undefined : Number(connectionId),
         },
-        { withCredentials: true }
+        { withCredentials: true },
       );
 
       // Reset form
@@ -85,19 +89,19 @@ const AddMeterModal = ({ open, onClose, onSaved }) => {
       setConnectionId("");
 
       onSaved?.(); // refresh table
-      onClose();   // close modal
+      onClose(); // close modal
     } catch (err) {
       console.error(err);
-      alert("Failed to save meter");
+      setError("Failed to save meter");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Add Meter</DialogTitle>
+    <Dialog open={open} onClose={onClose}>
       <DialogContent>
+        {error && <div style={{ color: "red", marginBottom: 8 }}>{error}</div>}
         <Grid container spacing={2} mt={0.5}>
           {/* Serial Number - mandatory */}
           <Grid item xs={12} sm={6}>
@@ -160,7 +164,9 @@ const AddMeterModal = ({ open, onClose, onSaved }) => {
               required
             >
               {["installed", "removed", "faulty", "inactive"].map((s) => (
-                <MenuItem key={s} value={s}>{s}</MenuItem>
+                <MenuItem key={s} value={s}>
+                  {s}
+                </MenuItem>
               ))}
             </TextField>
           </Grid>
@@ -173,7 +179,9 @@ const AddMeterModal = ({ open, onClose, onSaved }) => {
               size="small"
               label="Size"
               value={meterSize}
-              onChange={(e) => setMeterSize(e.target.value ? Number(e.target.value) : "")}
+              onChange={(e) =>
+                setMeterSize(e.target.value ? Number(e.target.value) : "")
+              }
             />
           </Grid>
 
@@ -223,4 +231,3 @@ AddMeterModal.propTypes = {
 };
 
 export default AddMeterModal;
-

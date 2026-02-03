@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Box,
   Typography,
@@ -10,26 +10,41 @@ import {
   IconButton,
   useMediaQuery,
   Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  DialogContentText,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
-import { Add, Refresh, Visibility } from "@mui/icons-material";
-import axios from "axios";
+import {
+  Add,
+  Refresh,
+  Visibility,
+  Cancel,
+  CheckCircle,
+} from "@mui/icons-material";
 import dayjs from "dayjs";
+import { toast } from "react-toastify";
 
 import AssignTaskDialog from "../../components/tasks/createTasks";
 import TaskDetails from "../../components/tasks/tasksDetails";
 import { getTheme } from "../../store/theme";
-
-const API_URL = import.meta.env.VITE_BASE_URL;
+import apiClient from "../../services/apiClient";
+import {
+  PermissionDeniedUI,
+  isPermissionDenied,
+} from "../../utils/permissionHelper";
 
 const TaskBoard = () => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
-const [paginationModel, setPaginationModel] = useState({
-  page: 0,
-  pageSize: 10,
-});
+  const [paginationModel, setPaginationModel] = useState({
+    page: 0,
+    pageSize: 10,
+  });
 
   const [totalItems, setTotalItems] = useState(0);
 
@@ -41,6 +56,11 @@ const [paginationModel, setPaginationModel] = useState({
   const [selectedTask, setSelectedTask] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState(null);
+
+  // Complete & Cancel dialogs
+  const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const theme = getTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -66,7 +86,7 @@ const [paginationModel, setPaginationModel] = useState({
       IN_PROGRESS: "primary",
       COMPLETED: "success",
       FAILED: "error",
-    }[status] || "default");
+    })[status] || "default";
 
   const getPriorityColor = (priority) =>
     ({
@@ -74,39 +94,47 @@ const [paginationModel, setPaginationModel] = useState({
       MEDIUM: "warning",
       LOW: "success",
       CRITICAL: "secondary",
-    }[priority] || "default");
+    })[priority] || "default";
 
   /* --------------------------------------
    * 📦 Fetch Tasks (SERVER search + pagination)
    * ------------------------------------ */
 
+  const fetchTasks = useCallback(async () => {
+    setLoading(true);
 
-const fetchTasks = useCallback(async () => {
-  setLoading(true);
+    try {
+      const response = await apiClient.get("/get-tasks", {
+        params: {
+          page: paginationModel.page + 1, // API is 1-based
+          limit: paginationModel.pageSize,
+          status: filter.status || undefined,
+          q: filter.search?.trim() || undefined,
+        },
+      });
 
-  try {
-    const response = await axios.get(`${API_URL}/get-tasks`, {
-      withCredentials: true,
-      params: {
-        page: paginationModel.page + 1, // API is 1-based
-        limit: paginationModel.pageSize,
-        status: filter.status || undefined,
-        q: filter.search?.trim() || undefined,
-      },
-    });
+      const { data, pagination } = response.data;
 
-
-    const { data, pagination } = response.data;
-
-    setTasks(data.map(flattenTask));
-    setTotalItems(pagination.totalItems);
-  } catch (error) {
-    console.error("Error fetching tasks:", error);
-  } finally {
-    setLoading(false);
-  }
-}, [paginationModel.page, paginationModel.pageSize, filter.status, filter.search]);
-
+      setTasks(data.map(flattenTask));
+      setTotalItems(pagination.totalItems);
+      setPermissionDenied(false);
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
+      if (isPermissionDenied(error)) {
+        setPermissionDenied(true);
+        setTasks([]);
+      } else {
+        toast.error("Failed to load tasks");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    paginationModel.page,
+    paginationModel.pageSize,
+    filter.status,
+    filter.search,
+  ]);
 
   /* --------------------------------------
    * 🔍 Task Details
@@ -115,9 +143,7 @@ const fetchTasks = useCallback(async () => {
     setDetailsLoading(true);
     setDetailsError(null);
     try {
-      const response = await axios.get(`${API_URL}/get-task/${taskId}`, {
-        withCredentials: true,
-      });
+      const response = await apiClient.get(`/get-task/${taskId}`);
 
       if (response.data.success) {
         setSelectedTask(response.data.data);
@@ -131,25 +157,23 @@ const fetchTasks = useCallback(async () => {
     }
   };
 
-useEffect(() => {
-  fetchTasks();
-}, [
-  fetchTasks,              // ← keep this (it's stable thanks to useCallback)
-  paginationModel.page,    // important triggers
-  paginationModel.pageSize,
-  filter.status,
-  filter.search
-]);
+  useEffect(() => {
+    fetchTasks();
+  }, [
+    fetchTasks, // ← keep this (it's stable thanks to useCallback)
+    paginationModel.page, // important triggers
+    paginationModel.pageSize,
+    filter.status,
+    filter.search,
+  ]);
 
   /* --------------------------------------
    * 🧭 Handlers
    * ------------------------------------ */
-const handleSearch = (e) => {
-  setFilter((prev) => ({ ...prev, search: e.target.value }));
-  setPaginationModel((prev) => ({ ...prev, page: 0 }));
-};
-
-
+  const handleSearch = (e) => {
+    setFilter((prev) => ({ ...prev, search: e.target.value }));
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  };
 
   const openAssignDialog = (taskId = null) => {
     setSelectedTaskId(taskId);
@@ -183,24 +207,122 @@ const handleSearch = (e) => {
   };
 
   /* --------------------------------------
+   * ❌ Cancel Task
+   * ------------------------------------ */
+  const handleCancelTask = async () => {
+    if (!selectedTaskId) {
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const response = await apiClient.patch(
+        `/tasks/${selectedTaskId}/cancel`,
+        {},
+      );
+
+      if (response.data.success) {
+        toast.success("Task cancelled successfully");
+        setCancelDialogOpen(false);
+        fetchTasks();
+        if (selectedTask) {
+          fetchTaskDetails(selectedTaskId); // Refresh details
+        }
+      }
+    } catch (error) {
+      console.error("Error cancelling task:", error);
+      toast.error(error.response?.data?.message || "Failed to cancel task");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  /* --------------------------------------
+   * ✅ Complete Task
+   * ------------------------------------ */
+  const handleCompleteTask = async () => {
+    if (!selectedTaskId) {
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const response = await apiClient.patch(
+        `/tasks/${selectedTaskId}/complete`,
+        {},
+      );
+
+      if (response.data.success) {
+        toast.success("Task completed successfully");
+        setCompleteDialogOpen(false);
+        fetchTasks();
+        if (selectedTask) {
+          fetchTaskDetails(selectedTaskId); // Refresh details
+        }
+      }
+    } catch (error) {
+      console.error("Error completing task:", error);
+      toast.error(error.response?.data?.message || "Failed to complete task");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  /* --------------------------------------
    * 📊 Columns
    * ------------------------------------ */
   const columns = [
     {
       field: "actions",
-      headerName: "View",
-      width: 60,
+      headerName: "Actions",
+      width: 150,
       align: "center",
       renderCell: (params) => (
-        <IconButton
-          color="primary"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleSelectTask(params?.row?.id);
-          }}
-        >
-          <Visibility />
-        </IconButton>
+        <Box sx={{ display: "flex", gap: 0.5 }}>
+          <IconButton
+            color="primary"
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleSelectTask(params?.row?.id);
+            }}
+            title="View Details"
+          >
+            <Visibility fontSize="small" />
+          </IconButton>
+          <IconButton
+            color="success"
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedTaskId(params?.row?.id);
+              setCompleteDialogOpen(true);
+            }}
+            disabled={
+              params?.row?.status === "CANCELLED" ||
+              params?.row?.status === "COMPLETED"
+            }
+            title="Mark as Complete"
+          >
+            <CheckCircle fontSize="small" />
+          </IconButton>
+          <IconButton
+            color="warning"
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedTaskId(params?.row?.id);
+              setCancelDialogOpen(true);
+            }}
+            disabled={
+              params?.row?.status === "CANCELLED" ||
+              params?.row?.status === "COMPLETED"
+            }
+            title="Cancel Task"
+          >
+            <Cancel fontSize="small" />
+          </IconButton>
+        </Box>
       ),
     },
     { field: "title", headerName: "Title", width: 200 },
@@ -235,17 +357,25 @@ const handleSearch = (e) => {
       field: "dueDate",
       headerName: "Due Date",
       width: 150,
-      valueGetter: (params) =>
-        params?.row?.dueDate
-          ? dayjs(params?.row?.dueDate).format("MMM D, YYYY")
-          : "-",
+      renderCell: (params) => {
+        const dueDate = params?.row?.dueDate;
+        if (!dueDate) {
+          return "-";
+        }
+        return dayjs(dueDate).format("MMM D, YYYY");
+      },
     },
     {
       field: "createdAt",
       headerName: "Created At",
       width: 150,
-      valueGetter: (params) =>
-        dayjs(params?.row?.createdAt).format("MMM D, YYYY"),
+      renderCell: (params) => {
+        const createdAt = params?.row?.createdAt;
+        if (!createdAt) {
+          return "-";
+        }
+        return dayjs(createdAt).format("MMM D, YYYY");
+      },
     },
   ];
 
@@ -263,126 +393,203 @@ const handleSearch = (e) => {
         maxWidth: "100vw",
       }}
     >
-      {/* Left Side */}
-      <Box
-        sx={{
-          flex: isMobile ? "1" : selectedTask ? "0 0 50%" : "1",
-          transition: "flex 0.3s ease",
-        }}
-      >
-        <Box display="flex" justifyContent="space-between" mb={3}>
-          <Typography variant="h6" fontWeight="bold">
-            Task Board
-          </Typography>
-          <Box>
-            <Button
-              variant="contained"
-              startIcon={<Add />}
-              sx={{ mr: 2 }}
-              onClick={() => openAssignDialog()}
-            >
-              Create Task
-            </Button>
-            <Button variant="outlined" startIcon={<Refresh />} onClick={fetchTasks}>
-              Refresh
-            </Button>
-          </Box>
-        </Box>
-
-        {/* Filters */}
-        <Box display="flex" gap={1} mb={3}>
-          <TextField
-            label="Search Task"
-            size="small"
-            value={filter.search}
-            onChange={handleSearch}
-            sx={{ width: 250 }}
-          />
-          <TextField
-            select
-            label="Status"
-            size="small"
-            value={filter.status}
-            onChange={(e) => {
-              setFilter((prev) => ({ ...prev, status: e.target.value }));
-              setPaginationModel((prev) => ({ ...prev, page: 0 }));
+      {permissionDenied ? (
+        <PermissionDeniedUI permission="tasks:view" />
+      ) : (
+        <>
+          {/* Left Side */}
+          <Box
+            sx={{
+              flex: isMobile ? "1" : selectedTask ? "0 0 50%" : "1",
+              transition: "flex 0.3s ease",
             }}
-            sx={{ width: 200 }}
           >
-            <MenuItem value="">All</MenuItem>
-            {["PENDING", "ASSIGNED", "IN_PROGRESS", "COMPLETED", "FAILED"].map(
-              (status) => (
-                <MenuItem key={status} value={status}>
-                  {status}
-                </MenuItem>
-              )
-            )}
-          </TextField>
-        </Box>
-
-        <Paper sx={{ p: 1, height: "calc(100% - 120px)" }}>
-          {loading ? (
-            <Box display="flex" justifyContent="center" p={5}>
-              <CircularProgress />
+            <Box display="flex" justifyContent="space-between" mb={3}>
+              <Typography variant="h6" fontWeight="bold">
+                Task Board
+              </Typography>
+              <Box sx={{ display: "flex", gap: 1 }}>
+                <Button
+                  variant="contained"
+                  startIcon={<Add />}
+                  onClick={() => openAssignDialog()}
+                >
+                  Create Task
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<Refresh />}
+                  onClick={fetchTasks}
+                >
+                  Refresh
+                </Button>
+              </Box>
             </Box>
-          ) : (
-   <DataGrid
-  rows={tasks}
-  columns={columns}
-  loading={loading}
-  paginationMode="server"
-  rowCount={totalItems}
 
-  paginationModel={paginationModel}
-  onPaginationModelChange={setPaginationModel}
+            {/* Filters */}
+            <Box display="flex" gap={1} mb={3}>
+              <TextField
+                label="Search Task"
+                size="small"
+                value={filter.search}
+                onChange={handleSearch}
+                sx={{ width: 250 }}
+              />
+              <TextField
+                select
+                label="Status"
+                size="small"
+                value={filter.status}
+                onChange={(e) => {
+                  setFilter((prev) => ({ ...prev, status: e.target.value }));
+                  setPaginationModel((prev) => ({ ...prev, page: 0 }));
+                }}
+                sx={{ width: 200 }}
+              >
+                <MenuItem value="">All</MenuItem>
+                {[
+                  "PENDING",
+                  "ASSIGNED",
+                  "IN_PROGRESS",
+                  "COMPLETED",
+                  "FAILED",
+                ].map((status) => (
+                  <MenuItem key={status} value={status}>
+                    {status}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Box>
 
-  pageSizeOptions={[10, 25, 50]}
-  getRowId={(row) => row.id}
-  disableSelectionOnClick
-  sx={{ height: "100%" }}
-/>
-
-
-          )}
-        </Paper>
-      </Box>
-
-      {/* Right Side */}
-      <Box
-        sx={{
-          flex: isMobile ? "1" : selectedTask ? "0 0 500px" : "0 0 0",
-          transition: "flex 0.3s ease",
-          overflow: "auto",
-          display: selectedTask || isMobile ? "block" : "none",
-        }}
-      >
-        {detailsLoading ? (
-          <Box display="flex" justifyContent="center" p={5}>
-            <CircularProgress />
+            <Paper sx={{ p: 1, height: "calc(100% - 120px)" }}>
+              {loading ? (
+                <Box display="flex" justifyContent="center" p={5}>
+                  <CircularProgress />
+                </Box>
+              ) : (
+                <DataGrid
+                  rows={tasks}
+                  columns={columns}
+                  loading={loading}
+                  paginationMode="server"
+                  rowCount={totalItems}
+                  paginationModel={paginationModel}
+                  onPaginationModelChange={setPaginationModel}
+                  pageSizeOptions={[10, 25, 50]}
+                  getRowId={(row) => row.id}
+                  disableSelectionOnClick
+                  sx={{ height: "100%" }}
+                />
+              )}
+            </Paper>
           </Box>
-        ) : detailsError ? (
-          <Box sx={{ p: 3 }}>
-            <Typography color="error">{detailsError}</Typography>
-            <Button onClick={handleCloseDetails} sx={{ mt: 2 }}>
-              Close
-            </Button>
-          </Box>
-        ) : selectedTask ? (
-          <TaskDetails task={selectedTask} onClose={handleCloseDetails} />
-        ) : (
-          <Box sx={{ p: 3 }}>
-            <Typography>Select a task to view details</Typography>
-          </Box>
-        )}
-      </Box>
 
-      <AssignTaskDialog
-        open={assignDialogOpen}
-        onClose={closeAssignDialog}
-        taskId={selectedTaskId}
-        onAssigned={handleAssigned}
-        theme={theme}
-      />
+          {/* Right Side */}
+          <Box
+            sx={{
+              flex: isMobile ? "1" : selectedTask ? "0 0 500px" : "0 0 0",
+              transition: "flex 0.3s ease",
+              overflow: "auto",
+              display: selectedTask || isMobile ? "block" : "none",
+            }}
+          >
+            {detailsLoading ? (
+              <Box display="flex" justifyContent="center" p={5}>
+                <CircularProgress />
+              </Box>
+            ) : detailsError ? (
+              <Box sx={{ p: 3 }}>
+                <Typography color="error">{detailsError}</Typography>
+                <Button onClick={handleCloseDetails} sx={{ mt: 2 }}>
+                  Close
+                </Button>
+              </Box>
+            ) : selectedTask ? (
+              <TaskDetails task={selectedTask} onClose={handleCloseDetails} />
+            ) : (
+              <Box sx={{ p: 3 }}>
+                <Typography>Select a task to view details</Typography>
+              </Box>
+            )}
+          </Box>
+
+          <AssignTaskDialog
+            open={assignDialogOpen}
+            onClose={closeAssignDialog}
+            taskId={selectedTaskId}
+            onAssigned={handleAssigned}
+            theme={theme}
+          />
+
+          {/* Complete Task Dialog */}
+          <Dialog
+            open={completeDialogOpen}
+            onClose={() => !actionLoading && setCompleteDialogOpen(false)}
+          >
+            <DialogTitle>Complete Task</DialogTitle>
+            <DialogContent>
+              <DialogContentText>
+                Are you sure you want to mark this task as completed? This
+                action will set the task status to COMPLETED.
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+              <Button
+                onClick={() => setCompleteDialogOpen(false)}
+                disabled={actionLoading}
+              >
+                No, Keep Pending
+              </Button>
+              <Button
+                onClick={handleCompleteTask}
+                color="success"
+                variant="contained"
+                disabled={actionLoading}
+              >
+                {actionLoading ? (
+                  <CircularProgress size={20} />
+                ) : (
+                  "Yes, Mark Complete"
+                )}
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Cancel Task Dialog */}
+          <Dialog
+            open={cancelDialogOpen}
+            onClose={() => !actionLoading && setCancelDialogOpen(false)}
+          >
+            <DialogTitle>Cancel Task</DialogTitle>
+            <DialogContent>
+              <DialogContentText>
+                Are you sure you want to cancel this task? This action will set
+                the task status to CANCELLED.
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+              <Button
+                onClick={() => setCancelDialogOpen(false)}
+                disabled={actionLoading}
+              >
+                No, Keep Task
+              </Button>
+              <Button
+                onClick={handleCancelTask}
+                color="warning"
+                variant="contained"
+                disabled={actionLoading}
+              >
+                {actionLoading ? (
+                  <CircularProgress size={20} />
+                ) : (
+                  "Yes, Cancel Task"
+                )}
+              </Button>
+            </DialogActions>
+          </Dialog>
+        </>
+      )}
     </Box>
   );
 };

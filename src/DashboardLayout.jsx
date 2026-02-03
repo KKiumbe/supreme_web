@@ -1,14 +1,12 @@
 import { AppBar, Toolbar, IconButton, Typography } from "@mui/material";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
-import {useThemeStore} from "./store/authStore";
-
-
+import { useThemeStore } from "./store/theme";
 
 const DashboardLayout = () => {
-   const darkMode = useThemeStore((state) => state.darkMode);
+  const darkMode = useThemeStore((state) => state.darkMode);
 
-   const toggleTheme = useThemeStore((state) => state.toggleTheme);
+  const toggleTheme = useThemeStore((state) => state.toggleTheme);
 
   return (
     <AppBar position="static">

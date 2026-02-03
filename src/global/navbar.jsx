@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   AppBar,
   Toolbar,
@@ -9,6 +9,7 @@ import {
   Drawer,
   List,
   ListItem,
+  ListItemButton,
   ListItemText,
   Divider,
   TextField,
@@ -16,9 +17,15 @@ import {
   Alert,
   Badge,
 } from "@mui/material";
-import { AccountCircle, Menu as MenuIcon, Edit, Notifications } from "@mui/icons-material";
+import {
+  AccountCircle,
+  Menu as MenuIcon,
+  Edit,
+  Notifications,
+} from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
-import { useAuthStore, useThemeStore } from "../store/authStore";
+import { useAuthStore } from "../store/authStore";
+import { useThemeStore } from "../store/theme";
 import axios from "axios";
 import { getTheme } from "../store/theme";
 
@@ -51,20 +58,22 @@ export default function Navbar() {
     password: "",
     confirmPassword: "",
   });
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
   const BASEURL = import.meta.env.VITE_BASE_URL;
   const theme = getTheme(darkMode ? "dark" : "light");
 
-
   useEffect(() => {
-  if (!currentUser) {
-    navigate("/login");
-  }
-}, [currentUser]);
-
+    if (!currentUser) {
+      navigate("/login");
+    }
+  }, [currentUser]);
 
   // Mock notifications (replace with API call when ready)
   useEffect(() => {
@@ -80,30 +89,57 @@ export default function Navbar() {
 
     const attemptFetch = async (attempt) => {
       try {
-        const response = await axios.get(`${BASEURL}/get-sms-balance`, { withCredentials: true });
+        const response = await axios.get(`${BASEURL}/get-sms-balance`, {
+          withCredentials: true,
+        });
         setSMS(response.data.credit);
         setSmsLoading(false);
         return true;
       } catch (error) {
         console.error(`SMS balance fetch attempt ${attempt}:`, error);
-        if (attempt < retries && error.response?.status !== 401) {
+
+        // Handle 403 (Forbidden/No permission) - silently hide SMS balance
+        if (error.response?.status === 403) {
+          setSMS(null);
+          setSmsLoading(false);
+          setSmsError(true);
+          return false;
+        }
+
+        // Retry logic for other errors
+        if (
+          attempt < retries &&
+          error.response?.status !== 401 &&
+          error.response?.status !== 403
+        ) {
           await new Promise((resolve) => setTimeout(resolve, delay));
           return attemptFetch(attempt + 1);
         }
+
+        // Handle 401 (Unauthorized) - redirect to login
+        if (error.response?.status === 401) {
+          setSnackbar({
+            open: true,
+            message: "Session expired. Please log in again.",
+            severity: "error",
+          });
+          setSMS(null);
+          setSmsLoading(false);
+          setSmsError(true);
+          logout();
+          navigate("/login");
+          return false;
+        }
+
+        // Handle other errors - show error message
         const errorMessage =
-          error.response?.status === 401
-            ? "Session expired. Please log in again."
-            : error.response?.status === 500
+          error.response?.status === 500
             ? "Server error. SMS balance unavailable."
             : error.response?.data?.message || "Failed to fetch SMS balance.";
         setSnackbar({ open: true, message: errorMessage, severity: "error" });
-        setSMS(null); // Set to null to hide the SMS balance section
+        setSMS(null);
         setSmsLoading(false);
         setSmsError(true);
-        if (error.response?.status === 401) {
-          logout();
-          navigate("/login");
-        }
         return false;
       }
     };
@@ -163,13 +199,27 @@ export default function Navbar() {
   };
 
   const handleUpdateUser = async () => {
-    const { firstName, email, phoneNumber, currentPassword, password, confirmPassword } = userDetails;
+    const {
+      firstName,
+      email,
+      phoneNumber,
+      currentPassword,
+      password,
+      confirmPassword,
+    } = userDetails;
 
     if (!firstName || !email) {
-      setSnackbar({ open: true, message: "First name and email are required", severity: "error" });
+      setSnackbar({
+        open: true,
+        message: "First name and email are required",
+        severity: "error",
+      });
       return;
     }
-    if ((currentPassword || password || confirmPassword) && (!currentPassword || !password)) {
+    if (
+      (currentPassword || password || confirmPassword) &&
+      (!currentPassword || !password)
+    ) {
       setSnackbar({
         open: true,
         message: "Current and new passwords are required to change password",
@@ -178,27 +228,49 @@ export default function Navbar() {
       return;
     }
     if (password && password !== confirmPassword) {
-      setSnackbar({ open: true, message: "New passwords do not match", severity: "error" });
+      setSnackbar({
+        open: true,
+        message: "New passwords do not match",
+        severity: "error",
+      });
       return;
     }
     if (password && password.length < 6) {
-      setSnackbar({ open: true, message: "New password must be at least 6 characters", severity: "error" });
+      setSnackbar({
+        open: true,
+        message: "New password must be at least 6 characters",
+        severity: "error",
+      });
       return;
     }
 
     const payload = {};
-    if (firstName) payload.firstName = firstName;
-    if (userDetails.lastName) payload.lastName = userDetails.lastName;
-    if (email) payload.email = email;
-    if (phoneNumber) payload.phoneNumber = phoneNumber;
+    if (firstName) {
+      payload.firstName = firstName;
+    }
+    if (userDetails.lastName) {
+      payload.lastName = userDetails.lastName;
+    }
+    if (email) {
+      payload.email = email;
+    }
+    if (phoneNumber) {
+      payload.phoneNumber = phoneNumber;
+    }
     if (currentPassword && password) {
       payload.currentPassword = currentPassword;
       payload.password = password;
     }
 
     try {
-      const response = await axios.put(`${BASEURL}/update-user`, payload, { withCredentials: true });
-      setSnackbar({ open: true, message: "Profile updated successfully", severity: "success" });
+      const response = await axios.put(`${BASEURL}/update-user`, payload, {
+        withCredentials: true,
+      });
+      setSnackbar({
+        open: true,
+        message: "Profile updated successfully",
+        severity: "success",
+      });
       setEditMode(false);
       if (response) {
         navigate("/login");
@@ -207,14 +279,23 @@ export default function Navbar() {
       console.error("Error updating profile:", error);
       setSnackbar({
         open: true,
-        message: "Error updating profile: " + (error.response?.data?.message || error.message),
+        message:
+          "Error updating profile: " +
+          (error.response?.data?.message || error.message),
         severity: "error",
       });
     }
   };
 
   const notificationDrawer = (
-    <Box sx={{ width: 300, bgcolor: darkMode ? "#333" : "#fff", color: darkMode ? "#fff" : "#000", p: 2 }}>
+    <Box
+      sx={{
+        width: 300,
+        bgcolor: darkMode ? "#333" : "#fff",
+        color: darkMode ? "#fff" : "#000",
+        p: 2,
+      }}
+    >
       <Typography variant="h6" gutterBottom>
         Notifications
       </Typography>
@@ -228,7 +309,11 @@ export default function Navbar() {
               <ListItemText
                 primary={notification.message}
                 secondary={new Date(notification.createdAt).toLocaleString()}
-                sx={{ color: notification.read ? theme.palette.grey[500] : theme.palette.grey[100] }}
+                sx={{
+                  color: notification.read
+                    ? theme.palette.grey[500]
+                    : theme.palette.grey[100],
+                }}
               />
             </ListItem>
           ))}
@@ -238,8 +323,22 @@ export default function Navbar() {
   );
 
   const profileDrawer = (
-    <Box sx={{ width: 300, bgcolor: darkMode ? "#333" : "#fff", color: darkMode ? "#fff" : "#000", p: 2 }}>
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+    <Box
+      sx={{
+        width: 300,
+        bgcolor: darkMode ? "#333" : "#fff",
+        color: darkMode ? "#fff" : "#000",
+        p: 2,
+      }}
+    >
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          mb: 2,
+        }}
+      >
         <Typography variant="h6">Profile</Typography>
         <IconButton
           onClick={handleEditToggle}
@@ -335,7 +434,11 @@ export default function Navbar() {
                   variant="contained"
                   onClick={handleUpdateUser}
                   fullWidth
-                  sx={{ mb: 1, bgcolor: theme.palette.greenAccent.main, color: "#fff" }}
+                  sx={{
+                    mb: 1,
+                    bgcolor: theme.palette.greenAccent.main,
+                    color: "#fff",
+                  }}
                 >
                   Save Changes
                 </Button>
@@ -345,7 +448,10 @@ export default function Navbar() {
                   variant="outlined"
                   onClick={handleEditToggle}
                   fullWidth
-                  sx={{ color: theme.palette.grey[300], borderColor: theme.palette.grey[300] }}
+                  sx={{
+                    color: theme.palette.grey[300],
+                    borderColor: theme.palette.grey[300],
+                  }}
                 >
                   Cancel
                 </Button>
@@ -353,9 +459,7 @@ export default function Navbar() {
             </>
           ) : (
             <>
-              <ListItem>
-                <ListItemText primary="Tenant" secondary={currentUser.tenant?.name || "Unknown"} />
-              </ListItem>
+              <ListItem></ListItem>
               <ListItem>
                 <ListItemText
                   primary="Name"
@@ -363,23 +467,38 @@ export default function Navbar() {
                 />
               </ListItem>
               <ListItem>
-                <ListItemText primary="Email" secondary={currentUser.email || "N/A"} />
+                <ListItemText
+                  primary="Email"
+                  secondary={currentUser.email || "N/A"}
+                />
               </ListItem>
               <ListItem>
-                <ListItemText primary="Phone" secondary={currentUser.phoneNumber || "N/A"} />
+                <ListItemText
+                  primary="Phone"
+                  secondary={currentUser.phoneNumber || "N/A"}
+                />
               </ListItem>
               <ListItem>
-                <ListItemText primary="Gender" secondary={currentUser.gender || "N/A"} />
+                <ListItemText
+                  primary="Gender"
+                  secondary={currentUser.gender || "N/A"}
+                />
               </ListItem>
               <ListItem>
-                <ListItemText primary="County" secondary={currentUser.county || "N/A"} />
+                <ListItemText
+                  primary="County"
+                  secondary={currentUser.county || "N/A"}
+                />
               </ListItem>
               <ListItem>
-                <ListItemText primary="Town" secondary={currentUser.town || "N/A"} />
+                <ListItemText
+                  primary="Town"
+                  secondary={currentUser.town || "N/A"}
+                />
               </ListItem>
-              <ListItem button onClick={handleLogout}>
+              <ListItemButton onClick={handleLogout}>
                 <ListItemText primary="Logout" />
-              </ListItem>
+              </ListItemButton>
             </>
           )}
         </List>
@@ -390,18 +509,25 @@ export default function Navbar() {
   );
 
   const mobileDrawer = (
-    <Box sx={{ width: 250, bgcolor: darkMode ? "#333" : "#fff", color: darkMode ? "#fff" : "#000", p: 2 }}>
+    <Box
+      sx={{
+        width: 250,
+        bgcolor: darkMode ? "#333" : "#fff",
+        color: darkMode ? "#fff" : "#000",
+        p: 2,
+      }}
+    >
       <Typography variant="h6" gutterBottom>
         Menu
       </Typography>
       <Divider sx={{ mb: 2 }} />
       <List>
-        <ListItem button onClick={toggleTheme}>
+        <ListItemButton onClick={toggleTheme}>
           <ListItemText primary={darkMode ? "Dark Mode" : "Light Mode"} />
-        </ListItem>
-        <ListItem button onClick={handleLogout}>
+        </ListItemButton>
+        <ListItemButton onClick={handleLogout}>
           <ListItemText primary="Logout" />
-        </ListItem>
+        </ListItemButton>
       </List>
     </Box>
   );
@@ -409,7 +535,14 @@ export default function Navbar() {
   return (
     <>
       <style>{blinkKeyframes}</style>
-      <AppBar position="fixed" sx={{ width: "100%", zIndex: 1100, bgcolor: theme.palette.primary.main }}>
+      <AppBar
+        position="fixed"
+        sx={{
+          width: "100%",
+          zIndex: 1100,
+          bgcolor: theme.palette.primary.main,
+        }}
+      >
         <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
           <Box sx={{ display: "flex", alignItems: "center" }}>
             <IconButton
@@ -421,7 +554,11 @@ export default function Navbar() {
             >
               <MenuIcon />
             </IconButton>
-            <Typography variant="h6" sx={{ ml: { xs: 1, md: 2 }, color: theme.palette.grey[100] }} paddingLeft={10}>
+            <Typography
+              variant="h6"
+              sx={{ ml: { xs: 1, md: 2 }, color: theme.palette.grey[100] }}
+              paddingLeft={10}
+            >
               TAQA
             </Typography>
           </Box>
@@ -437,7 +574,9 @@ export default function Navbar() {
             <IconButton
               color="inherit"
               onClick={toggleTheme}
-              aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+              aria-label={
+                darkMode ? "Switch to light mode" : "Switch to dark mode"
+              }
             >
               {darkMode ? "🌙" : "☀️"}
             </IconButton>
@@ -465,7 +604,11 @@ export default function Navbar() {
               </Badge>
             </IconButton>
 
-            <IconButton color="inherit" onClick={handleProfileToggle} aria-label="Open profile">
+            <IconButton
+              color="inherit"
+              onClick={handleProfileToggle}
+              aria-label="Open profile"
+            >
               <AccountCircle />
             </IconButton>
 
@@ -485,10 +628,13 @@ export default function Navbar() {
         anchor="right"
         open={mobileOpen}
         onClose={handleDrawerToggle}
-        sx={{ display: { xs: "block", md: "none" }, "& .MuiDrawer-paper": { width: "250px" } }}
+        sx={{
+          display: { xs: "block", md: "none" },
+          "& .MuiDrawer-paper": { width: "250px" },
+        }}
         ModalProps={{
           keepMounted: true,
-          'aria-hidden': false,
+          "aria-hidden": false,
         }}
         aria-label="Mobile menu drawer"
       >
@@ -500,11 +646,15 @@ export default function Navbar() {
         open={notificationOpen}
         onClose={handleNotificationToggle}
         sx={{
-          "& .MuiDrawer-paper": { width: "300px", bgcolor: darkMode ? "#333" : "#fff", color: darkMode ? "#fff" : "#000" },
+          "& .MuiDrawer-paper": {
+            width: "300px",
+            bgcolor: darkMode ? "#333" : "#fff",
+            color: darkMode ? "#fff" : "#000",
+          },
         }}
         ModalProps={{
           keepMounted: true,
-          'aria-hidden': false,
+          "aria-hidden": false,
         }}
         aria-label="Notifications drawer"
       >
@@ -516,11 +666,15 @@ export default function Navbar() {
         open={profileOpen}
         onClose={handleProfileToggle}
         sx={{
-          "& .MuiDrawer-paper": { width: "300px", bgcolor: darkMode ? "#333" : "#fff", color: darkMode ? "#fff" : "#000" },
+          "& .MuiDrawer-paper": {
+            width: "300px",
+            bgcolor: darkMode ? "#333" : "#fff",
+            color: darkMode ? "#fff" : "#000",
+          },
         }}
         ModalProps={{
           keepMounted: true,
-          'aria-hidden': false,
+          "aria-hidden": false,
         }}
         aria-label="Profile drawer"
       >

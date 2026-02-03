@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
+  PermissionDeniedUI,
+  isPermissionDenied,
+} from "../../utils/permissionHelper";
+import {
   Box,
   Typography,
   Paper,
@@ -9,7 +13,7 @@ import {
   Grid,
   Autocomplete,
   MenuItem,
-  Skeleton
+  Skeleton,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import {
@@ -39,16 +43,17 @@ const useDebounce = (value, delay = 500) => {
    Screen
 ------------------------------------------------------- */
 const PaymentsScreen = () => {
-
   const navigate = useNavigate();
-  const currentUser = useAuthStore(state => state.currentUser);
+  const currentUser = useAuthStore((state) => state.currentUser);
   const BASEURL = import.meta.env.VITE_BASE_URL;
 
   /* -------------------------------------------------------
      Auth Guard
   ------------------------------------------------------- */
   useEffect(() => {
-    if (!currentUser) navigate("/login");
+    if (!currentUser) {
+      navigate("/login");
+    }
   }, [currentUser, navigate]);
 
   /* -------------------------------------------------------
@@ -57,6 +62,7 @@ const PaymentsScreen = () => {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   const [pagination, setPagination] = useState({
     page: 1,
@@ -111,10 +117,22 @@ const PaymentsScreen = () => {
         totalCount: res.data.totalCount,
         totalPages: res.data.totalPages,
       });
+      setPermissionDenied(false);
     } catch (err) {
       console.error("Failed to fetch payments:", err);
-      setError(err.response?.data?.message || "Failed to load payments");
-      setPayments([]);
+      if (isPermissionDenied(err)) {
+        setPermissionDenied(true);
+        setPayments([]);
+        setPagination({
+          page: 1,
+          pageSize: 10,
+          totalCount: 0,
+          totalPages: 1,
+        });
+      } else {
+        setError(err.response?.data?.message || "Failed to load payments");
+        setPayments([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -135,13 +153,13 @@ const PaymentsScreen = () => {
   ------------------------------------------------------- */
   const handleSearch = (_, value) => {
     setSearch(value ?? "");
-    setPagination(prev => ({ ...prev, page: 1 }));
+    setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
   const handleReset = () => {
     setSearch("");
     setModeOfPayment("");
-    setPagination(prev => ({ ...prev, page: 1 }));
+    setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
   const exportToCSV = (data, filename) => {
@@ -154,7 +172,7 @@ const PaymentsScreen = () => {
       "Created At",
     ];
 
-    const rows = data.map(p =>
+    const rows = data.map((p) =>
       [
         p.amount,
         p.modeOfPayment,
@@ -163,8 +181,8 @@ const PaymentsScreen = () => {
         p.ref || "-",
         p.createdAt,
       ]
-        .map(v => `"${v}"`)
-        .join(",")
+        .map((v) => `"${v}"`)
+        .join(","),
     );
 
     const csv = [headers.join(","), ...rows].join("\n");
@@ -183,7 +201,7 @@ const PaymentsScreen = () => {
   ------------------------------------------------------- */
   const normalizedPayments = useMemo(
     () =>
-      payments.map(p => ({
+      payments.map((p) => ({
         id: p.id,
         amount: `KES ${Number(p.amount).toLocaleString()}`,
         modeOfPayment: p.modeOfPayment,
@@ -192,7 +210,7 @@ const PaymentsScreen = () => {
         ref: p.ref ?? "-",
         createdAt: new Date(p.createdAt).toLocaleString(),
       })),
-    [payments]
+    [payments],
   );
 
   /* -------------------------------------------------------
@@ -207,7 +225,7 @@ const PaymentsScreen = () => {
       { field: "ref", headerName: "Reference", width: 120 },
       { field: "createdAt", headerName: "Created At", width: 200 },
     ],
-    []
+    [],
   );
 
   /* -------------------------------------------------------
@@ -215,123 +233,132 @@ const PaymentsScreen = () => {
   ------------------------------------------------------- */
   return (
     <Box sx={{ p: 3, minHeight: "100vh" }}>
-      {/* Header */}
-      <Grid container justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h5" fontWeight="bold">
-          Payments
-        </Typography>
-        <Tooltip title="Export CSV">
-          <IconButton
-            onClick={() =>
-              exportToCSV(normalizedPayments, "payments.csv")
-            }
+      {permissionDenied ? (
+        <PermissionDeniedUI permission="payments:view" />
+      ) : (
+        <>
+          {/* Header */}
+          <Grid
+            container
+            justifyContent="space-between"
+            alignItems="center"
+            mb={3}
           >
-            <DownloadIcon />
-          </IconButton>
-        </Tooltip>
-      </Grid>
-
-      {/* Filters */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={5}>
-            <Autocomplete
-              freeSolo
-              options={[]}
-              onInputChange={handleSearch}
-              renderInput={params => (
-                <TextField
-                  {...params}
-                  size="small"
-                  fullWidth
-                  placeholder="Search by reference, name, or transaction ID"
-                  InputProps={{
-                    ...params.InputProps,
-                    startAdornment: (
-                      <SearchIcon sx={{ mr: 1, color: "text.secondary" }} />
-                    ),
-                  }}
-                />
-              )}
-            />
-          </Grid>
-
-          <Grid item xs={12} md={3}>
-            <TextField
-              select
-              size="small"
-              fullWidth
-              label="Payment Mode"
-              value={modeOfPayment}
-              onChange={e => {
-                setModeOfPayment(e.target.value);
-                setPagination(p => ({ ...p, page: 1 }));
-              }}
-            >
-              <MenuItem value="">All</MenuItem>
-              {paymentModes.map(mode => (
-                <MenuItem key={mode} value={mode}>
-                  {mode}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          <Grid item xs={12} md={1}>
-            <Tooltip title="Reset">
-              <IconButton onClick={handleReset}>
-                <RefreshIcon />
+            <Typography variant="h5" fontWeight="bold">
+              Payments
+            </Typography>
+            <Tooltip title="Export CSV">
+              <IconButton
+                onClick={() => exportToCSV(normalizedPayments, "payments.csv")}
+              >
+                <DownloadIcon />
               </IconButton>
             </Tooltip>
           </Grid>
-        </Grid>
-      </Paper>
 
-      {/* Table */}
-      <Paper sx={{ minHeight: 400 }}>
-        {loading ? (
-          <>
-            <Skeleton height={60} />
-            <Skeleton height={400} />
-          </>
-        ) : (
-          <DataGrid
-            rows={normalizedPayments}
-            columns={columns}
-            getRowId={row => row.id}
-            paginationMode="server"
-            rowCount={pagination.totalCount}
-            pageSizeOptions={[10, 20, 50]}
-            paginationModel={{
-              page: pagination.page - 1,
-              pageSize: pagination.pageSize,
-            }}
-            onPaginationModelChange={model =>
-              setPagination(prev => ({
-                ...prev,
-                page: model.page + 1,
-                pageSize: model.pageSize,
-              }))
-            }
-            disableRowSelectionOnClick
-            slots={{
-              noRowsOverlay: () => (
-                <Box
-                  height="100%"
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="center"
+          {/* Filters */}
+          <Paper sx={{ p: 2, mb: 3 }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={5}>
+                <Autocomplete
+                  freeSolo
+                  options={[]}
+                  onInputChange={handleSearch}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      size="small"
+                      fullWidth
+                      placeholder="Search by reference, name, or transaction ID"
+                      InputProps={{
+                        ...params.InputProps,
+                        startAdornment: (
+                          <SearchIcon sx={{ mr: 1, color: "text.secondary" }} />
+                        ),
+                      }}
+                    />
+                  )}
+                />
+              </Grid>
+
+              <Grid item xs={12} md={3}>
+                <TextField
+                  select
+                  size="small"
+                  fullWidth
+                  label="Payment Mode"
+                  value={modeOfPayment}
+                  onChange={(e) => {
+                    setModeOfPayment(e.target.value);
+                    setPagination((p) => ({ ...p, page: 1 }));
+                  }}
                 >
-                  <Typography color="text.secondary">
-                    {error || "No payments found"}
-                  </Typography>
-                </Box>
-              ),
-            }}
-            sx={{ height: "100%" }}
-          />
-        )}
-      </Paper>
+                  <MenuItem value="">All</MenuItem>
+                  {paymentModes.map((mode) => (
+                    <MenuItem key={mode} value={mode}>
+                      {mode}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+
+              <Grid item xs={12} md={1}>
+                <Tooltip title="Reset">
+                  <IconButton onClick={handleReset}>
+                    <RefreshIcon />
+                  </IconButton>
+                </Tooltip>
+              </Grid>
+            </Grid>
+          </Paper>
+
+          {/* Table */}
+          <Paper sx={{ minHeight: 400 }}>
+            {loading ? (
+              <>
+                <Skeleton height={60} />
+                <Skeleton height={400} />
+              </>
+            ) : (
+              <DataGrid
+                rows={normalizedPayments}
+                columns={columns}
+                getRowId={(row) => row.id}
+                paginationMode="server"
+                rowCount={pagination.totalCount}
+                pageSizeOptions={[10, 20, 50]}
+                paginationModel={{
+                  page: pagination.page - 1,
+                  pageSize: pagination.pageSize,
+                }}
+                onPaginationModelChange={(model) =>
+                  setPagination((prev) => ({
+                    ...prev,
+                    page: model.page + 1,
+                    pageSize: model.pageSize,
+                  }))
+                }
+                disableRowSelectionOnClick
+                slots={{
+                  noRowsOverlay: () => (
+                    <Box
+                      height="100%"
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="center"
+                    >
+                      <Typography color="text.secondary">
+                        {error || "No payments found"}
+                      </Typography>
+                    </Box>
+                  ),
+                }}
+                sx={{ height: "100%" }}
+              />
+            )}
+          </Paper>
+        </>
+      )}
     </Box>
   );
 };

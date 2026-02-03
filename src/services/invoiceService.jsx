@@ -1,26 +1,14 @@
 import axios from "axios";
+import env from "../config/env";
 
-
-const BASE_URL = import.meta.env.VITE_BASE_URL;
-
-
+const BASE_URL = env.BASE_URL;
 
 export const fetchInvoices = async () => {
-
-
-
-  console.log(`this is base url ${BASE_URL}`);
-
-  const {data} = await axios.get(`${BASE_URL}/invoices/all`, {
-    headers: { 'Content-Type': 'application/json' },
-   
+  const { data } = await axios.get(`${BASE_URL}/invoices/all`, {
+    headers: { "Content-Type": "application/json" },
   });
 
-
   return data;
-
-
- 
 };
 
 export const fetchInvoiceById = async (id) => {

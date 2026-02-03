@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { TextField, Button, Box, Typography, Paper } from "@mui/material";
 import { useAuthStore } from "../../store/authStore";
 import axios from "axios";
 import { getTheme } from "../../store/theme";
-
 
 const Login = () => {
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -17,7 +16,6 @@ const Login = () => {
 
   const BASEURL = import.meta.env.VITE_BASE_URL;
 
-
   // useEffect(() => {
   //   if (currentUser) {
   //     navigate("/", { replace: true });
@@ -29,16 +27,18 @@ const Login = () => {
     setError("");
 
     try {
-      console.log(`this is base url ${BASEURL}`);
       const response = await axios.post(
         `${BASEURL}/signin`,
         { phoneNumber, password },
-        { withCredentials: true }
+        { withCredentials: true },
       );
 
-      login(response.data.user);
+      // ✅ Pass both user and token to login
+      const { user, token } = response.data;
+      login(user, token);
       navigate("/");
-    } catch (error) {
+    } catch (err) {
+      console.error("Login error:", err);
       setError("Invalid phone number or password");
     }
   };
@@ -50,12 +50,21 @@ const Login = () => {
         justifyContent: "center",
         alignItems: "center",
         minHeight: "100vh",
-      ml:65 // Apply theme color
+        ml: 65, // Apply theme color
       }}
     >
-      <Paper elevation={3} sx={{ p: 4, maxWidth: 400, width: "100%", textAlign: "center" }}>
-        <Typography variant="h5" mb={2}>Login</Typography>
-        {error && <Typography color="error" mb={2}>{error}</Typography>}
+      <Paper
+        elevation={3}
+        sx={{ p: 4, maxWidth: 400, width: "100%", textAlign: "center" }}
+      >
+        <Typography variant="h5" mb={2}>
+          Login
+        </Typography>
+        {error && (
+          <Typography color="error" mb={2}>
+            {error}
+          </Typography>
+        )}
 
         <Box component="form" onSubmit={handleLogin}>
           <TextField
@@ -65,7 +74,10 @@ const Login = () => {
             value={phoneNumber}
             onChange={(e) => setPhoneNumber(e.target.value)}
             required
-            sx={{backgroundColor:theme.palette.primary.dark , color:theme.palette.primary.contrastText}}
+            sx={{
+              backgroundColor: theme.palette.primary.dark,
+              color: theme.palette.primary.contrastText,
+            }}
           />
 
           <TextField
@@ -77,7 +89,10 @@ const Login = () => {
             onChange={(e) => setPassword(e.target.value)}
             required
             autoComplete="current-password"
-            sx={{backgroundColor:theme.palette.primary.dark , color:theme.palette.primary.contrastText}}
+            sx={{
+              backgroundColor: theme.palette.primary.dark,
+              color: theme.palette.primary.contrastText,
+            }}
           />
 
           <Button
@@ -91,9 +106,11 @@ const Login = () => {
         </Box>
 
         <Box mt={2}>
-        
           <Typography variant="body2" mt={1}>
-            <Link to="/reset-password" style={{ textDecoration: "none", color: "#1976d2" }}>
+            <Link
+              to="/reset-password"
+              style={{ textDecoration: "none", color: "#1976d2" }}
+            >
               Forgot password?
             </Link>
           </Typography>

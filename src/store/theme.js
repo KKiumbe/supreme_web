@@ -1,5 +1,22 @@
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import { createTheme } from "@mui/material/styles";
-import { useThemeStore } from "./authStore";
+
+// ✅ Theme Store with persistence
+export const useThemeStore = create(
+  persist(
+    (set) => ({
+      darkMode: true, // Default to dark mode
+
+      toggleTheme: () => set((state) => ({ darkMode: !state.darkMode })),
+
+      setDarkMode: (value) => set({ darkMode: value }),
+    }),
+    {
+      name: "theme-storage", // localStorage key
+    },
+  ),
+);
 
 // Theme tokens
 export const tokens = (mode) => ({
@@ -70,7 +87,7 @@ export const getTheme = () => {
       divider: colors.divider,
       background: {
         default: darkMode ? colors.primary[700] : colors.primary[600], // Change default background color based on mode
-        paper: darkMode ? colors.primary[400] : colors.primary[700],   // Change paper background color based on mode
+        paper: darkMode ? colors.primary[400] : colors.primary[700], // Change paper background color based on mode
       },
     },
     typography: {

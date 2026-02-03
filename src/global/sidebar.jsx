@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   Drawer,
   List,
-  ListItem,
+  ListItemButton,
   ListItemIcon,
   ListItemText,
   IconButton,
@@ -22,7 +22,6 @@ import {
   AttachMoney,
   Chat,
   Send,
-  MonetizationOn,
   Assignment,
   ReceiptLong,
   Business,
@@ -36,7 +35,7 @@ import {
   PersonAddAlt,
   PostAdd,
   AutoFixHigh,
-  Tune
+  Tune,
 } from "@mui/icons-material";
 
 import BusinessIcon from "@mui/icons-material/Business";
@@ -61,43 +60,52 @@ const Sidebar = () => {
   const renderSubmenu = (menuKey, items) => (
     <Collapse in={submenuOpen[menuKey]} timeout="auto" unmountOnExit>
       <List component="div" disablePadding>
-        {items.map(({ icon, label, path, isSubmenu, submenuKey, children }, idx) => (
-          <div key={idx}>
-            <ListItem
-              button
-              sx={{ pl: 3, py: 0.5 }}
-              onClick={() => {
-                if (isSubmenu) toggleSubmenu(submenuKey);
-                else navigate(path);
-              }}
-            >
-              <ListItemIcon sx={{ minWidth: 30 }}>{icon}</ListItemIcon>
-              {open && <ListItemText primary={label} />}
-              {open && isSubmenu && (
-                submenuOpen[submenuKey] ? <ExpandLess /> : <ExpandMore />
-              )}
-            </ListItem>
+        {items.map(
+          ({ icon, label, path, isSubmenu, submenuKey, children }, idx) => (
+            <div key={idx}>
+              <ListItemButton
+                sx={{ pl: 3, py: 0.5 }}
+                onClick={() => {
+                  if (isSubmenu) {
+                    toggleSubmenu(submenuKey);
+                  } else {
+                    navigate(path);
+                  }
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 30 }}>{icon}</ListItemIcon>
+                {open && <ListItemText primary={label} />}
+                {open &&
+                  isSubmenu &&
+                  (submenuOpen[submenuKey] ? <ExpandLess /> : <ExpandMore />)}
+              </ListItemButton>
 
-            {/* Nested submenu children */}
-            {isSubmenu && submenuOpen[submenuKey] && children && (
-              <Collapse in={submenuOpen[submenuKey]} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding sx={{ pl: 4 }}>
-                  {children.map((child, cIdx) => (
-                    <ListItem
-                      key={cIdx}
-                      button
-                      sx={{ py: 0.5 }}
-                      onClick={() => navigate(child.path)}
-                    >
-                      <ListItemIcon sx={{ minWidth: 30 }}>{child.icon}</ListItemIcon>
-                      {open && <ListItemText primary={child.label} />}
-                    </ListItem>
-                  ))}
-                </List>
-              </Collapse>
-            )}
-          </div>
-        ))}
+              {/* Nested submenu children */}
+              {isSubmenu && submenuOpen[submenuKey] && children && (
+                <Collapse
+                  in={submenuOpen[submenuKey]}
+                  timeout="auto"
+                  unmountOnExit
+                >
+                  <List component="div" disablePadding sx={{ pl: 4 }}>
+                    {children.map((child, cIdx) => (
+                      <ListItemButton
+                        key={cIdx}
+                        sx={{ py: 0.5 }}
+                        onClick={() => navigate(child.path)}
+                      >
+                        <ListItemIcon sx={{ minWidth: 30 }}>
+                          {child.icon}
+                        </ListItemIcon>
+                        {open && <ListItemText primary={child.label} />}
+                      </ListItemButton>
+                    ))}
+                  </List>
+                </Collapse>
+              )}
+            </div>
+          ),
+        )}
       </List>
     </Collapse>
   );
@@ -121,32 +129,52 @@ const Sidebar = () => {
       </IconButton>
 
       <List sx={{ p: 0 }}>
-
         {/* DASHBOARD */}
-        <ListItem button onClick={() => navigate("/")} sx={{ py: 1 }}>
+        <ListItemButton onClick={() => navigate("/")} sx={{ py: 1 }}>
           <ListItemIcon sx={{ minWidth: 40 }}>
             <Dashboard sx={{ fontSize: 24 }} />
           </ListItemIcon>
           {open && <ListItemText primary="Dashboard" />}
-        </ListItem>
+        </ListItemButton>
 
         {/* ACCOUNTS */}
-        <ListItem button onClick={() => toggleSubmenu("Accounts")} sx={{ py: 1 }}>
+        <ListItemButton
+          onClick={() => toggleSubmenu("Accounts")}
+          sx={{ py: 1 }}
+        >
           <ListItemIcon sx={{ minWidth: 40 }}>
             <Person sx={{ fontSize: 24 }} />
           </ListItemIcon>
           {open && <ListItemText primary="Accounts" />}
           {open && (submenuOpen.Accounts ? <ExpandLess /> : <ExpandMore />)}
-        </ListItem>
+        </ListItemButton>
 
         {renderSubmenu("Accounts", [
-          { icon: <Search sx={{ fontSize: 20 }} />, label: "Account Inquiry", path: "/customers" },
-           { icon: <HomeWorkIcon sx={{ fontSize: 20 }} />, label: "Connections", path: "/connections" },
-          { icon: <HowToReg sx={{ fontSize: 20 }} />, label: "Approvals", path: "/new-customers" },
-          { icon: <PersonAddAlt sx={{ fontSize: 20 }} />, label: "Create Customer", path: "/add-customer" },
-          { icon: <AccountTree sx={{ fontSize: 20 }} />, label: "Schemes & Zones", path: "/schemes/zones" },
-
-
+          {
+            icon: <Search sx={{ fontSize: 20 }} />,
+            label: "Account Inquiry",
+            path: "/customers",
+          },
+          {
+            icon: <HomeWorkIcon sx={{ fontSize: 20 }} />,
+            label: "Connections",
+            path: "/connections",
+          },
+          {
+            icon: <HowToReg sx={{ fontSize: 20 }} />,
+            label: "Approvals",
+            path: "/new-customers",
+          },
+          {
+            icon: <PersonAddAlt sx={{ fontSize: 20 }} />,
+            label: "Create Customer",
+            path: "/add-customer",
+          },
+          {
+            icon: <AccountTree sx={{ fontSize: 20 }} />,
+            label: "Schemes & Zones",
+            path: "/schemes/zones",
+          },
 
           {
             icon: <Poll sx={{ fontSize: 20 }} />,
@@ -154,25 +182,45 @@ const Sidebar = () => {
             isSubmenu: true,
             submenuKey: "Survey",
             children: [
-              { icon: <Ballot sx={{ fontSize: 20 }} />, label: "View Surveys", path: "/surveys" },
-              { icon: <PostAdd sx={{ fontSize: 20 }} />, label: "Add Survey", path: "/add-survey" },
+              {
+                icon: <Ballot sx={{ fontSize: 20 }} />,
+                label: "View Surveys",
+                path: "/surveys",
+              },
+              {
+                icon: <PostAdd sx={{ fontSize: 20 }} />,
+                label: "Add Survey",
+                path: "/add-survey",
+              },
             ],
           },
         ])}
 
         {/* BILLING */}
-        <ListItem button onClick={() => toggleSubmenu("Billing")} sx={{ py: 1 }}>
+        <ListItemButton onClick={() => toggleSubmenu("Billing")} sx={{ py: 1 }}>
           <ListItemIcon sx={{ minWidth: 40 }}>
             <Receipt sx={{ fontSize: 24 }} />
           </ListItemIcon>
           {open && <ListItemText primary="Billing" />}
           {open && (submenuOpen.Billing ? <ExpandLess /> : <ExpandMore />)}
-        </ListItem>
+        </ListItemButton>
 
         {renderSubmenu("Billing", [
-          { icon: <Receipt sx={{ fontSize: 20 }} />, label: "View", path: "/invoices" },
-          { icon: <Add sx={{ fontSize: 20 }} />, label: "Create", path: "/create-invoice" },
-          {icon: <AutoFixHigh sx={{ fontSize: 20 }} />, label: "Bill Adjustments", path: "/bill-adjustments" },
+          {
+            icon: <Receipt sx={{ fontSize: 20 }} />,
+            label: "View",
+            path: "/invoices",
+          },
+          {
+            icon: <Add sx={{ fontSize: 20 }} />,
+            label: "Create",
+            path: "/create-invoice",
+          },
+          {
+            icon: <AutoFixHigh sx={{ fontSize: 20 }} />,
+            label: "Bill Adjustments",
+            path: "/bill-adjustments",
+          },
 
           {
             icon: <Water sx={{ fontSize: 20 }} />,
@@ -180,107 +228,181 @@ const Sidebar = () => {
             isSubmenu: true,
             submenuKey: "meterReading",
             children: [
-              { icon: <Water sx={{ fontSize: 20 }} />, label: "Normal Readings", path: "/meter-readings" },
-              { icon: <FlashOn sx={{ fontSize: 20 }} />, label: "Abnormal Readings", path: "/abnormal-readings" },
- { 
-  icon: <Tune sx={{ fontSize: 20 }} />, 
-  label: "Meter Reading Adjustments", 
-  path: "/meter-reading-adjustments" 
-},
+              {
+                icon: <Water sx={{ fontSize: 20 }} />,
+                label: "Normal Readings",
+                path: "/meter-readings",
+              },
+              {
+                icon: <FlashOn sx={{ fontSize: 20 }} />,
+                label: "Abnormal Readings",
+                path: "/abnormal-readings",
+              },
+              {
+                icon: <Tune sx={{ fontSize: 20 }} />,
+                label: "Meter Reading Adjustments",
+                path: "/meter-reading-adjustments",
+              },
             ],
           },
         ])}
 
         {/* PAYMENTS */}
-        <ListItem button onClick={() => toggleSubmenu("payments")} sx={{ py: 1 }}>
+        <ListItemButton
+          onClick={() => toggleSubmenu("payments")}
+          sx={{ py: 1 }}
+        >
           <ListItemIcon sx={{ minWidth: 40 }}>
             <Payment sx={{ fontSize: 24 }} />
           </ListItemIcon>
           {open && <ListItemText primary="Payments" />}
           {open && (submenuOpen.payments ? <ExpandLess /> : <ExpandMore />)}
-        </ListItem>
+        </ListItemButton>
 
         {renderSubmenu("payments", [
-          { icon: <Payment sx={{ fontSize: 20 }} />, label: "View", path: "/payments" },
-          { icon: <Payment sx={{ fontSize: 20 }} />, label: "Unreceipted", path: "/unreceipted-payments" },
-          { icon: <AttachMoney sx={{ fontSize: 20 }} />, label: "Create", path: "/add-payment" },
-          { icon: <ReceiptLong sx={{ fontSize: 20 }} />, label: "Receipts", path: "/receipts" },
+          {
+            icon: <Payment sx={{ fontSize: 20 }} />,
+            label: "View",
+            path: "/payments",
+          },
+          {
+            icon: <Payment sx={{ fontSize: 20 }} />,
+            label: "Unreceipted",
+            path: "/unreceipted-payments",
+          },
+          {
+            icon: <AttachMoney sx={{ fontSize: 20 }} />,
+            label: "Create",
+            path: "/add-payment",
+          },
+          {
+            icon: <ReceiptLong sx={{ fontSize: 20 }} />,
+            label: "Receipts",
+            path: "/receipts",
+          },
         ])}
 
         {/* METER MANAGER */}
-        <ListItem button onClick={() => toggleSubmenu("meterManager")} sx={{ py: 1 }}>
+        <ListItemButton
+          onClick={() => toggleSubmenu("meterManager")}
+          sx={{ py: 1 }}
+        >
           <ListItemIcon sx={{ minWidth: 40 }}>
             <Business sx={{ fontSize: 24 }} />
           </ListItemIcon>
           {open && <ListItemText primary="Meter Manager" />}
           {open && (submenuOpen.meterManager ? <ExpandLess /> : <ExpandMore />)}
-        </ListItem>
+        </ListItemButton>
 
         {renderSubmenu("meterManager", [
-          { icon: <Business sx={{ fontSize: 20 }} />, label: "Meter Inventory", path: "/meter-inventory" },
-         
+          {
+            icon: <Business sx={{ fontSize: 20 }} />,
+            label: "Meter Inventory",
+            path: "/meter-inventory",
+          },
         ])}
 
         {/* TASKS */}
-        <ListItem button onClick={() => toggleSubmenu("tasks")} sx={{ py: 1 }}>
+        <ListItemButton onClick={() => toggleSubmenu("tasks")} sx={{ py: 1 }}>
           <ListItemIcon sx={{ minWidth: 40 }}>
             <Assignment sx={{ fontSize: 24 }} />
           </ListItemIcon>
           {open && <ListItemText primary="Tasks" />}
           {open && (submenuOpen.tasks ? <ExpandLess /> : <ExpandMore />)}
-        </ListItem>
+        </ListItemButton>
 
         {renderSubmenu("tasks", [
-          { icon: <Assignment sx={{ fontSize: 20 }} />, label: "Task Board", path: "/tasks" },
+          {
+            icon: <Assignment sx={{ fontSize: 20 }} />,
+            label: "Task Board",
+            path: "/tasks",
+          },
           //{ icon: <Add sx={{ fontSize: 20 }} />, label: "Create Task", path: "/tasks/create" },
-          { icon: <ReceiptLong sx={{ fontSize: 20 }} />, label: "Task Types", path: "/tasks/types" },
+          {
+            icon: <ReceiptLong sx={{ fontSize: 20 }} />,
+            label: "Task Types",
+            path: "/tasks/types",
+          },
           //{ icon: <AttachMoney sx={{ fontSize: 20 }} />, label: "Attachments", path: "/tasks/attachments" },
         ])}
 
         {/* COMMUNICATION */}
-        <ListItem button onClick={() => toggleSubmenu("communication")} sx={{ py: 1 }}>
+        <ListItemButton
+          onClick={() => toggleSubmenu("communication")}
+          sx={{ py: 1 }}
+        >
           <ListItemIcon sx={{ minWidth: 40 }}>
             <Chat sx={{ fontSize: 24 }} />
           </ListItemIcon>
           {open && <ListItemText primary="Communication" />}
-          {open && (submenuOpen.communication ? <ExpandLess /> : <ExpandMore />)}
-        </ListItem>
+          {open &&
+            (submenuOpen.communication ? <ExpandLess /> : <ExpandMore />)}
+        </ListItemButton>
 
         {renderSubmenu("communication", [
-          { icon: <Chat sx={{ fontSize: 20 }} />, label: "Sent SMS", path: "/sent-sms" },
-          { icon: <Send sx={{ fontSize: 20 }} />, label: "Send SMS", path: "/send-sms" },
-          { icon: <Receipt sx={{ fontSize: 20 }} />, label: "Send Bills", path: "/send-bills" },
-          
+          {
+            icon: <Chat sx={{ fontSize: 20 }} />,
+            label: "Sent SMS",
+            path: "/sent-sms",
+          },
+          {
+            icon: <Send sx={{ fontSize: 20 }} />,
+            label: "Send SMS",
+            path: "/send-sms",
+          },
+          {
+            icon: <Receipt sx={{ fontSize: 20 }} />,
+            label: "Send Bills",
+            path: "/send-bills",
+          },
         ])}
 
         {/* REPORTS */}
-        <ListItem button onClick={() => toggleSubmenu("reports")} sx={{ py: 1 }}>
+        <ListItemButton onClick={() => toggleSubmenu("reports")} sx={{ py: 1 }}>
           <ListItemIcon sx={{ minWidth: 40 }}>
             <BarChart sx={{ fontSize: 24 }} />
           </ListItemIcon>
           {open && <ListItemText primary="Reports" />}
           {open && (submenuOpen.reports ? <ExpandLess /> : <ExpandMore />)}
-        </ListItem>
+        </ListItemButton>
 
         {renderSubmenu("reports", [
-          { icon: <Assignment sx={{ fontSize: 20 }} />, label: "View", path: "/view-reports" },
-          { icon: <Assignment sx={{ fontSize: 20 }} />, label: "Custom", path: "/request-custom-reports" },
+          {
+            icon: <Assignment sx={{ fontSize: 20 }} />,
+            label: "View",
+            path: "/view-reports",
+          },
+          {
+            icon: <Assignment sx={{ fontSize: 20 }} />,
+            label: "Custom",
+            path: "/request-custom-reports",
+          },
         ])}
 
         {/* SETTINGS */}
-        <ListItem button onClick={() => toggleSubmenu("settings")} sx={{ py: 1 }}>
+        <ListItemButton
+          onClick={() => toggleSubmenu("settings")}
+          sx={{ py: 1 }}
+        >
           <ListItemIcon sx={{ minWidth: 40 }}>
             <Settings sx={{ fontSize: 24 }} />
           </ListItemIcon>
           {open && <ListItemText primary="Settings" />}
           {open && (submenuOpen.settings ? <ExpandLess /> : <ExpandMore />)}
-        </ListItem>
+        </ListItemButton>
 
         {renderSubmenu("settings", [
-          { icon: <Person sx={{ fontSize: 20 }} />, label: "Users", path: "/users" },
-          { icon: <BusinessIcon sx={{ fontSize: 20 }} />, label: "Org Details", path: "/org-details" },
+          {
+            icon: <Person sx={{ fontSize: 20 }} />,
+            label: "Users",
+            path: "/users",
+          },
+          {
+            icon: <BusinessIcon sx={{ fontSize: 20 }} />,
+            label: "Org Details",
+            path: "/org-details",
+          },
         ])}
-
       </List>
     </Drawer>
   );

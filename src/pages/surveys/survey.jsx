@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  PermissionDeniedUI,
+  isPermissionDenied,
+} from "../../utils/permissionHelper";
+import {
   Box,
   Typography,
   CircularProgress,
@@ -55,6 +59,7 @@ const Surveys = () => {
   const [surveys, setSurveys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterTaskStatus, setFilterTaskStatus] = useState("all");
   const currentUser = useAuthStore((state) => state.currentUser);
@@ -62,11 +67,13 @@ const Surveys = () => {
   // Debounced search handler
   const debouncedSetSearchTerm = useMemo(
     () => debounce((value) => setSearchTerm(value), 300),
-    []
+    [],
   );
 
   useEffect(() => {
-    if (!currentUser) navigate("/login");
+    if (!currentUser) {
+      navigate("/login");
+    }
   }, [currentUser, navigate]);
 
   useEffect(() => {
@@ -77,7 +84,8 @@ const Surveys = () => {
           withCredentials: true,
           params: {
             search: searchTerm || undefined, // Search by customer name, phone, plot, or officer
-            taskStatus: filterTaskStatus !== "all" ? filterTaskStatus : undefined,
+            taskStatus:
+              filterTaskStatus !== "all" ? filterTaskStatus : undefined,
           },
         });
 
@@ -101,17 +109,26 @@ const Surveys = () => {
           }));
 
           setSurveys(flattened);
+          setPermissionDenied(false);
         } else {
           setError(response.data.message || "Failed to fetch surveys");
         }
       } catch (err) {
-        setError(`Error fetching surveys: ${err.message}`);
+        if (isPermissionDenied(err)) {
+          setPermissionDenied(true);
+          setSurveys([]);
+          setError(null);
+        } else {
+          setError(`Error fetching surveys: ${err.message}`);
+        }
       } finally {
         setLoading(false);
       }
     };
 
-    if (currentUser) fetchSurveys();
+    if (currentUser) {
+      fetchSurveys();
+    }
   }, [currentUser, searchTerm, filterTaskStatus]);
 
   const handleRowClick = (params) => {
@@ -151,9 +168,8 @@ const Surveys = () => {
             <PhotoCamera sx={{ fontSize: 22, color: "grey.500" }} />
           ),
       },
-      
     ],
-    []
+    [],
   );
 
   const filteredSurveys = useMemo(() => {
@@ -163,7 +179,7 @@ const Surveys = () => {
         s.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         s.phoneNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
         s.plotNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.officerName.toLowerCase().includes(searchTerm.toLowerCase())
+        s.officerName.toLowerCase().includes(searchTerm.toLowerCase()),
     );
   }, [surveys, searchTerm]);
 
@@ -180,117 +196,127 @@ const Surveys = () => {
           overflowX: "hidden",
         }}
       >
-        {/* Header */}
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 2,
-            mb: 3,
-            width: "100%",
-          }}
-        >
-          <Typography
-            variant={isMobile ? "h6" : "h5"}
-            sx={{ fontWeight: 600 }}
-          >
-            Surveys
-          </Typography>
-          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-            <TextField
-              label="Search by Customer, Phone, Plot, or Officer"
-              variant="outlined"
-              size={isMobile ? "small" : "medium"}
-              onChange={(e) => debouncedSetSearchTerm(e.target.value)}
-              sx={{ width: { xs: "100%", sm: 300 } }}
-            />
-            <FormControl
-              sx={{ width: { xs: "100%", sm: 200 } }}
-              size={isMobile ? "small" : "medium"}
-            >
-              <InputLabel id="task-status-filter-label">Task Status</InputLabel>
-              <Select
-                labelId="task-status-filter-label"
-                value={filterTaskStatus}
-                label="Task Status"
-                onChange={(e) => setFilterTaskStatus(e.target.value)}
-              >
-                <MenuItem value="all">All</MenuItem>
-                <MenuItem value="PENDING">Pending</MenuItem>
-                <MenuItem value="IN_PROGRESS">In Progress</MenuItem>
-                <MenuItem value="COMPLETED">Completed</MenuItem>
-              </Select>
-            </FormControl>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() => navigate("/surveys/new")}
-              sx={{ height: "fit-content" }}
-            >
-              New Survey
-            </Button>
-          </Box>
-        </Box>
-
-        {/* Content */}
-        <Box sx={{ flex: 1, width: "100%" }}>
-          {loading ? (
-            <Box sx={{ display: "flex", justifyContent: "center", mt: 6 }}>
-              <CircularProgress />
-            </Box>
-          ) : error ? (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          ) : surveys.length === 0 ? (
-            <Alert severity="info">No surveys found.</Alert>
-          ) : (
-            <Paper
-              elevation={3}
+        {permissionDenied ? (
+          <PermissionDeniedUI permission="surveys:view" />
+        ) : (
+          <>
+            {/* Header */}
+            <Box
               sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 2,
+                mb: 3,
                 width: "100%",
-                height: "calc(100vh - 220px)",
-                p: 2,
-                borderRadius: 3,
-                backgroundColor: "background.paper",
               }}
             >
-              <DataGrid
-                rows={filteredSurveys}
-                columns={columns}
-                getRowId={(row) => row.id}
-                disableRowSelectionOnClick
-                pageSizeOptions={[10, 20, 50]}
-                initialState={{
-                  pagination: { paginationModel: { pageSize: 10, page: 0 } },
-                }}
-                onRowClick={handleRowClick}
-                sx={{
-                  "& .MuiDataGrid-columnHeaders": {
-                    backgroundColor: "primary.main",
-                    color: "#fff",
-                    fontWeight: 600,
-                    fontSize: "0.95rem",
-                  },
-                  "& .MuiDataGrid-cell": {
-                    fontSize: "0.875rem",
-                    display: "flex",
-                    alignItems: "center",
-                  },
-                  "& .MuiDataGrid-row:hover": {
-                    backgroundColor: "action.hover",
-                    cursor: "pointer",
-                  },
-                  "& .MuiDataGrid-footerContainer": {
-                    justifyContent: "center",
-                  },
-                }}
-              />
-            </Paper>
-          )}
-        </Box>
+              <Typography
+                variant={isMobile ? "h6" : "h5"}
+                sx={{ fontWeight: 600 }}
+              >
+                Surveys
+              </Typography>
+              <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                <TextField
+                  label="Search by Customer, Phone, Plot, or Officer"
+                  variant="outlined"
+                  size={isMobile ? "small" : "medium"}
+                  onChange={(e) => debouncedSetSearchTerm(e.target.value)}
+                  sx={{ width: { xs: "100%", sm: 300 } }}
+                />
+                <FormControl
+                  sx={{ width: { xs: "100%", sm: 200 } }}
+                  size={isMobile ? "small" : "medium"}
+                >
+                  <InputLabel id="task-status-filter-label">
+                    Task Status
+                  </InputLabel>
+                  <Select
+                    labelId="task-status-filter-label"
+                    value={filterTaskStatus}
+                    label="Task Status"
+                    onChange={(e) => setFilterTaskStatus(e.target.value)}
+                  >
+                    <MenuItem value="all">All</MenuItem>
+                    <MenuItem value="PENDING">Pending</MenuItem>
+                    <MenuItem value="IN_PROGRESS">In Progress</MenuItem>
+                    <MenuItem value="COMPLETED">Completed</MenuItem>
+                  </Select>
+                </FormControl>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={() => navigate("/surveys/new")}
+                  sx={{ height: "fit-content" }}
+                >
+                  New Survey
+                </Button>
+              </Box>
+            </Box>
+
+            {/* Content */}
+            <Box sx={{ flex: 1, width: "100%" }}>
+              {loading ? (
+                <Box sx={{ display: "flex", justifyContent: "center", mt: 6 }}>
+                  <CircularProgress />
+                </Box>
+              ) : error ? (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {error}
+                </Alert>
+              ) : surveys.length === 0 ? (
+                <Alert severity="info">No surveys found.</Alert>
+              ) : (
+                <Paper
+                  elevation={3}
+                  sx={{
+                    width: "100%",
+                    height: "calc(100vh - 220px)",
+                    p: 2,
+                    borderRadius: 3,
+                    backgroundColor: "background.paper",
+                  }}
+                >
+                  <DataGrid
+                    rows={filteredSurveys}
+                    columns={columns}
+                    getRowId={(row) => row.id}
+                    disableRowSelectionOnClick
+                    pageSizeOptions={[10, 20, 50]}
+                    initialState={{
+                      pagination: {
+                        paginationModel: { pageSize: 10, page: 0 },
+                      },
+                    }}
+                    onRowClick={handleRowClick}
+                    sx={{
+                      "& .MuiDataGrid-columnHeaders": {
+                        backgroundColor: "primary.main",
+                        color: "#fff",
+                        fontWeight: 600,
+                        fontSize: "0.95rem",
+                      },
+                      "& .MuiDataGrid-cell": {
+                        fontSize: "0.875rem",
+                        display: "flex",
+                        alignItems: "center",
+                      },
+                      "& .MuiDataGrid-row:hover": {
+                        backgroundColor: "action.hover",
+                        cursor: "pointer",
+                      },
+                      "& .MuiDataGrid-footerContainer": {
+                        justifyContent: "center",
+                      },
+                    }}
+                  />
+                </Paper>
+              )}
+            </Box>
+          </>
+        )}
       </Box>
     </ErrorBoundary>
   );

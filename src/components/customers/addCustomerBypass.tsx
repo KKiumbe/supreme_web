@@ -14,7 +14,9 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Chip,
 } from "@mui/material";
+import { LockOutlined } from "@mui/icons-material";
 import axios from "axios";
 
 const API_URL = import.meta.env.VITE_BASE_URL || "";
@@ -34,6 +36,7 @@ const AddCustomerModal: React.FC<AddCustomerModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   const [schemes, setSchemes] = useState<any[]>([]);
   const [zones, setZones] = useState<any[]>([]);
@@ -61,13 +64,25 @@ const AddCustomerModal: React.FC<AddCustomerModalProps> = ({
 
   /* ---------------- FETCH LOOKUPS ---------------- */
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      return;
+    }
 
+    // Reset permission denied state when opening
+    setPermissionDenied(false);
+
+    // Fetch schemes
     axios
       .get(`${API_URL}/schemes`, { withCredentials: true })
       .then((res) => setSchemes(res.data.data || []))
-      .catch(() => setSchemes([]));
+      .catch((err) => {
+        if (err.response?.status === 403) {
+          setPermissionDenied(true);
+        }
+        setSchemes([]);
+      });
 
+    // Fetch tariff categories
     axios
       .get(`${API_URL}/tarrifs/block`, { withCredentials: true })
       .then((res) => {
@@ -82,7 +97,12 @@ const AddCustomerModal: React.FC<AddCustomerModalProps> = ({
         });
         setTariffs(Array.from(map.values()));
       })
-      .catch(() => setTariffs([]));
+      .catch((err) => {
+        if (err.response?.status === 403) {
+          setPermissionDenied(true);
+        }
+        setTariffs([]);
+      });
   }, [open]);
 
   /* ---------------- HANDLERS ---------------- */
@@ -134,14 +154,12 @@ const AddCustomerModal: React.FC<AddCustomerModalProps> = ({
           previousMeterReading: form.previousMeterReading
             ? Number(form.previousMeterReading)
             : null,
-          sixMonthsMean: form.sixMonthsMean
-            ? Number(form.sixMonthsMean)
-            : null,
+          sixMonthsMean: form.sixMonthsMean ? Number(form.sixMonthsMean) : null,
           closingBalance: form.closingBalance
             ? Number(form.closingBalance)
             : null,
         },
-        { withCredentials: true }
+        { withCredentials: true },
       );
 
       setSuccess("Customer created successfully");
@@ -163,156 +181,214 @@ const AddCustomerModal: React.FC<AddCustomerModalProps> = ({
       <DialogTitle>Add Customer</DialogTitle>
 
       <DialogContent dividers>
-        <Stack spacing={3}>
-          {error && <Alert severity="error">{error}</Alert>}
-          {success && <Alert severity="success">{success}</Alert>}
+        {permissionDenied ? (
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              py: 6,
+              gap: 2,
+            }}
+          >
+            <Box
+              sx={{
+                width: 120,
+                height: 120,
+                borderRadius: "50%",
+                bgcolor: "error.main",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: 0.1,
+                mb: 2,
+              }}
+            >
+              <LockOutlined
+                sx={{ fontSize: 80, color: "error.main", opacity: 1 }}
+              />
+            </Box>
+            <Typography variant="h5" fontWeight="bold" color="text.primary">
+              Access Denied
+            </Typography>
+            <Typography
+              variant="body1"
+              color="text.secondary"
+              textAlign="center"
+              maxWidth={500}
+            >
+              You don&apos;t have permission to access the required data for
+              creating customers. Please contact your administrator to request
+              access.
+            </Typography>
+            <Stack direction="row" spacing={1} mt={2}>
+              <Chip
+                label="Permission Required: schemes:view"
+                color="error"
+                variant="outlined"
+                size="small"
+              />
+              <Chip
+                label="Permission Required: tariffs:view"
+                color="error"
+                variant="outlined"
+                size="small"
+              />
+            </Stack>
+          </Box>
+        ) : (
+          <Stack spacing={3}>
+            {error && <Alert severity="error">{error}</Alert>}
+            {success && <Alert severity="success">{success}</Alert>}
 
-          <Paper variant="outlined" sx={{ p: 2 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={4}>
-                <TextField
-                  label="Connection Number *"
-                  fullWidth
-                  value={form.connectionNumber}
-                  onChange={(e) =>
-                    setForm({ ...form, connectionNumber: e.target.value })
-                  }
-                />
-              </Grid>
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    label="Connection Number *"
+                    fullWidth
+                    value={form.connectionNumber}
+                    onChange={(e) =>
+                      setForm({ ...form, connectionNumber: e.target.value })
+                    }
+                  />
+                </Grid>
 
-              <Grid item xs={12} md={4}>
-                <TextField
-                  label="Customer Name *"
-                  fullWidth
-                  value={form.customerName}
-                  onChange={(e) =>
-                    setForm({ ...form, customerName: e.target.value })
-                  }
-                />
-              </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    label="Customer Name *"
+                    fullWidth
+                    value={form.customerName}
+                    onChange={(e) =>
+                      setForm({ ...form, customerName: e.target.value })
+                    }
+                  />
+                </Grid>
 
-              <Grid item xs={12} md={4}>
-                <TextField
-                  label="Phone Number *"
-                  fullWidth
-                  value={form.phoneNumber}
-                  onChange={(e) =>
-                    setForm({ ...form, phoneNumber: e.target.value })
-                  }
-                />
-              </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    label="Phone Number *"
+                    fullWidth
+                    value={form.phoneNumber}
+                    onChange={(e) =>
+                      setForm({ ...form, phoneNumber: e.target.value })
+                    }
+                  />
+                </Grid>
 
-              <Grid item xs={12} md={4}>
-                <TextField
-                  select
-                  label="Tariff Category *"
-                  fullWidth
-                  value={form.tariffCategoryId}
-                  onChange={(e) =>
-                    setForm({ ...form, tariffCategoryId: e.target.value })
-                  }
-                >
-                  {tariffs.map((t) => (
-                    <MenuItem key={t.id} value={t.id}>
-                      {t.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    select
+                    label="Tariff Category *"
+                    fullWidth
+                    value={form.tariffCategoryId}
+                    onChange={(e) =>
+                      setForm({ ...form, tariffCategoryId: e.target.value })
+                    }
+                  >
+                    {tariffs.map((t) => (
+                      <MenuItem key={t.id} value={t.id}>
+                        {t.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
 
-              <Grid item xs={12} md={4}>
-                <TextField
-                  select
-                  label="Scheme"
-                  fullWidth
-                  value={form.schemeId}
-                  onChange={(e) => handleSchemeChange(e.target.value)}
-                >
-                  {schemes.map((s) => (
-                    <MenuItem key={s.id} value={s.id}>
-                      {s.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    select
+                    label="Scheme"
+                    fullWidth
+                    value={form.schemeId}
+                    onChange={(e) => handleSchemeChange(e.target.value)}
+                  >
+                    {schemes.map((s) => (
+                      <MenuItem key={s.id} value={s.id}>
+                        {s.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
 
-              <Grid item xs={12} md={4}>
-                <TextField
-                  select
-                  label="Zone"
-                  fullWidth
-                  disabled={!zones.length}
-                  value={form.zoneId}
-                  onChange={(e) => handleZoneChange(e.target.value)}
-                >
-                  {zones.map((z) => (
-                    <MenuItem key={z.id} value={z.id}>
-                      {z.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    select
+                    label="Zone"
+                    fullWidth
+                    disabled={!zones.length}
+                    value={form.zoneId}
+                    onChange={(e) => handleZoneChange(e.target.value)}
+                  >
+                    {zones.map((z) => (
+                      <MenuItem key={z.id} value={z.id}>
+                        {z.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
 
-              <Grid item xs={12} md={4}>
-                <TextField
-                  select
-                  label="Route"
-                  fullWidth
-                  disabled={!routes.length}
-                  value={form.routeId}
-                  onChange={(e) =>
-                    setForm({ ...form, routeId: e.target.value })
-                  }
-                >
-                  {routes.map((r) => (
-                    <MenuItem key={r.id} value={r.id}>
-                      {r.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    select
+                    label="Route"
+                    fullWidth
+                    disabled={!routes.length}
+                    value={form.routeId}
+                    onChange={(e) =>
+                      setForm({ ...form, routeId: e.target.value })
+                    }
+                  >
+                    {routes.map((r) => (
+                      <MenuItem key={r.id} value={r.id}>
+                        {r.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
 
-              <Grid item xs={12} md={4}>
-                <TextField
-                  label="Previous Meter Reading"
-                  type="number"
-                  fullWidth
-                  value={form.previousMeterReading}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      previousMeterReading: e.target.value,
-                    })
-                  }
-                />
-              </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    label="Previous Meter Reading"
+                    type="number"
+                    fullWidth
+                    value={form.previousMeterReading}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        previousMeterReading: e.target.value,
+                      })
+                    }
+                  />
+                </Grid>
 
-              <Grid item xs={12} md={4}>
-                <TextField
-                  label="6 Months Mean"
-                  type="number"
-                  fullWidth
-                  value={form.sixMonthsMean}
-                  onChange={(e) =>
-                    setForm({ ...form, sixMonthsMean: e.target.value })
-                  }
-                />
-              </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    label="6 Months Mean"
+                    type="number"
+                    fullWidth
+                    value={form.sixMonthsMean}
+                    onChange={(e) =>
+                      setForm({ ...form, sixMonthsMean: e.target.value })
+                    }
+                  />
+                </Grid>
 
-              <Grid item xs={12} md={4}>
-                <TextField
-                  label="Opening Balance"
-                  type="number"
-                  fullWidth
-                  value={form.closingBalance}
-                  onChange={(e) =>
-                    setForm({ ...form, closingBalance: e.target.value })
-                  }
-                />
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    label="Opening Balance"
+                    type="number"
+                    fullWidth
+                    value={form.closingBalance}
+                    onChange={(e) =>
+                      setForm({ ...form, closingBalance: e.target.value })
+                    }
+                  />
+                </Grid>
               </Grid>
-            </Grid>
-          </Paper>
-        </Stack>
+            </Paper>
+          </Stack>
+        )}
       </DialogContent>
 
       <DialogActions>
@@ -320,7 +396,7 @@ const AddCustomerModal: React.FC<AddCustomerModalProps> = ({
         <Button
           variant="contained"
           onClick={handleSubmit}
-          disabled={loading}
+          disabled={loading || permissionDenied}
         >
           {loading ? <CircularProgress size={20} /> : "Create Customer"}
         </Button>

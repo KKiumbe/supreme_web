@@ -20,6 +20,10 @@ import {
 } from "@mui/material";
 import axios from "axios";
 import TitleComponent from "../../components/title";
+import {
+  PermissionDeniedUI,
+  isPermissionDenied,
+} from "../../utils/permissionHelper";
 
 const SentSMSPage = () => {
   const [smsMessages, setSmsMessages] = useState([]);
@@ -28,6 +32,7 @@ const SentSMSPage = () => {
   const [totalRows, setTotalRows] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -42,19 +47,27 @@ const SentSMSPage = () => {
     try {
       const response = await axios.get(
         `${BASEURL}/sms-history?page=${page + 1}&limit=${pageSize}&search=${encodeURIComponent(
-          searchQuery
+          searchQuery,
         )}&status=${statusFilter}`,
-        { withCredentials: true }
+        { withCredentials: true },
       );
-      console.log("API Response:", JSON.stringify(response.data, null, 2));
       const { data, totalRecords } = response.data;
       setSmsMessages(data || []);
       setTotalRows(totalRecords || 0);
+      setPermissionDenied(false);
     } catch (error) {
-      setError(error.response?.data?.message || "Failed to fetch SMS messages.");
       console.error("Error fetching SMS messages:", error);
-      setSmsMessages([]);
-      setTotalRows(0);
+      if (isPermissionDenied(error)) {
+        setPermissionDenied(true);
+        setSmsMessages([]);
+        setTotalRows(0);
+      } else {
+        setError(
+          error.response?.data?.message || "Failed to fetch SMS messages.",
+        );
+        setSmsMessages([]);
+        setTotalRows(0);
+      }
     } finally {
       setLoading(false);
     }
@@ -112,7 +125,9 @@ const SentSMSPage = () => {
       headerName: "Date Sent",
       width: 180,
       renderCell: (params) => {
-        if (!params?.value) return "N/A";
+        if (!params?.value) {
+          return "N/A";
+        }
         try {
           return new Date(params.value).toLocaleString(undefined, {
             year: "numeric",
@@ -141,101 +156,138 @@ const SentSMSPage = () => {
         alignItems: "center",
       }}
     >
-      <Box
-        sx={{
-          minWidth: 600,
-          maxWidth: 1200,
-          width: "100%",
-        }}
-      >
-        <Typography
-          component="div"
-          variant="h4"
-          sx={{ color: theme.palette.primary.contrastText, mb: 2, ml: -5 }}
-        >
-          <TitleComponent title="Sent Messages History" />
-        </Typography>
-
-        {/* Search and Filter Controls */}
-        <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
-          <TextField
-            label="Search by Mobile or Message"
-            variant="outlined"
-            value={searchQuery}
-            onChange={handleSearchChange}
-            sx={{ width: 300 }}
-          />
-          <FormControl sx={{ width: 200 }}>
-            <InputLabel>Status</InputLabel>
-            <Select
-              value={statusFilter}
-              onChange={handleStatusChange}
-              label="Status"
+      {permissionDenied ? (
+        <PermissionDeniedUI permission="sms:view" />
+      ) : (
+        <>
+          <Box
+            sx={{
+              minWidth: 600,
+              maxWidth: 1200,
+              width: "100%",
+            }}
+          >
+            <Typography
+              component="div"
+              variant="h4"
+              sx={{ color: theme.palette.primary.contrastText, mb: 2, ml: -5 }}
             >
-              <MenuItem value="">All</MenuItem>
-              <MenuItem value="PENDING">Pending</MenuItem>
-              <MenuItem value="SENT">Sent</MenuItem>
-              <MenuItem value="FAILED">Failed</MenuItem>
-              <MenuItem value="DELIVERED">Delivered</MenuItem>
-            </Select>
-          </FormControl>
-        </Box>
+              <TitleComponent title="Sent Messages History" />
+            </Typography>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 2, borderRadius: 2, bgcolor: theme.palette.grey[300] }}>
-            {error}
-          </Alert>
-        )}
+            {/* Search and Filter Controls */}
+            <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+              <TextField
+                label="Search by Mobile or Message"
+                variant="outlined"
+                value={searchQuery}
+                onChange={handleSearchChange}
+                sx={{ width: 300 }}
+              />
+              <FormControl sx={{ width: 200 }}>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={statusFilter}
+                  onChange={handleStatusChange}
+                  label="Status"
+                >
+                  <MenuItem value="">All</MenuItem>
+                  <MenuItem value="PENDING">Pending</MenuItem>
+                  <MenuItem value="SENT">Sent</MenuItem>
+                  <MenuItem value="FAILED">Failed</MenuItem>
+                  <MenuItem value="DELIVERED">Delivered</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
 
-        {loading ? (
-          <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "50vh" }}>
-            <CircularProgress size={70} sx={{ color: theme.palette.primary.main }} />
+            {error && (
+              <Alert
+                severity="error"
+                sx={{
+                  mb: 2,
+                  borderRadius: 2,
+                  bgcolor: theme.palette.grey[300],
+                }}
+              >
+                {error}
+              </Alert>
+            )}
+
+            {loading ? (
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  height: "50vh",
+                }}
+              >
+                <CircularProgress
+                  size={70}
+                  sx={{ color: theme.palette.primary.main }}
+                />
+              </Box>
+            ) : (
+              <Box sx={{ height: 600, width: "100%" }}>
+                <DataGrid
+                  rows={smsMessages}
+                  columns={columns}
+                  paginationMode="server"
+                  rowCount={totalRows || 0}
+                  pageSizeOptions={[10, 20, 50]}
+                  paginationModel={{ page, pageSize }}
+                  onPaginationModelChange={(params) => {
+                    setPage(params.page);
+                    setPageSize(params.pageSize);
+                  }}
+                  loading={loading}
+                  getRowId={(row) => row.id}
+                />
+              </Box>
+            )}
+            {!loading && (
+              <Typography
+                sx={{
+                  textAlign: "center",
+                  mt: 2,
+                  color:
+                    theme.palette.mode === "dark"
+                      ? theme.palette.grey[100]
+                      : theme.palette.grey[900],
+                }}
+              >
+                Page {page + 1} of {Math.ceil(totalRows / pageSize) || 1}
+              </Typography>
+            )}
           </Box>
-        ) : (
-          <Box sx={{ height: 600, width: "100%" }}>
-            <DataGrid
-              rows={smsMessages}
-              columns={columns}
-              paginationMode="server"
-              rowCount={totalRows || 0}
-              pageSizeOptions={[10, 20, 50]}
-              paginationModel={{ page, pageSize }}
-              onPaginationModelChange={(params) => {
-                setPage(params.page);
-                setPageSize(params.pageSize);
-              }}
-              loading={loading}
-              getRowId={(row) => row.id}
-            />
-          </Box>
-        )}
-        {!loading && (
-          <Typography sx={{ textAlign: "center", mt: 2, color: theme.palette.mode === "dark" ? theme.palette.grey[100] : theme.palette.grey[900] }}>
-            Page {page + 1} of {Math.ceil(totalRows / pageSize) || 1}
-          </Typography>
-        )}
-      </Box>
 
-      {/* Dialog for displaying full message */}
-      <Dialog
-        open={openDialog}
-        onClose={handleCloseDialog}
-        aria-labelledby="message-dialog-title"
-        aria-describedby="message-dialog-description"
-        sx={{ "& .MuiDialog-paper": { minWidth: "300px", maxWidth: "500px" } }}
-      >
-        <DialogTitle id="message-dialog-title">Message Content</DialogTitle>
-        <DialogContent>
-          <DialogContentText id="message-dialog-description" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-            {selectedMessage || "No message content available."}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog} color="primary">
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
+          {/* Dialog for displaying full message */}
+          <Dialog
+            open={openDialog}
+            onClose={handleCloseDialog}
+            aria-labelledby="message-dialog-title"
+            aria-describedby="message-dialog-description"
+            sx={{
+              "& .MuiDialog-paper": { minWidth: "300px", maxWidth: "500px" },
+            }}
+          >
+            <DialogTitle id="message-dialog-title">Message Content</DialogTitle>
+            <DialogContent>
+              <DialogContentText
+                id="message-dialog-description"
+                sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+              >
+                {selectedMessage || "No message content available."}
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleCloseDialog} color="primary">
+                Close
+              </Button>
+            </DialogActions>
+          </Dialog>
+        </>
+      )}
     </Box>
   );
 };

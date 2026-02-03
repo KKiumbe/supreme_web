@@ -1,14 +1,11 @@
-
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
 import { CssBaseline, Box } from "@mui/material";
 
-
-
 import HomeScreen from "./pages/home/home";
 import CustomersScreen from "./pages/customers/customers";
 
-import BillList from "./pages/billing/Invoices"
+import BillList from "./pages/billing/Invoices";
 import CreateInvoice from "./pages/billing/createInvoice";
 
 import InvoiceDetails from "./pages/billing/InvoiceDetail";
@@ -34,11 +31,10 @@ import UserDetails from "./pages/settings/users/userDetails";
 import Organization from "./pages/settings/org/orgDetails";
 import EditOrganization from "./pages/settings/org/editOrg";
 
-
 import TaskDetailsScreen from "./pages/task/taskDetails";
 import SchemeZoneRouteScreen from "./pages/settings/schemes/scheme";
-import { useAuthStore, useThemeStore } from "./store/authStore";
-import { getTheme } from "./store/theme";
+import { useAuthStore } from "./store/authStore";
+import { useThemeStore, getTheme } from "./store/theme";
 
 import Navbar from "./global/navbar";
 import ForgotPasswordScreen from "./pages/auth/forgotPassword";
@@ -66,9 +62,12 @@ import MeterReadingAdjustmentsScreen from "./pages/meterReading/readingsAdjustme
 import SmsScreen from "./pages/communication/sendSMS";
 
 const App = () => {
-  const { darkMode } = useThemeStore();
   const { isAuthenticated } = useAuthStore();
-  const theme = getTheme(darkMode ? "dark" : "light");
+  const { darkMode } = useThemeStore(); // Subscribe to darkMode changes
+  const theme = getTheme(); // This will use the updated darkMode value
+
+  // eslint-disable-next-line no-console
+  console.log("Theme mode:", darkMode ? "dark" : "light"); // For debugging
 
   return (
     <ThemeProvider theme={theme}>
@@ -76,35 +75,42 @@ const App = () => {
       <Router>
         <Box
           sx={{
-            minHeight: "100vh", // Full viewport height
-            width: "100%", // Full width
-            backgroundColor: theme.palette.background.default, // Theme background
-            display: "flex", // Flexbox for sidebar and content
+            minHeight: "100vh",
+            width: "100%",
+            backgroundColor: theme.palette.background.default,
+            display: "flex",
             flexDirection: "row",
           }}
         >
           {isAuthenticated && <Sidebar />}
           <Box
             sx={{
-              flexGrow: 1, // Takes remaining space
+              flexGrow: 1,
               display: "flex",
               flexDirection: "column",
-              minHeight: "100vh", // Ensure content fills height
+              minHeight: "100vh",
             }}
           >
             {isAuthenticated && <Navbar />}
             <Box
               component="main"
               sx={{
-                flexGrow: 1, // Content expands to fill space
-                backgroundColor: theme.palette.background.default, // Consistent background
-                p: 3, // Padding for content
+                flexGrow: 1,
+                backgroundColor: theme.palette.background.default,
+                color: theme.palette.text.primary,
+                p: 3,
               }}
             >
               <Routes>
                 <Route path="/login" element={<Login />} />
-                <Route path="/reset-password" element={<ForgotPasswordScreen />} />
-                <Route path="/change-password" element={<ChangePasswordScreen />} />
+                <Route
+                  path="/reset-password"
+                  element={<ForgotPasswordScreen />}
+                />
+                <Route
+                  path="/change-password"
+                  element={<ChangePasswordScreen />}
+                />
                 <Route path="/verify-otp" element={<VerifyOtpScreen />} />
                 <Route
                   path="/"
@@ -123,22 +129,20 @@ const App = () => {
                   }
                 />
 
-
-   
                 <Route
                   path="/invoices"
                   element={
                     <ProtectedRoute>
-                      <BillList/>
+                      <BillList />
                     </ProtectedRoute>
                   }
                 />
 
-                   <Route
+                <Route
                   path="/bill-adjustments"
                   element={
                     <ProtectedRoute>
-                      <AdjustmentsList/>
+                      <AdjustmentsList />
                     </ProtectedRoute>
                   }
                 />
@@ -199,26 +203,23 @@ const App = () => {
                   }
                 />
 
-
-                     <Route
+                <Route
                   path="/meter-readings"
                   element={
                     <ProtectedRoute>
-                      <WaterReadingsList/>
+                      <WaterReadingsList />
                     </ProtectedRoute>
                   }
-                /> 
+                />
 
-                
-
-                     <Route
+                <Route
                   path="/meter-readings"
                   element={
                     <ProtectedRoute>
-                      <WaterReadingsList/>
+                      <WaterReadingsList />
                     </ProtectedRoute>
                   }
-                /> 
+                />
 
                 <Route
                   path="/meter-reading-adjustments"
@@ -226,14 +227,8 @@ const App = () => {
                     <ProtectedRoute>
                       <MeterReadingAdjustmentsScreen />
                     </ProtectedRoute>
-                  }/>
-
-
-
-               
-                
-
-                
+                  }
+                />
 
                 <Route
                   path="/receipts"
@@ -275,7 +270,7 @@ const App = () => {
                     </ProtectedRoute>
                   }
                 />
-            
+
                 <Route
                   path="/view-reports"
                   element={
@@ -341,95 +336,88 @@ const App = () => {
                   }
                 />
 
-
-               
-
-                 
-
-<Route
+                <Route
                   path="task-details/:taskId"
                   element={
                     <ProtectedRoute>
                       <TaskDetailsScreen />
                     </ProtectedRoute>
                   }
-                />  
+                />
 
-                  <Route
+                <Route
                   path="schemes/zones"
                   element={
                     <ProtectedRoute>
                       <SchemeZoneRouteScreen />
                     </ProtectedRoute>
                   }
-                /> 
+                />
 
-                     <Route
+                <Route
                   path="meter-inventory"
                   element={
                     <ProtectedRoute>
                       <MeterScreen />
                     </ProtectedRoute>
                   }
-                /> 
+                />
 
-                   <Route
+                <Route
                   path="connections"
                   element={
                     <ProtectedRoute>
                       <ConnectionsScreen />
                     </ProtectedRoute>
                   }
-                /> 
+                />
 
-                  <Route
+                <Route
                   path="new-customers"
                   element={
                     <ProtectedRoute>
                       <NewCustomersScreen />
                     </ProtectedRoute>
                   }
-                /> 
+                />
 
-                   <Route
+                <Route
                   path="abnormal-readings"
                   element={
                     <ProtectedRoute>
                       <AbnormalMeterReadingsList />
                     </ProtectedRoute>
                   }
-                /> 
+                />
 
-
-
-                   <Route
+                <Route
                   path="bill-types"
                   element={
                     <ProtectedRoute>
                       <BillTypeScreen />
                     </ProtectedRoute>
                   }
-                /> 
+                />
 
-                    <Route
+                <Route
                   path="unreceipted-payments"
                   element={
                     <ProtectedRoute>
                       <UnreceipedPayments />
                     </ProtectedRoute>
                   }
-                /> 
+                />
 
-                      <Route
+                <Route
                   path="upload-bank-payments"
                   element={
                     <ProtectedRoute>
                       <BankUploadsScreen />
                     </ProtectedRoute>
                   }
-                /> 
+                />
 
-                    <Route
+                <Route
                   path="tasks"
                   element={
                     <ProtectedRoute>
@@ -473,14 +461,6 @@ const App = () => {
                     </ProtectedRoute>
                   }
                 />
-
-
-
-
-
-
-
-               
               </Routes>
             </Box>
           </Box>
