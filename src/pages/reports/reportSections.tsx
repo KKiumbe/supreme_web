@@ -12,7 +12,8 @@ export type ReportKey =
   | "BILLS_BY_CUSTOMER"
   | "CUSTOMERS_REPORT1"
   | "PAYMENTS_REPORT1"
-  | "METER_READINGS";
+  | "METER_READINGS"
+  | "TOTAL_VOLUME_CONSUMED";
 
 export const PAYMENT_MODES = [
   "CASH",
@@ -117,6 +118,14 @@ export const REPORT_SECTIONS: ReportSection[] = [
         params: [
           { name: "startDate", label: "Start Date", type: "date" },
           { name: "endDate", label: "End Date", type: "date" },
+        ],
+      },
+      {
+        key: "TOTAL_VOLUME_CONSUMED",
+        label: "Total Volume Consumed by Month",
+        params: [
+          { name: "month", label: "Month", type: "date" },
+          { name: "year", label: "Year", type: "date" },
         ],
       },
     ],
