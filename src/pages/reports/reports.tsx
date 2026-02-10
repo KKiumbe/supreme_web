@@ -125,10 +125,19 @@ export default function ReportsPage() {
     setError(null);
 
     try {
-      const job = await requestReportJob({
+      const requestPayload = {
         reportType: activeReport.key,
         params: { ...params, format },
+      };
+
+      console.warn("📊 Sending Report Request to API:", {
+        reportType: requestPayload.reportType,
+        reportLabel: activeReport.label,
+        format: requestPayload.params.format,
+        parameters: requestPayload.params,
       });
+
+      const job = await requestReportJob(requestPayload);
 
       setJobs((prev) => [job, ...prev]);
       setActiveReport(null);
