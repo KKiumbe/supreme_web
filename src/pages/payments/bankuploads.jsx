@@ -27,12 +27,14 @@ import {
   Download as DownloadIcon,
   Add as AddIcon,
   CheckCircle as CheckCircleIcon,
+  Visibility as VisibilityIcon,
 } from "@mui/icons-material";
 import axios from "axios";
 import { useAuthStore } from "../../store/authStore";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import apiClient from "../../services/apiClient";
+import BatchDetailsModal from "./BatchDetailsModal";
 
 /* -------------------------------------------------------
    CONSTANTS
@@ -44,6 +46,7 @@ const BANK_OPTIONS = [
     value: "CONSOLIDATED",
     endpoint: "consolidated",
   },
+  { label: "M-Pesa", value: "MPESA", endpoint: "mpesa-upload" },
 ];
 
 /* -------------------------------------------------------
@@ -82,6 +85,8 @@ const BankUploadsScreen = () => {
   const [selectedBank, setSelectedBank] = useState("");
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState(""); // "preparing", "uploading", "processing"
 
   // Mark as processed state
   const [processingBatchId, setProcessingBatchId] = useState(null);
@@ -89,6 +94,10 @@ const BankUploadsScreen = () => {
     open: false,
     batchId: null,
   });
+
+  // Batch details modal state
+  const [batchDetailsOpen, setBatchDetailsOpen] = useState(false);
+  const [selectedBatch, setSelectedBatch] = useState(null);
 
   /* -------------------------------------------------------
      Fetch Upload Batches
@@ -151,29 +160,67 @@ const BankUploadsScreen = () => {
 
     const formData = new FormData();
     formData.append("file", file);
-
-    // ✅ THIS IS THE FIX
     formData.append("bank", selectedBank);
 
     setUploading(true);
+    setUploadStatus("preparing");
+    setUploadProgress(10);
+
     try {
-      await axios.post(
-        `${BASEURL}/payments/bank-upload/${bank.endpoint}`,
-        formData,
-        {
-          withCredentials: true,
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
+      let uploadUrl;
+      if (selectedBank === "MPESA") {
+        uploadUrl = `${BASEURL}/payments/${bank.endpoint}`;
+      } else {
+        // Bank uploads use the bank-upload endpoint
+        uploadUrl = `${BASEURL}/payments/bank-upload/${bank.endpoint}`;
+      }
+
+      console.warn("📤 Uploading to endpoint:", uploadUrl);
+      console.warn("📋 File:", file.name, "Bank:", selectedBank);
+      console.warn("📦 File size:", (file.size / 1024 / 1024).toFixed(2), "MB");
+      console.warn("📋 FormData contents:", {
+        bank: selectedBank,
+        fileName: file.name,
+      });
+
+      setUploadStatus("uploading");
+      setUploadProgress(30);
+
+      const response = await axios.post(uploadUrl, formData, {
+        withCredentials: true,
+        headers: {
+          "Content-Type": "multipart/form-data",
         },
-      );
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percentCompleted = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total,
+            );
+            setUploadProgress(30 + percentCompleted * 0.6);
+          }
+        },
+      });
+
+      console.warn("✅ Upload response:", response.data);
+
+      setUploadStatus("processing");
+      setUploadProgress(95);
+
+      // Simulate processing time
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       setOpen(false);
       setSelectedBank("");
       setFile(null);
+      setUploadProgress(0);
+      setUploadStatus("");
       fetchUploads();
+      toast.success("✅ File uploaded and processed successfully!");
     } catch (err) {
-      toast.error(err.response?.data?.message || "Upload failed");
+      console.error("❌ Upload error:", err);
+      setUploadStatus("error");
+      setUploadProgress(0);
+      toast.error(err.response?.data?.message || "❌ Upload failed");
     } finally {
       setUploading(false);
     }
@@ -203,6 +250,16 @@ const BankUploadsScreen = () => {
 
   const closeConfirmDialog = () => {
     setConfirmDialog({ open: false, batchId: null });
+  };
+
+  const openBatchDetails = (batch) => {
+    setSelectedBatch(batch);
+    setBatchDetailsOpen(true);
+  };
+
+  const closeBatchDetails = () => {
+    setBatchDetailsOpen(false);
+    setSelectedBatch(null);
   };
 
   /* -------------------------------------------------------
@@ -296,28 +353,39 @@ const BankUploadsScreen = () => {
       {
         field: "actions",
         headerName: "Actions",
-        width: 150,
+        width: 200,
         sortable: false,
         renderCell: (params) => (
-          <Tooltip title="Mark as Processed">
-            <span>
+          <Box sx={{ display: "flex", gap: 1 }}>
+            <Tooltip title="View Details">
               <IconButton
                 size="small"
-                color="success"
-                onClick={() => openConfirmDialog(params.row.id)}
-                disabled={
-                  params.row.status === "POSTED" ||
-                  processingBatchId === params.row.id
-                }
+                color="info"
+                onClick={() => openBatchDetails(params.row)}
               >
-                {processingBatchId === params.row.id ? (
-                  <CircularProgress size={20} />
-                ) : (
-                  <CheckCircleIcon />
-                )}
+                <VisibilityIcon />
               </IconButton>
-            </span>
-          </Tooltip>
+            </Tooltip>
+            <Tooltip title="Mark as Processed">
+              <span>
+                <IconButton
+                  size="small"
+                  color="success"
+                  onClick={() => openConfirmDialog(params.row.id)}
+                  disabled={
+                    params.row.status === "POSTED" ||
+                    processingBatchId === params.row.id
+                  }
+                >
+                  {processingBatchId === params.row.id ? (
+                    <CircularProgress size={20} />
+                  ) : (
+                    <CheckCircleIcon />
+                  )}
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Box>
         ),
       },
     ],
@@ -422,55 +490,98 @@ const BankUploadsScreen = () => {
           {/* Upload Modal */}
           <Dialog
             open={open}
-            onClose={() => setOpen(false)}
+            onClose={() => !uploading && setOpen(false)}
             maxWidth="sm"
             fullWidth
+            disableEscapeKeyDown={uploading}
           >
-            <DialogTitle>New Bank Upload</DialogTitle>
+            <DialogTitle>
+              {uploading ? `Uploading... ${uploadStatus}` : "New Bank Upload"}
+            </DialogTitle>
 
             <DialogContent>
-              <TextField
-                select
-                fullWidth
-                label="Bank"
-                margin="normal"
-                value={selectedBank}
-                onChange={(e) => setSelectedBank(e.target.value)}
-              >
-                {BANK_OPTIONS.map((b) => (
-                  <MenuItem key={b.value} value={b.value}>
-                    {b.label}
-                  </MenuItem>
-                ))}
-              </TextField>
+              {uploading ? (
+                <Box sx={{ py: 3, textAlign: "center" }}>
+                  <CircularProgress
+                    variant="determinate"
+                    value={uploadProgress}
+                    size={100}
+                    sx={{ mb: 2 }}
+                  />
+                  <Typography variant="h6" sx={{ mb: 1 }}>
+                    {uploadProgress.toFixed(0)}%
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mb: 2 }}
+                  >
+                    {uploadStatus === "preparing" && "📦 Preparing file..."}
+                    {uploadStatus === "uploading" &&
+                      `📤 Uploading ${file?.name}...`}
+                    {uploadStatus === "processing" && "⚙️ Processing upload..."}
+                    {uploadStatus === "error" && "❌ Upload failed"}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {file &&
+                      `File size: ${(file.size / 1024 / 1024).toFixed(2)} MB`}
+                  </Typography>
+                </Box>
+              ) : (
+                <>
+                  <TextField
+                    select
+                    fullWidth
+                    label="Bank"
+                    margin="normal"
+                    value={selectedBank}
+                    onChange={(e) => setSelectedBank(e.target.value)}
+                  >
+                    {BANK_OPTIONS.map((b) => (
+                      <MenuItem key={b.value} value={b.value}>
+                        {b.label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
 
-              <Button
-                variant="outlined"
-                component="label"
-                fullWidth
-                sx={{ mt: 2 }}
-              >
-                {file ? file.name : "Choose Excel File"}
-                <input
-                  type="file"
-                  hidden
-                  accept=".xlsx,.xls"
-                  onChange={(e) => setFile(e.target.files?.[0] || null)}
-                />
-              </Button>
+                  <Button
+                    variant="outlined"
+                    component="label"
+                    fullWidth
+                    sx={{ mt: 2 }}
+                  >
+                    {file ? `✅ ${file.name}` : "Choose Excel File"}
+                    <input
+                      type="file"
+                      hidden
+                      accept=".xlsx,.xls"
+                      onChange={(e) => setFile(e.target.files?.[0] || null)}
+                    />
+                  </Button>
+                </>
+              )}
             </DialogContent>
 
             <DialogActions>
               <Button onClick={() => setOpen(false)} disabled={uploading}>
-                Cancel
+                {uploading ? "Uploading..." : "Cancel"}
               </Button>
               <Button
                 variant="contained"
                 onClick={handleUpload}
                 disabled={!selectedBank || !file || uploading}
-                startIcon={uploading && <CircularProgress size={18} />}
               >
-                Upload
+                {uploading ? (
+                  <>
+                    <CircularProgress
+                      size={18}
+                      sx={{ mr: 1, color: "inherit" }}
+                    />
+                    Uploading...
+                  </>
+                ) : (
+                  "Upload"
+                )}
               </Button>
             </DialogActions>
           </Dialog>
@@ -512,6 +623,13 @@ const BankUploadsScreen = () => {
               </Button>
             </DialogActions>
           </Dialog>
+
+          {/* Batch Details Modal */}
+          <BatchDetailsModal
+            open={batchDetailsOpen}
+            onClose={closeBatchDetails}
+            batch={selectedBatch}
+          />
         </>
       )}
     </Box>
