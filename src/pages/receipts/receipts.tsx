@@ -1,16 +1,14 @@
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Box,
   Typography,
   Paper,
   IconButton,
-  Tooltip,
   Divider,
   Chip,
   TextField,
   InputAdornment,
 } from "@mui/material";
-import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 import { DataGrid } from "@mui/x-data-grid";
 import { Visibility } from "@mui/icons-material";
@@ -20,13 +18,25 @@ import ReceiptDetails from "../../components/receipts/receiptsDetails";
 
 const BASEURL = import.meta.env.VITE_BASE_URL;
 
+interface Receipt {
+  id: string;
+  receiptNumber: string;
+  customerName: string;
+  phoneNumber?: string;
+  connectionNumber?: string;
+  amount: number;
+  modeOfPayment: string;
+  createdAt: string;
+  raw?: any;
+}
+
 export default function ReceiptsPage() {
-  const currentUser = useAuthStore((s) => s.currentUser);
+  const currentUser = useAuthStore((s: any) => s.currentUser);
   const navigate = useNavigate();
 
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<Receipt[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
+  const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
 
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
@@ -89,7 +99,7 @@ export default function ReceiptsPage() {
 
       setLoading(false);
     },
-    [page, pageSize, search]
+    [page, pageSize, search],
   );
 
   useEffect(() => {
@@ -110,7 +120,7 @@ export default function ReceiptsPage() {
     }, 400);
 
     return () => clearTimeout(t);
-  }, [search]);
+  }, [search, fetchReceipts]);
 
   /* ----------------------------------
      Columns
@@ -161,7 +171,6 @@ export default function ReceiptsPage() {
           mb={2}
           p={2}
           sx={{
-            
             borderRadius: 1,
           }}
         >
