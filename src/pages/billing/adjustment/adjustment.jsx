@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -47,7 +47,10 @@ const useDebounce = (value, delay = 600) => {
 
 const formatCurrency = (amount) =>
   typeof amount === "number" || typeof amount === "string"
-    ? Number(amount).toLocaleString("en-KE", { style: "currency", currency: "KES" })
+    ? Number(amount).toLocaleString("en-KE", {
+        style: "currency",
+        currency: "KES",
+      })
     : "—";
 
 const flattenAdjustment = (adj) => {
@@ -95,7 +98,11 @@ export default function AdjustmentsList() {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
 
-  const [toast, setToast] = useState({ open: false, message: "", severity: "info" });
+  const [toast, setToast] = useState({
+    open: false,
+    message: "",
+    severity: "info",
+  });
   const showToast = useCallback((msg, severity = "info") => {
     setToast({ open: true, message: msg, severity });
   }, []);
@@ -106,7 +113,9 @@ export default function AdjustmentsList() {
   const fetchAdjustments = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${BASE_URL}/adjustment`, { withCredentials: true });
+      const res = await axios.get(`${BASE_URL}/adjustment`, {
+        withCredentials: true,
+      });
       setAdjustments((res.data.data ?? []).map(flattenAdjustment));
     } catch (err) {
       console.error(err);
@@ -117,13 +126,17 @@ export default function AdjustmentsList() {
   }, [showToast]);
 
   useEffect(() => {
-    if (currentUser) fetchAdjustments();
+    if (currentUser) {
+      fetchAdjustments();
+    }
   }, [currentUser, fetchAdjustments]);
 
   /* ───────────────────────── Filtered Data ───────────────────────── */
 
   const filteredAdjustments = useMemo(() => {
-    if (!debouncedSearch.trim()) return adjustments;
+    if (!debouncedSearch.trim()) {
+      return adjustments;
+    }
 
     const q = debouncedSearch.toLowerCase();
     return adjustments.filter((a) =>
@@ -138,7 +151,7 @@ export default function AdjustmentsList() {
         a.status,
       ]
         .filter(Boolean)
-        .some((v) => v.toString().toLowerCase().includes(q))
+        .some((v) => v.toString().toLowerCase().includes(q)),
     );
   }, [adjustments, debouncedSearch]);
 
@@ -176,7 +189,9 @@ export default function AdjustmentsList() {
   /* ───────────────────────── Approve / Reject ───────────────────────── */
 
   const handleApprove = async () => {
-    if (!selectedAdjustment) return;
+    if (!selectedAdjustment) {
+      return;
+    }
 
     try {
       const { id, adjustmentType } = selectedAdjustment;
@@ -192,7 +207,7 @@ export default function AdjustmentsList() {
         adjustmentType === "CANCELLATION"
           ? "Bill cancellation approved successfully"
           : "Adjustment approved successfully",
-        "success"
+        "success",
       );
 
       setApproveDialogOpen(false);
@@ -220,14 +235,14 @@ export default function AdjustmentsList() {
       await axios.post(
         endpoint,
         { reason: rejectReason.trim() },
-        { withCredentials: true }
+        { withCredentials: true },
       );
 
       showToast(
         adjustmentType === "CANCELLATION"
           ? "Bill cancellation rejected"
           : "Adjustment rejected",
-        "info"
+        "info",
       );
 
       setRejectDialogOpen(false);
@@ -244,7 +259,9 @@ export default function AdjustmentsList() {
   const AdjustmentActions = ({ row }) => {
     const [anchorEl, setAnchorEl] = useState(null);
 
-    if (row.status !== "PENDING") return null;
+    if (row.status !== "PENDING") {
+      return null;
+    }
 
     return (
       <>
@@ -296,7 +313,13 @@ export default function AdjustmentsList() {
         <Chip
           size="small"
           label={value}
-          color={value === "APPROVED" ? "success" : value === "REJECTED" ? "error" : "warning"}
+          color={
+            value === "APPROVED"
+              ? "success"
+              : value === "REJECTED"
+                ? "error"
+                : "warning"
+          }
         />
       ),
     },
@@ -335,7 +358,9 @@ export default function AdjustmentsList() {
     { field: "approvedByName", headerName: "Approved By", width: 180 },
   ];
 
-  if (!currentUser) return null;
+  if (!currentUser) {
+    return null;
+  }
 
   const isCancellation = selectedAdjustment?.adjustmentType === "CANCELLATION";
 
@@ -363,7 +388,9 @@ export default function AdjustmentsList() {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         InputProps={{
-          startAdornment: <SearchIcon sx={{ mr: 1, color: "text.secondary" }} />,
+          startAdornment: (
+            <SearchIcon sx={{ mr: 1, color: "text.secondary" }} />
+          ),
         }}
         sx={{ mb: 3 }}
       />
@@ -374,19 +401,29 @@ export default function AdjustmentsList() {
           columns={columns}
           loading={loading}
           disableRowSelectionOnClick
-          sx={{ border: 0, "& .MuiDataGrid-columnHeaders": { backgroundColor: "#f5f5f5" } }}
+          sx={{
+            border: 0,
+            "& .MuiDataGrid-columnHeaders": { backgroundColor: "#f5f5f5" },
+          }}
         />
       </Paper>
 
       {/* Select Invoice Dialog */}
-      <Dialog open={selectInvoiceOpen} onClose={() => setSelectInvoiceOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={selectInvoiceOpen}
+        onClose={() => setSelectInvoiceOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>Select Invoice</DialogTitle>
         <DialogContent dividers>
           <Autocomplete
             fullWidth
             loading={searchLoading}
             options={invoiceOptions}
-            getOptionLabel={(opt) => `${opt.billNumber} — ${opt.connection?.customer?.customerName || ""}`}
+            getOptionLabel={(opt) =>
+              `${opt.billNumber} — ${opt.connection?.customer?.customerName || ""}`
+            }
             onInputChange={(_, v) => setInvoiceSearch(v)}
             onChange={(_, v) => setSelectedInvoice(v)}
             renderInput={(params) => (
@@ -430,7 +467,10 @@ export default function AdjustmentsList() {
           setInvoiceSearch("");
         }}
         onSuccess={() => {
-          showToast("Adjustment / cancellation request created successfully", "success");
+          showToast(
+            "Adjustment / cancellation request created successfully",
+            "success",
+          );
           fetchAdjustments();
         }}
         showToast={showToast}
@@ -457,7 +497,9 @@ export default function AdjustmentsList() {
           <Divider sx={{ my: 2 }} />
           <Typography>
             Adjustment Amount:{" "}
-            <strong>{formatCurrency(selectedAdjustment?.requestedAmount)}</strong>
+            <strong>
+              {formatCurrency(selectedAdjustment?.requestedAmount)}
+            </strong>
           </Typography>
           <Alert severity="info" sx={{ mt: 3 }} icon={<WarningIcon />}>
             This will update the bill and customer balances.
@@ -481,7 +523,8 @@ export default function AdjustmentsList() {
         <DialogTitle color="error">Confirm Bill Cancellation</DialogTitle>
         <DialogContent dividers>
           <Alert severity="warning" sx={{ mb: 3 }} icon={<WarningIcon />}>
-            <strong>This is a destructive action!</strong><br />
+            <strong>This is a destructive action!</strong>
+            <br />
             The bill will be permanently cancelled and balances reversed.
           </Alert>
 
@@ -513,8 +556,15 @@ export default function AdjustmentsList() {
       </Dialog>
 
       {/* REJECT DIALOG */}
-      <Dialog open={rejectDialogOpen} onClose={() => setRejectDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Reject {isCancellation ? "Cancellation" : "Adjustment"}</DialogTitle>
+      <Dialog
+        open={rejectDialogOpen}
+        onClose={() => setRejectDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Reject {isCancellation ? "Cancellation" : "Adjustment"}
+        </DialogTitle>
         <DialogContent dividers>
           <TextField
             autoFocus
@@ -547,7 +597,11 @@ export default function AdjustmentsList() {
         onClose={handleCloseToast}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
-        <Alert onClose={handleCloseToast} severity={toast.severity} sx={{ width: "100%" }}>
+        <Alert
+          onClose={handleCloseToast}
+          severity={toast.severity}
+          sx={{ width: "100%" }}
+        >
           {toast.message}
         </Alert>
       </Snackbar>

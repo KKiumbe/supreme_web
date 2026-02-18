@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -32,16 +32,6 @@ import BillDetails from "../../components/bills/billDetail";
 import CreateAdjustmentDialog from "../../components/adjustments/CreateAdjustmentDialog";
 
 // ── Helpers ───────────────────────────────────────
-const useDebounce = (value, delay = 500) => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => setDebouncedValue(value), delay);
-    return () => clearTimeout(handler);
-  }, [value, delay]);
-
-  return debouncedValue;
-};
 
 // ── Constants ─────────────────────────────────────
 const BASE_URL = import.meta.env.VITE_BASE_URL || "";

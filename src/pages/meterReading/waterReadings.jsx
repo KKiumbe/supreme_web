@@ -23,7 +23,6 @@ import axios from "axios";
 import { useAuthStore } from "../../store/authStore";
 import { useNavigate } from "react-router-dom";
 import ImageIcon from "@mui/icons-material/Image";
-import CircularProgress from "@mui/material/CircularProgress";
 
 import AddReadingStepperModal from "../../components/meterReading/addReading";
 import EditAbnormalReadingModal from "../../components/meterReading/updateAbnormal";
