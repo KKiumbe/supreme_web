@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -45,7 +45,9 @@ export default function CreateAdjustmentDialog({
   }, [open]);
 
   /* ---------------- Guard ---------------- */
-  if (!invoiceId) return null;
+  if (!invoiceId) {
+    return null;
+  }
 
   /* ---------------- Submit ---------------- */
   const handleSubmit = async () => {
@@ -56,28 +58,36 @@ export default function CreateAdjustmentDialog({
       return;
     }
 
+    if (!reason || reason.trim() === "") {
+      showToast("Please provide a reason for the adjustment.", "warning");
+      return;
+    }
+
     setSubmitting(true);
 
-    try {
-      await axios.post(
-        `${BASEURL}/adjustment`,
-        {
-          invoiceId,
-          amount: numericAmount,
-          direction,
-          reason,
-        },
-        { withCredentials: true }
-      );
+    const payload = {
+      invoiceId,
+      amount: numericAmount,
+      direction,
+      reason: reason.trim(),
+    };
 
+    console.warn("📤 Submitting adjustment:", payload);
+
+    try {
+      const response = await axios.post(`${BASEURL}/adjustment`, payload, {
+        withCredentials: true,
+      });
+
+      console.warn("✅ Adjustment response:", response.data);
       showToast("Adjustment request submitted successfully.", "success");
 
       onClose();
       onSuccess?.();
     } catch (err) {
+      console.error("❌ Adjustment error:", err.response?.data || err.message);
       const message =
-        err?.response?.data?.message ||
-        "Failed to create adjustment.";
+        err?.response?.data?.message || "Failed to create adjustment.";
       showToast(message, "error");
     } finally {
       setSubmitting(false);
@@ -94,9 +104,7 @@ export default function CreateAdjustmentDialog({
           <Typography variant="body2" color="text.secondary">
             Invoice
           </Typography>
-          <Typography fontWeight="bold">
-            {billNumber || "—"}
-          </Typography>
+          <Typography fontWeight="bold">{billNumber || "—"}</Typography>
 
           {customerName && (
             <Typography variant="body2" color="text.secondary">
