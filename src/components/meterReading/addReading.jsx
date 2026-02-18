@@ -170,10 +170,10 @@ export default function AddReadingStepperModal({
     }
 
     // 🔥 VALIDATION: Only validate if previousReading exists
-    if (previousReading && Number(currentReading) <= Number(previousReading)) {
+    if (previousReading && Number(currentReading) < Number(previousReading)) {
       setSnackbar({
         open: true,
-        message: `Current reading must be greater than previous reading (${previousReading}).`,
+        message: `Current reading must be greater than or equal to previous reading (${previousReading}). Zero consumption is allowed for faulty meters.`,
         severity: "error",
       });
       return;
