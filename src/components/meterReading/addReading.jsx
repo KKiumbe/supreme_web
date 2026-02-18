@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Button,
@@ -24,7 +24,11 @@ import PropTypes from "prop-types";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
-export default function AddReadingStepperModal({ open, onClose, onReadingAdded }) {
+export default function AddReadingStepperModal({
+  open,
+  onClose,
+  onReadingAdded,
+}) {
   const [step, setStep] = useState(0);
   const steps = ["Search Customer", "Select Connection", "Enter & Review"];
 
@@ -92,7 +96,9 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
   // 🔹 Select a customer
   const handleSelectCustomer = (customerId) => {
     const cust = customers.find((c) => c.id === customerId);
-    if (!cust) return;
+    if (!cust) {
+      return;
+    }
 
     setSelectedCustomer(cust);
     setCustomers([cust]);
@@ -108,10 +114,12 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
   // 🔹 Select a connection
   const handleSelectConnection = (connectionNumber) => {
     const conn = selectedCustomer?.connections?.find(
-      (c) => String(c.connectionNumber) === String(connectionNumber)
+      (c) => String(c.connectionNumber) === String(connectionNumber),
     );
 
-    if (!conn) return;
+    if (!conn) {
+      return;
+    }
 
     setSelectedConnection(conn);
     setSelectedConnectionNumber(connectionNumber);
@@ -120,7 +128,9 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
 
     // 🔥 Previous reading comes EXACTLY from endpoint
     setPreviousReading(
-      String(lastReading?.currentReading ?? lastReading?.previousReading ?? "0")
+      String(
+        lastReading?.currentReading ?? lastReading?.previousReading ?? "0",
+      ),
     );
 
     setCurrentReading("");
@@ -137,7 +147,9 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
   const usage = (() => {
     const prev = Number(previousReading || 0);
     const curr = Number(currentReading || 0);
-    if (isNaN(prev) || isNaN(curr)) return null;
+    if (isNaN(prev) || isNaN(curr)) {
+      return null;
+    }
     return curr - prev;
   })();
 
@@ -157,8 +169,8 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
       return;
     }
 
-    // 🔥 VALIDATION: Only check HERE
-    if (Number(currentReading) <= Number(previousReading)) {
+    // 🔥 VALIDATION: Only validate if previousReading exists
+    if (previousReading && Number(currentReading) <= Number(previousReading)) {
       setSnackbar({
         open: true,
         message: `Current reading must be greater than previous reading (${previousReading}).`,
@@ -173,13 +185,22 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
       const payload = {
         connectionId: Number(selectedConnection.id),
         currentReading: Number(currentReading),
+        ...(previousReading && { previousReading: Number(previousReading) }),
         notes: notes || null,
         type: "ACTUAL",
       };
 
-      await axios.post(`${BASE_URL}/meter-readings/manual`, payload, {
-        withCredentials: true,
-      });
+      console.warn("📤 Submitting meter reading:", payload);
+
+      const response = await axios.post(
+        `${BASE_URL}/meter-readings/manual`,
+        payload,
+        {
+          withCredentials: true,
+        },
+      );
+
+      console.warn("✅ Meter reading response:", response.data);
 
       setSnackbar({
         open: true,
@@ -190,7 +211,10 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
       onReadingAdded?.();
       setTimeout(onClose, 1000);
     } catch (err) {
-      console.error("Error saving meter reading:", err);
+      console.error(
+        "❌ Error saving meter reading:",
+        err.response?.data || err.message,
+      );
       setSnackbar({
         open: true,
         message: err?.response?.data?.message || "Failed to save reading",
@@ -280,11 +304,15 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
                           mb: 1,
                           cursor: "pointer",
                           background:
-                            selectedCustomer?.id === c.id ? "action.selected" : "inherit",
+                            selectedCustomer?.id === c.id
+                              ? "action.selected"
+                              : "inherit",
                           "&:hover": { background: "action.hover" },
                         }}
                       >
-                        <Typography sx={{ fontWeight: 600 }}>{c.customerName}</Typography>
+                        <Typography sx={{ fontWeight: 600 }}>
+                          {c.customerName}
+                        </Typography>
                         <Typography variant="body2" color="text.secondary">
                           {c.accountNumber} • {c.phoneNumber}
                         </Typography>
@@ -313,7 +341,10 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
               >
                 {selectedCustomer.connections?.length ? (
                   selectedCustomer.connections.map((conn) => (
-                    <MenuItem key={conn.connectionNumber} value={conn.connectionNumber}>
+                    <MenuItem
+                      key={conn.connectionNumber}
+                      value={conn.connectionNumber}
+                    >
                       {conn.connectionNumber} — Meter {conn.meter?.id ?? "N/A"}
                     </MenuItem>
                   ))
@@ -360,12 +391,18 @@ export default function AddReadingStepperModal({ open, onClose, onReadingAdded }
               Units Used: <strong>{usage ?? "-"}</strong>
             </Typography>
 
-            <Box sx={{ display: "flex", justifyContent: "space-between", mt: 3 }}>
+            <Box
+              sx={{ display: "flex", justifyContent: "space-between", mt: 3 }}
+            >
               <Button variant="outlined" onClick={onClose}>
                 Close
               </Button>
 
-              <Button variant="contained" disabled={saving} onClick={handleSave}>
+              <Button
+                variant="contained"
+                disabled={saving}
+                onClick={handleSave}
+              >
                 {saving ? <CircularProgress size={18} /> : "Save Reading"}
               </Button>
             </Box>

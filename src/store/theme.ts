@@ -3,14 +3,20 @@ import { persist } from "zustand/middleware";
 import { createTheme } from "@mui/material/styles";
 
 // ✅ Theme Store with persistence
-export const useThemeStore = create(
+type ThemeState = {
+  darkMode: boolean;
+  toggleTheme: () => void;
+  setDarkMode: (value: boolean) => void;
+};
+
+export const useThemeStore = create<ThemeState>()(
   persist(
     (set) => ({
       darkMode: true, // Default to dark mode
 
       toggleTheme: () => set((state) => ({ darkMode: !state.darkMode })),
 
-      setDarkMode: (value) => set({ darkMode: value }),
+      setDarkMode: (value: boolean) => set({ darkMode: value }),
     }),
     {
       name: "theme-storage", // localStorage key
@@ -19,7 +25,7 @@ export const useThemeStore = create(
 );
 
 // Theme tokens
-export const tokens = (mode) => ({
+export const tokens = (mode: string) => ({
   ...(mode === "dark"
     ? {
         primary: { 400: "#1E1E1E", 600: "#121212", 700: "#0f0f0f" },
@@ -60,25 +66,11 @@ export const getTheme = () => {
         300: colors.grey[300],
         500: colors.grey[500],
       },
-      greenAccent: {
-        main: colors.greenAccent[500],
-        light: "#81c784",
-        dark: colors.greenAccent[700],
-        contrastText: "#fff",
-      },
       success: {
         main: colors.success.main,
         dark: colors.success.dark,
         light: colors.success.light,
         contrastText: "#fff",
-      },
-      blueAccent: {
-        main: colors.blueAccent[500],
-        dark: colors.blueAccent[700],
-      },
-      redAccent: {
-        main: colors.redAccent[500],
-        dark: colors.redAccent[700],
       },
       text: {
         primary: colors.text.primary,
