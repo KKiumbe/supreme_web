@@ -360,10 +360,12 @@ export default function AddReadingStepperModal({
         {step === 2 && selectedConnection && (
           <Box>
             <TextField
-              label="Previous Reading"
+              label="Previous Reading (optional)"
               fullWidth
+              type="number"
               value={previousReading}
-              InputProps={{ readOnly: true }}
+              onChange={(e) => setPreviousReading(e.target.value)}
+              placeholder={selectedConnection?.lastReading ?? ""}
               sx={{ mb: 2 }}
             />
 
