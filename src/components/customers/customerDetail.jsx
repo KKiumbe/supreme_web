@@ -23,25 +23,31 @@ const CustomerDetails = ({ customerId, onClose }) => {
   const [customer, setCustomer] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "error" });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "error",
+  });
   const [smsMessage, setSmsMessage] = useState("");
 
   // Commitment state
   const [showCommitmentForm, setShowCommitmentForm] = useState(false);
   const [commitmentAmount, setCommitmentAmount] = useState("");
   const [commitmentStartDate, setCommitmentStartDate] = useState(
-    dayjs().format("YYYY-MM-DD")
+    dayjs().format("YYYY-MM-DD"),
   );
   const [submittingCommitment, setSubmittingCommitment] = useState(false);
 
+  // Location visibility state
+  const [showLocation, setShowLocation] = useState(false);
+
   const [statementFromDate, setStatementFromDate] = useState(
-  dayjs().startOf("month").format("YYYY-MM-DD")
-);
+    dayjs().startOf("month").format("YYYY-MM-DD"),
+  );
 
-const [statementToDate, setStatementToDate] = useState(
-  dayjs().format("YYYY-MM-DD")
-);
-
+  const [statementToDate, setStatementToDate] = useState(
+    dayjs().format("YYYY-MM-DD"),
+  );
 
   const theme = getTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -52,10 +58,17 @@ const [statementToDate, setStatementToDate] = useState(
     schemeName: data.connections?.[0]?.scheme?.name || data.schemeName || "-",
     zoneName: data.connections?.[0]?.zone?.name || data.zoneName || "-",
     routeName: data.connections?.[0]?.route?.name || data.routeName || "-",
-    tariffName: data.connections?.[0]?.tariffCategory?.name || data.tariffName || "-",
-    createdAt: data.createdAt ? dayjs(data.createdAt).format("MMM D, YYYY") : "-",
-    updatedAt: data.updatedAt ? dayjs(data.updatedAt).format("MMM D, YYYY") : "-",
-    customerDob: data.customerDob ? dayjs(data.customerDob).format("MMM D, YYYY") : "-",
+    tariffName:
+      data.connections?.[0]?.tariffCategory?.name || data.tariffName || "-",
+    createdAt: data.createdAt
+      ? dayjs(data.createdAt).format("MMM D, YYYY")
+      : "-",
+    updatedAt: data.updatedAt
+      ? dayjs(data.updatedAt).format("MMM D, YYYY")
+      : "-",
+    customerDob: data.customerDob
+      ? dayjs(data.customerDob).format("MMM D, YYYY")
+      : "-",
   });
 
   const getPrimaryAccount = () => {
@@ -75,18 +88,28 @@ const [statementToDate, setStatementToDate] = useState(
         setCustomer(flattenCustomer(response.data.data));
       } else {
         setError("Failed to fetch customer details");
-        setSnackbar({ open: true, message: "Failed to fetch customer details", severity: "error" });
+        setSnackbar({
+          open: true,
+          message: "Failed to fetch customer details",
+          severity: "error",
+        });
       }
     } catch (err) {
       setError("Error fetching customer details: " + err.message);
-      setSnackbar({ open: true, message: "Error fetching customer details", severity: "error" });
+      setSnackbar({
+        open: true,
+        message: "Error fetching customer details",
+        severity: "error",
+      });
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (customerId) fetchCustomerDetails();
+    if (customerId) {
+      fetchCustomerDetails();
+    }
   }, [customerId]);
 
   // Status colors
@@ -99,7 +122,7 @@ const [statementToDate, setStatementToDate] = useState(
       REJECTED: "error",
       CONVERTED: "secondary",
       PENDING_CONNECTION: "warning",
-    }[status] || "default");
+    })[status] || "default";
 
   const handleRaiseCommitment = async () => {
     const account = getPrimaryAccount();
@@ -131,7 +154,7 @@ const [statementToDate, setStatementToDate] = useState(
           commitmentAmount: Number(commitmentAmount),
           commitmentStartDate,
         },
-        { withCredentials: true }
+        { withCredentials: true },
       );
 
       if (res.data?.success) {
@@ -160,23 +183,39 @@ const [statementToDate, setStatementToDate] = useState(
   // Send SMS
   const handleSendSms = async () => {
     if (!smsMessage.trim()) {
-      setSnackbar({ open: true, message: "Please enter a message", severity: "warning" });
+      setSnackbar({
+        open: true,
+        message: "Please enter a message",
+        severity: "warning",
+      });
       return;
     }
     try {
       const res = await axios.post(
         `${API_URL}/send-sms-to-customer/${customerId}`,
         { message: smsMessage },
-        { withCredentials: true }
+        { withCredentials: true },
       );
       if (res.data.success) {
-        setSnackbar({ open: true, message: "SMS sent successfully", severity: "success" });
+        setSnackbar({
+          open: true,
+          message: "SMS sent successfully",
+          severity: "success",
+        });
         setSmsMessage("");
       } else {
-        setSnackbar({ open: true, message: "Failed to send SMS", severity: "error" });
+        setSnackbar({
+          open: true,
+          message: "Failed to send SMS",
+          severity: "error",
+        });
       }
     } catch (err) {
-      setSnackbar({ open: true, message: "Error sending SMS: " + err.message, severity: "error" });
+      setSnackbar({
+        open: true,
+        message: "Error sending SMS: " + err.message,
+        severity: "error",
+      });
     }
   };
 
@@ -186,67 +225,78 @@ const [statementToDate, setStatementToDate] = useState(
       const res = await axios.post(
         `${API_URL}/send-bills-to-connection/${customerId}`,
         { message: smsMessage },
-        { withCredentials: true }
+        { withCredentials: true },
       );
       if (res.data.success) {
-        setSnackbar({ open: true, message: "Bill sent successfully", severity: "success" });
+        setSnackbar({
+          open: true,
+          message: "Bill sent successfully",
+          severity: "success",
+        });
         setSmsMessage("");
       } else {
-        setSnackbar({ open: true, message: "Failed to send bill", severity: "error" });
+        setSnackbar({
+          open: true,
+          message: "Failed to send bill",
+          severity: "error",
+        });
       }
     } catch (err) {
-      setSnackbar({ open: true, message: "Error sending bill: " + err.message, severity: "error" });
+      setSnackbar({
+        open: true,
+        message: "Error sending bill: " + err.message,
+        severity: "error",
+      });
     }
   };
 
   // Download/View Connection Statement PDF
-const handleViewStatement = async (connectionId) => {
-  try {
-    setLoading(true);
+  const handleViewStatement = async (connectionId) => {
+    try {
+      setLoading(true);
 
-    const response = await axios.get(
-      `${API_URL}/reports/connection/statement/${connectionId}`,
-      {
-        withCredentials: true,
-        responseType: "blob",
-        params: {
-          from: statementFromDate,
-          to: statementToDate,
+      const response = await axios.get(
+        `${API_URL}/reports/connection/statement/${connectionId}`,
+        {
+          withCredentials: true,
+          responseType: "blob",
+          params: {
+            from: statementFromDate,
+            to: statementToDate,
+          },
         },
-      }
-    );
+      );
 
-    const blob = new Blob([response.data], { type: "application/pdf" });
-    const url = window.URL.createObjectURL(blob);
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
 
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute(
-      "download",
-      `Statement_${connectionId}_${statementFromDate}_to_${statementToDate}.pdf`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute(
+        "download",
+        `Statement_${connectionId}_${statementFromDate}_to_${statementToDate}.pdf`,
+      );
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
 
-    setTimeout(() => window.URL.revokeObjectURL(url), 100);
+      setTimeout(() => window.URL.revokeObjectURL(url), 100);
 
-    setSnackbar({
-      open: true,
-      message: "Statement downloaded successfully",
-      severity: "success",
-    });
-  } catch (err) {
-    setSnackbar({
-      open: true,
-      message: err.response?.data?.message || "Failed to download statement",
-      severity: "error",
-    });
-  } finally {
-    setLoading(false);
-  }
-};
-
+      setSnackbar({
+        open: true,
+        message: "Statement downloaded successfully",
+        severity: "success",
+      });
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.message || "Failed to download statement",
+        severity: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (loading && !customer) {
     return (
@@ -260,7 +310,11 @@ const handleViewStatement = async (connectionId) => {
     return (
       <Box sx={{ p: 3 }}>
         <Typography color="error">{error}</Typography>
-        <Button variant="outlined" onClick={fetchCustomerDetails} sx={{ mt: 2, mr: 1 }}>
+        <Button
+          variant="outlined"
+          onClick={fetchCustomerDetails}
+          sx={{ mt: 2, mr: 1 }}
+        >
           Retry
         </Button>
         <Button
@@ -310,7 +364,12 @@ const handleViewStatement = async (connectionId) => {
           borderLeft: !isMobile ? `1px solid ${theme.palette.divider}` : "none",
         }}
       >
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="center"
+          mb={2}
+        >
           <Typography variant="h6" fontWeight="bold">
             Customer Details
           </Typography>
@@ -323,38 +382,66 @@ const handleViewStatement = async (connectionId) => {
           <Typography variant="subtitle1" fontWeight="bold">
             Personal Information
           </Typography>
-          <Typography><strong>Name:</strong> {customer.customerName || "-"}</Typography>
-          <Typography><strong>Phone:</strong> {customer.phoneNumber || "-"}</Typography>
-          <Typography><strong>Email:</strong> {customer.email || "-"}</Typography>
-          <Typography><strong>National ID:</strong> {customer.customerIdNo || "-"}</Typography>
-          <Typography><strong>Date of Birth:</strong> {customer.customerDob || "-"}</Typography>
+          <Typography>
+            <strong>Name:</strong> {customer.customerName || "-"}
+          </Typography>
+          <Typography>
+            <strong>Phone:</strong> {customer.phoneNumber || "-"}
+          </Typography>
+          <Typography>
+            <strong>Email:</strong> {customer.email || "-"}
+          </Typography>
+          <Typography>
+            <strong>National ID:</strong> {customer.customerIdNo || "-"}
+          </Typography>
+          <Typography>
+            <strong>Date of Birth:</strong> {customer.customerDob || "-"}
+          </Typography>
         </Box>
 
         <Box mb={2}>
-          <Typography variant="subtitle1" fontWeight="bold">Account Information</Typography>
-          <Typography><strong>Account Number:</strong> {customer.accountNumber || "-"}</Typography>
+          <Typography variant="subtitle1" fontWeight="bold">
+            Account Information
+          </Typography>
+          <Typography>
+            <strong>Account Number:</strong> {customer.accountNumber || "-"}
+          </Typography>
           <Typography>
             <strong>Balance:</strong>{" "}
-            {customer.closingBalance ? `KES ${parseFloat(customer.closingBalance).toFixed(2)}` : "-"}
+            {customer.closingBalance
+              ? `KES ${parseFloat(customer.closingBalance).toFixed(2)}`
+              : "-"}
           </Typography>
-          <Typography><strong>KRA PIN:</strong> {customer.customerKraPin || "-"}</Typography>
-          <Typography><strong>Deposit:</strong> {customer.customerDeposit || "-"}</Typography>
-          <Typography><strong>Disco Type:</strong> {customer.customerDiscoType || "-"}</Typography>
-          <Typography><strong>Has Water:</strong> {customer.hasWater ? "Yes" : "No"}</Typography>
-          <Typography><strong>Has Sewer:</strong> {customer.hasSewer ? "Yes" : "No"}</Typography>
+          <Typography>
+            <strong>KRA PIN:</strong> {customer.customerKraPin || "-"}
+          </Typography>
+          <Typography>
+            <strong>Deposit:</strong> {customer.customerDeposit || "-"}
+          </Typography>
+          <Typography>
+            <strong>Disco Type:</strong> {customer.customerDiscoType || "-"}
+          </Typography>
+          <Typography>
+            <strong>Has Water:</strong> {customer.hasWater ? "Yes" : "No"}
+          </Typography>
+          <Typography>
+            <strong>Has Sewer:</strong> {customer.hasSewer ? "Yes" : "No"}
+          </Typography>
         </Box>
 
         <Box mb={2}>
-          <Typography variant="subtitle1" fontWeight="bold">Connection Information</Typography>
-          
+          <Typography variant="subtitle1" fontWeight="bold">
+            Connection Information
+          </Typography>
+
           {(customer.connections || []).length ? (
             customer.connections.map((conn, index) => (
-              <Box 
-                key={conn.id} 
-                mb={2} 
-                p={2} 
-                border={1} 
-                borderColor="divider" 
+              <Box
+                key={conn.id}
+                mb={2}
+                p={2}
+                border={1}
+                borderColor="divider"
                 borderRadius={1}
                 bgcolor="background.paper"
               >
@@ -364,52 +451,110 @@ const handleViewStatement = async (connectionId) => {
 
                 <Typography component="div" mt={0.5}>
                   <strong>Status:</strong>{" "}
-                  <Chip label={conn.status} color={getStatusColor(conn.status)} size="small" />
+                  <Chip
+                    label={conn.status}
+                    color={getStatusColor(conn.status)}
+                    size="small"
+                  />
                 </Typography>
 
                 <Typography mt={0.5}>
-                  <strong>Scheme:</strong> {conn.scheme?.name || customer.schemeName || "-"}
+                  <strong>Scheme:</strong>{" "}
+                  {conn.scheme?.name || customer.schemeName || "-"}
                 </Typography>
                 <Typography>
-                  <strong>Tariff:</strong> {conn.tariffCategory?.name || customer.tariffName || "-"}
+                  <strong>Tariff:</strong>{" "}
+                  {conn.tariffCategory?.name || customer.tariffName || "-"}
                 </Typography>
+
+                {/* Location Information */}
+                {(conn.latitude || conn.longitude) && (
+                  <Box mt={1}>
+                    <Button
+                      size="small"
+                      onClick={() => setShowLocation(!showLocation)}
+                      sx={{ textTransform: "none" }}
+                    >
+                      {showLocation ? "Hide Location" : "Show Location"}
+                    </Button>
+                    {showLocation && (
+                      <Box
+                        mt={1}
+                        p={1.5}
+                        bgcolor="action.hover"
+                        borderRadius={1}
+                      >
+                        <Typography>
+                          <strong>Latitude:</strong> {conn.latitude || "-"}
+                        </Typography>
+                        <Typography>
+                          <strong>Longitude:</strong> {conn.longitude || "-"}
+                        </Typography>
+                        {conn.latitude && conn.longitude && (
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            mt={1}
+                          >
+                            📍{" "}
+                            <a
+                              href={`https://maps.google.com/?q=${conn.latitude},${conn.longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                color: "inherit",
+                                textDecoration: "underline",
+                              }}
+                            >
+                              View on Google Maps
+                            </a>
+                          </Typography>
+                        )}
+                      </Box>
+                    )}
+                  </Box>
+                )}
 
                 {conn.meter && (
                   <>
                     <Typography mt={0.5}>
-                      <strong>Meter Serial:</strong> {conn.meter.serialNumber || "-"}
+                      <strong>Meter Serial:</strong>{" "}
+                      {conn.meter.serialNumber || "-"}
                     </Typography>
-                    {(conn.meter.meterReadings || []).slice(0, 1).map((reading) => (
-                      <Typography key={reading.id}>
-                        <strong>Latest Reading:</strong>{" "}
-                        {reading.currentReading || "-"} (
-                        {reading.readingDate ? dayjs(reading.readingDate).format("MMM D, YYYY") : "-"}
-                        )
-                      </Typography>
-                    ))}
+                    {(conn.meter.meterReadings || [])
+                      .slice(0, 1)
+                      .map((reading) => (
+                        <Typography key={reading.id}>
+                          <strong>Latest Reading:</strong>{" "}
+                          {reading.currentReading || "-"} (
+                          {reading.readingDate
+                            ? dayjs(reading.readingDate).format("MMM D, YYYY")
+                            : "-"}
+                          )
+                        </Typography>
+                      ))}
                   </>
                 )}
 
                 <Box mt={1.5} display="flex" gap={1} flexWrap="wrap">
-  <TextField
-    label="From"
-    type="date"
-    size="small"
-    value={statementFromDate}
-    onChange={(e) => setStatementFromDate(e.target.value)}
-    InputLabelProps={{ shrink: true }}
-  />
+                  <TextField
+                    label="From"
+                    type="date"
+                    size="small"
+                    value={statementFromDate}
+                    onChange={(e) => setStatementFromDate(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                  />
 
-  <TextField
-    label="To"
-    type="date"
-    size="small"
-    value={statementToDate}
-    onChange={(e) => setStatementToDate(e.target.value)}
-    InputLabelProps={{ shrink: true }}
-  />
-</Box>
-
+                  <TextField
+                    label="To"
+                    type="date"
+                    size="small"
+                    value={statementToDate}
+                    onChange={(e) => setStatementToDate(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Box>
 
                 {/* Statement button */}
                 <Button
@@ -420,7 +565,7 @@ const handleViewStatement = async (connectionId) => {
                   onClick={() => handleViewStatement(conn.id)}
                   disabled={loading}
                 >
-                 Download Statement
+                  Download Statement
                 </Button>
               </Box>
             ))
@@ -430,17 +575,29 @@ const handleViewStatement = async (connectionId) => {
         </Box>
 
         <Box mb={2}>
-          <Typography variant="subtitle1" fontWeight="bold">Status</Typography>
+          <Typography variant="subtitle1" fontWeight="bold">
+            Status
+          </Typography>
           <Typography component="div">
             <strong>Status:</strong>{" "}
-            <Chip label={customer.status} color={getStatusColor(customer.status)} size="small" />
+            <Chip
+              label={customer.status}
+              color={getStatusColor(customer.status)}
+              size="small"
+            />
           </Typography>
-          <Typography><strong>Created At:</strong> {customer.createdAt}</Typography>
-          <Typography><strong>Updated At:</strong> {customer.updatedAt || "-"}</Typography>
+          <Typography>
+            <strong>Created At:</strong> {customer.createdAt}
+          </Typography>
+          <Typography>
+            <strong>Updated At:</strong> {customer.updatedAt || "-"}
+          </Typography>
         </Box>
 
         {/* Commitment Section */}
-        <Typography fontWeight="bold" mb={1}>Payment Commitment</Typography>
+        <Typography fontWeight="bold" mb={1}>
+          Payment Commitment
+        </Typography>
 
         {!account ? (
           <Typography>No account found</Typography>
@@ -472,7 +629,7 @@ const handleViewStatement = async (connectionId) => {
                     size="small"
                     variant="outlined"
                     color="theme.palette.primary.contrastText"
-                    sx={{ mt: 1,  }}
+                    sx={{ mt: 1 }}
                     onClick={() => setShowCommitmentForm(true)}
                   >
                     Raise Commitment
@@ -502,7 +659,9 @@ const handleViewStatement = async (connectionId) => {
                         onClick={handleRaiseCommitment}
                         disabled={submittingCommitment}
                       >
-                        {submittingCommitment ? "Saving…" : "Confirm Commitment"}
+                        {submittingCommitment
+                          ? "Saving…"
+                          : "Confirm Commitment"}
                       </Button>
                       <Button
                         variant="outlined"
@@ -582,7 +741,10 @@ const handleViewStatement = async (connectionId) => {
         autoHideDuration={6000}
         onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
       >
-        <Alert severity={snackbar.severity} onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}>
+        <Alert
+          severity={snackbar.severity}
+          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>
@@ -591,7 +753,8 @@ const handleViewStatement = async (connectionId) => {
 };
 
 CustomerDetails.propTypes = {
-  customerId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  customerId: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
+    .isRequired,
   onClose: PropTypes.func.isRequired,
 };
 
