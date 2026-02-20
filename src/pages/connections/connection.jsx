@@ -30,6 +30,7 @@ import {
   FilterList,
   GetApp,
   PowerOff,
+  Devices,
 } from "@mui/icons-material";
 import { DataGrid } from "@mui/x-data-grid";
 import { useAuthStore } from "../../store/authStore";
@@ -178,6 +179,18 @@ const ConnectionsScreen = () => {
   const [previewConnections, setPreviewConnections] = useState([]);
   const [previewSelectedIds, setPreviewSelectedIds] = useState([]);
   const [previewLoading, setPreviewLoading] = useState(false);
+
+  // Edit Connection Modal States
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editConnection, setEditConnection] = useState(null);
+  const [editConnectionNumber, setEditConnectionNumber] = useState("");
+  const [editStatus, setEditStatus] = useState("ACTIVE");
+  const [editSelectedSchemeId, setEditSelectedSchemeId] = useState("");
+  const [editSelectedZoneId, setEditSelectedZoneId] = useState("");
+  const [editSelectedRouteId, setEditSelectedRouteId] = useState("");
+  const [editSelectedTariffCategoryId, setEditSelectedTariffCategoryId] =
+    useState("");
+  const [editSubmitting, setEditSubmitting] = useState(false);
   const [disconnectionDialogOpen, setDisconnectionDialogOpen] = useState(false);
   const [minUnpaidMonths, setMinUnpaidMonths] = useState(""); // ✅ NEW
 
@@ -499,10 +512,20 @@ const ConnectionsScreen = () => {
 
   const handleAssignMeter = async () => {
     if (!selectedConnection || !selectedMeterId) {
+      setSnackbar({
+        open: true,
+        message: "Please select both a connection and a meter",
+        severity: "error",
+      });
       return;
     }
     setLoading(true);
     try {
+      console.warn("📤 Assigning meter:", {
+        connectionId: selectedConnection.id,
+        meterId: selectedMeterId,
+      });
+
       await axios.put(
         `${BASEURL}/assign-meter`,
         {
@@ -511,6 +534,9 @@ const ConnectionsScreen = () => {
         },
         { withCredentials: true },
       );
+
+      console.warn("✅ Meter assignment response: Success");
+
       resetAssignModal();
       fetchConnections(search, page, rowsPerPage, {
         status: statusFilter,
@@ -520,14 +546,40 @@ const ConnectionsScreen = () => {
       fetchMeters();
       setSnackbar({
         open: true,
-        message: "Meter assigned",
+        message: "✅ Meter assigned successfully",
         severity: "success",
       });
-    } catch (err) {
-      setSnackbar({ open: true, message: "Assign failed", severity: "error" });
+    } catch (error) {
+      console.error("❌ Meter assignment error:", error);
+      if (isPermissionDenied(error)) {
+        setPermissionDenied(true);
+      } else {
+        setSnackbar({
+          open: true,
+          message: error.response?.data?.message || "Failed to assign meter",
+          severity: "error",
+        });
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  // Open Assign Meter Modal
+  const handleOpenAssignMeterModal = (connection) => {
+    // Check if connection already has a meter
+    if (connection.meterId) {
+      setSnackbar({
+        open: true,
+        message:
+          "⚠️ This connection already has a meter assigned. Please unassign it first if you want to change it.",
+        severity: "warning",
+      });
+      return;
+    }
+    setSelectedConnection(connection);
+    setSelectedMeterId("");
+    setAssignMeterOpen(true);
   };
 
   const handleTaskCreated = () => {
@@ -600,6 +652,89 @@ const ConnectionsScreen = () => {
     setSelectedMeterId("");
   };
 
+  // Open Edit Connection Modal
+  const handleOpenEditModal = (connection) => {
+    setEditConnection(connection);
+    setEditConnectionNumber(connection.connectionNumber || "");
+    setEditStatus(connection.status || "ACTIVE");
+    setEditSelectedSchemeId(connection.schemeId || "");
+    setEditSelectedZoneId(connection.zoneId || "");
+    setEditSelectedRouteId(connection.routeId || "");
+    setEditSelectedTariffCategoryId(connection.tariffCategoryId || "");
+    setEditModalOpen(true);
+  };
+
+  // Reset Edit Modal
+  const resetEditModal = () => {
+    setEditModalOpen(false);
+    setEditConnection(null);
+    setEditConnectionNumber("");
+    setEditStatus("ACTIVE");
+    setEditSelectedSchemeId("");
+    setEditSelectedZoneId("");
+    setEditSelectedRouteId("");
+    setEditSelectedTariffCategoryId("");
+  };
+
+  // Handle Edit Connection Submit
+  const handleEditConnection = async () => {
+    if (!editConnection || !editConnectionNumber) {
+      setSnackbar({
+        open: true,
+        message: "Connection Number is required",
+        severity: "error",
+      });
+      return;
+    }
+
+    setEditSubmitting(true);
+    try {
+      const payload = {
+        connectionNumber: Number(editConnectionNumber),
+        status: editStatus,
+        tariffCategoryId: editSelectedTariffCategoryId || null,
+        schemeId: editSelectedSchemeId ? Number(editSelectedSchemeId) : null,
+        zoneId: editSelectedZoneId ? Number(editSelectedZoneId) : null,
+        routeId: editSelectedRouteId ? Number(editSelectedRouteId) : null,
+      };
+
+      console.warn("📤 Updating connection:", payload);
+
+      await axios.put(
+        `${BASEURL}/update-connection/${editConnection.id}`,
+        payload,
+        { withCredentials: true },
+      );
+
+      resetEditModal();
+      fetchConnections(search, page, rowsPerPage, {
+        status: statusFilter,
+        schemeId: schemeFilter,
+        zoneId: zoneFilter,
+      });
+
+      setSnackbar({
+        open: true,
+        message: "✅ Connection updated successfully",
+        severity: "success",
+      });
+    } catch (error) {
+      console.error("❌ Error updating connection:", error);
+      if (isPermissionDenied(error)) {
+        setPermissionDenied(true);
+      } else {
+        setSnackbar({
+          open: true,
+          message:
+            error.response?.data?.message || "Failed to update connection",
+          severity: "error",
+        });
+      }
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
   const openTaskDialog = (connection) => {
     if (!connection?.id || !connection?.customerId) {
       setSnackbar({
@@ -632,32 +767,48 @@ const ConnectionsScreen = () => {
       {
         field: "actions",
         headerName: "Actions",
-        width: 120,
+        width: 180,
         align: "center",
         renderCell: (params) => (
-          <Box>
-            {params?.row?.status === "PENDING_METER" ? (
-              <Tooltip title="Assign Meter Task">
+          <Box sx={{ display: "flex", gap: 0.5 }}>
+            <Tooltip title="Edit Connection">
+              <IconButton
+                size="small"
+                color="theme.palette.primary.contrastText"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenEditModal(params.row);
+                }}
+              >
+                <Edit fontSize="small" />
+              </IconButton>
+            </Tooltip>
+
+            {/* Show Assign Meter button if no meter assigned */}
+            {!params?.row?.meterId ? (
+              <Tooltip title="Assign Meter">
                 <IconButton
-                  color="theme.palette.primary.contrastText"
+                  size="small"
+                  color="warning"
                   onClick={(e) => {
                     e.stopPropagation();
-                    openTaskDialog(params.row);
+                    handleOpenAssignMeterModal(params.row);
                   }}
                 >
-                  <Edit />
+                  <Devices fontSize="small" />
                 </IconButton>
               </Tooltip>
             ) : (
               <Tooltip title="View Details">
                 <IconButton
-                  color="theme.palette.primary.contrastText"
+                  size="small"
+                  color="info"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleViewDetails(params.row);
                   }}
                 >
-                  <Visibility />
+                  <Visibility fontSize="small" />
                 </IconButton>
               </Tooltip>
             )}
@@ -1094,7 +1245,72 @@ const ConnectionsScreen = () => {
               fullWidth
               maxWidth="sm"
             >
-              {/* Assign meter dialog content */}
+              <DialogTitle>Assign Meter to Connection</DialogTitle>
+              <DialogContent
+                sx={{ pt: 3, display: "flex", flexDirection: "column", gap: 2 }}
+              >
+                {selectedConnection && (
+                  <>
+                    <TextField
+                      fullWidth
+                      label="Connection Number"
+                      value={selectedConnection.connectionNumber || ""}
+                      disabled
+                    />
+                    <TextField
+                      fullWidth
+                      label="Customer"
+                      value={selectedConnection.customerName || ""}
+                      disabled
+                    />
+
+                    {/* Warning if connection already has a meter */}
+                    {selectedConnection.meterId && (
+                      <Alert severity="warning">
+                        ⚠️ This connection already has a meter:{" "}
+                        <strong>{selectedConnection.meterSerialNumber}</strong>
+                      </Alert>
+                    )}
+                  </>
+                )}
+
+                <FormControl fullWidth disabled={loading}>
+                  <InputLabel>Select Meter</InputLabel>
+                  <Select
+                    value={selectedMeterId}
+                    onChange={(e) => setSelectedMeterId(e.target.value)}
+                    label="Select Meter"
+                  >
+                    <MenuItem value="">-- Choose a meter --</MenuItem>
+                    {meters
+                      .filter((m) => m.status === "AVAILABLE")
+                      .map((m) => (
+                        <MenuItem key={m.id} value={m.id}>
+                          {m.serialNumber} ({m.model})
+                        </MenuItem>
+                      ))}
+                  </Select>
+                </FormControl>
+
+                {!meters.some((m) => m.status === "AVAILABLE") && (
+                  <Typography color="warning.main" variant="caption">
+                    ⚠️ No available meters. Please add a new meter first.
+                  </Typography>
+                )}
+              </DialogContent>
+
+              <DialogActions>
+                <Button onClick={resetAssignModal} disabled={loading}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={handleAssignMeter}
+                  disabled={loading || !selectedMeterId}
+                >
+                  {loading ? <CircularProgress size={20} /> : "Assign Meter"}
+                </Button>
+              </DialogActions>
             </Dialog>
 
             <Dialog
@@ -1283,6 +1499,139 @@ const ConnectionsScreen = () => {
               <DialogActions>
                 <Button onClick={() => setDisconnectionDialogOpen(false)}>
                   Close
+                </Button>
+              </DialogActions>
+            </Dialog>
+
+            {/* Edit Connection Modal */}
+            <Dialog
+              open={editModalOpen}
+              onClose={resetEditModal}
+              fullWidth
+              maxWidth="sm"
+            >
+              <DialogTitle>Edit Connection</DialogTitle>
+              <DialogContent
+                sx={{ pt: 3, display: "flex", flexDirection: "column", gap: 2 }}
+              >
+                <TextField
+                  fullWidth
+                  label="Connection Number"
+                  value={editConnectionNumber}
+                  onChange={(e) => setEditConnectionNumber(e.target.value)}
+                  type="number"
+                  disabled={editSubmitting}
+                />
+
+                <FormControl fullWidth disabled={editSubmitting}>
+                  <InputLabel>Status</InputLabel>
+                  <Select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value)}
+                    label="Status"
+                  >
+                    <MenuItem value="ACTIVE">Active</MenuItem>
+                    <MenuItem value="PENDING_METER">Pending Meter</MenuItem>
+                    <MenuItem value="DISCONNECTED">Disconnected</MenuItem>
+                    <MenuItem value="INACTIVE">Inactive</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <FormControl fullWidth disabled={editSubmitting}>
+                  <InputLabel>Scheme</InputLabel>
+                  <Select
+                    value={editSelectedSchemeId}
+                    onChange={(e) => {
+                      setEditSelectedSchemeId(e.target.value);
+                      setEditSelectedZoneId("");
+                      setEditSelectedRouteId("");
+                    }}
+                    label="Scheme"
+                  >
+                    <MenuItem value="">None</MenuItem>
+                    {schemes.map((s) => (
+                      <MenuItem key={s.id} value={String(s.id)}>
+                        {s.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                {editSelectedSchemeId && (
+                  <FormControl fullWidth disabled={editSubmitting}>
+                    <InputLabel>Zone</InputLabel>
+                    <Select
+                      value={editSelectedZoneId}
+                      onChange={(e) => {
+                        setEditSelectedZoneId(e.target.value);
+                        setEditSelectedRouteId("");
+                      }}
+                      label="Zone"
+                    >
+                      <MenuItem value="">None</MenuItem>
+                      {schemes
+                        .find((s) => String(s.id) === editSelectedSchemeId)
+                        ?.zones?.map((z) => (
+                          <MenuItem key={z.id} value={String(z.id)}>
+                            {z.name}
+                          </MenuItem>
+                        ))}
+                    </Select>
+                  </FormControl>
+                )}
+
+                {editSelectedZoneId && (
+                  <FormControl fullWidth disabled={editSubmitting}>
+                    <InputLabel>Route</InputLabel>
+                    <Select
+                      value={editSelectedRouteId}
+                      onChange={(e) => setEditSelectedRouteId(e.target.value)}
+                      label="Route"
+                    >
+                      <MenuItem value="">None</MenuItem>
+                      {schemes
+                        .find((s) => String(s.id) === editSelectedSchemeId)
+                        ?.zones?.find(
+                          (z) => String(z.id) === editSelectedZoneId,
+                        )
+                        ?.routes?.map((r) => (
+                          <MenuItem key={r.id} value={String(r.id)}>
+                            {r.name}
+                          </MenuItem>
+                        ))}
+                    </Select>
+                  </FormControl>
+                )}
+
+                <FormControl fullWidth disabled={editSubmitting}>
+                  <InputLabel>Tariff Category</InputLabel>
+                  <Select
+                    value={editSelectedTariffCategoryId}
+                    onChange={(e) =>
+                      setEditSelectedTariffCategoryId(e.target.value)
+                    }
+                    label="Tariff Category"
+                  >
+                    <MenuItem value="">None</MenuItem>
+                    {tariffCategories.map((t) => (
+                      <MenuItem key={t.id} value={String(t.id)}>
+                        {t.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </DialogContent>
+
+              <DialogActions>
+                <Button onClick={resetEditModal} disabled={editSubmitting}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={handleEditConnection}
+                  disabled={editSubmitting}
+                >
+                  {editSubmitting ? <CircularProgress size={20} /> : "Update"}
                 </Button>
               </DialogActions>
             </Dialog>
