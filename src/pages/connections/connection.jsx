@@ -1,39 +1,18 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import {
   Box,
-  Button,
+  CircularProgress,
+  Snackbar,
+  Alert,
+  Tabs,
+  Tab,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  TextField,
-  InputAdornment,
-  CircularProgress,
-  IconButton,
   Typography,
-  MenuItem,
-  Snackbar,
-  Alert,
-  Tooltip,
-  Chip,
-  Collapse,
-  FormControl,
-  InputLabel,
-  Select,
-  Divider,
+  Button,
 } from "@mui/material";
-import {
-  Add,
-  Search,
-  Clear,
-  Visibility,
-  Edit,
-  FilterList,
-  GetApp,
-  PowerOff,
-  Devices,
-} from "@mui/icons-material";
-import { DataGrid } from "@mui/x-data-grid";
 import { useAuthStore } from "../../store/authStore";
 import { useThemeStore } from "../../store/theme";
 import axios from "axios";
@@ -48,6 +27,17 @@ import {
 import AssignMeterTaskDialog from "../../components/meterAssign/assignTask";
 import CreateDisconnectionTaskPage from "../../components/disconnectionTasks/create";
 import DisconnectionPreviewDialog from "../../components/connections/disconnectionPrev";
+import ActiveCommitmentConnectionsTab from "./activeCommitments";
+
+// Refactored components
+import ConnectionHeaderBar from "../../components/connections/ConnectionHeaderBar";
+import ConnectionsDataGrid from "../../components/connections/ConnectionsDataGrid";
+import ConnectionDetailsPanel from "../../components/connections/ConnectionDetailsPanel";
+import ConnectionFilters from "../../components/connections/ConnectionFilters";
+import DisconnectionSection from "../../components/connections/DisconnectionSection";
+import CreateConnectionDialog from "../../components/connections/CreateConnectionDialog";
+import EditConnectionDialog from "../../components/connections/EditConnectionDialog";
+import AssignMeterDialog from "../../components/connections/AssignMeterDialog";
 
 // Simple ErrorBoundary
 class ErrorBoundary extends React.Component {
@@ -148,6 +138,7 @@ const ConnectionsScreen = () => {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
 
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -885,536 +876,114 @@ const ConnectionsScreen = () => {
         ) : (
           <>
             {/* Header */}
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: 2,
-              }}
-            >
-              <Typography variant="h5" fontWeight={600}>
-                Connections
-              </Typography>
+            <ConnectionHeaderBar
+              activeTab={activeTab}
+              loading={loading}
+              currentUser={currentUser}
+              onDisconnectionClick={() => setDisconnectionDialogOpen(true)}
+              onFilterClick={() => setFilterOpen(!filterOpen)}
+              onExportClick={handleExport}
+              onNewConnectionClick={() => setModalOpen(true)}
+              filterOpen={filterOpen}
+            />
 
-              <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
-                <Button
-                  variant="outlined"
-                  color="error"
-                  startIcon={<PowerOff />}
-                  onClick={() => setDisconnectionDialogOpen(true)}
-                  disabled={loading}
-                >
-                  Create Disconnection Task
-                </Button>
-
-                <Button
-                  variant="outlined"
-                  startIcon={<FilterList />}
-                  onClick={() => setFilterOpen(!filterOpen)}
-                >
-                  Filters
-                </Button>
-
-                <Button
-                  variant="outlined"
-                  startIcon={<GetApp />}
-                  onClick={handleExport}
-                >
-                  Export CSV
-                </Button>
-
-                {currentUser?.role === "ADMIN" && (
-                  <Button
-                    variant="contained"
-                    startIcon={<Add />}
-                    onClick={() => setModalOpen(true)}
-                  >
-                    New Connection
-                  </Button>
-                )}
-              </Box>
+            {/* Tabs */}
+            <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+              <Tabs 
+                value={activeTab} 
+                onChange={(e, newValue) => setActiveTab(newValue)}
+                aria-label="connections tabs"
+              >
+                <Tab label="All Connections" />
+                <Tab label="Active Commitments" />
+              </Tabs>
             </Box>
 
-            {/* Search + Disconnection Controls */}
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <TextField
-                fullWidth
-                size="small"
-                placeholder="Search by conn #, customer name, phone, meter..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Search />
-                    </InputAdornment>
-                  ),
-                  endAdornment: search && (
-                    <InputAdornment position="end">
-                      <IconButton size="small" onClick={() => setSearch("")}>
-                        <Clear />
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
+            {/* Tab 0: All Connections */}
+            {activeTab === 0 && (
+              <>
+                <ConnectionFilters
+                  search={search}
+                  onSearchChange={setSearch}
+                  statusFilter={statusFilter}
+                  onStatusFilterChange={setStatusFilter}
+                  schemeFilter={schemeFilter}
+                  onSchemeFilterChange={setSchemeFilter}
+                  zoneFilter={zoneFilter}
+                  onZoneFilterChange={setZoneFilter}
+                  filterOpen={filterOpen}
+                  onFilterToggle={() => setFilterOpen(!filterOpen)}
+                  disconnectionSection={
+                    <DisconnectionSection
+                      previewScope={previewScope}
+                      onPreviewScopeChange={setPreviewScope}
+                      previewScopeId={previewScopeId}
+                      onPreviewScopeIdChange={setPreviewScopeId}
+                      minBalance={minBalance}
+                      onMinBalanceChange={setMinBalance}
+                      minUnpaidMonths={minUnpaidMonths}
+                      onMinUnpaidMonthsChange={setMinUnpaidMonths}
+                      schemes={schemes}
+                      zones={zones}
+                      routes={routes}
+                      previewLoading={previewLoading}
+                      onPreview={handleOpenDisconnectionPreview}
+                      onDownload={handleDownloadDueForDisconnection}
+                    />
+                  }
+                  schemes={schemes}
+                  zones={zones}
+                  statusOptions={statusOptions}
+                />
 
-              <Collapse in={true}>
-                <Box sx={{ p: 2, bgcolor: "action.hover", borderRadius: 1 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Overdue connections for disconnection
-                  </Typography>
-
-                  <Box
-                    sx={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: 2,
-                      alignItems: "center",
-                      mt: 1.5,
-                    }}
-                  >
-                    <FormControl size="small" sx={{ minWidth: 90 }}>
-                      <InputLabel>Level</InputLabel>
-                      <Select
-                        value={previewScope}
-                        label="Level"
-                        onChange={(e) => {
-                          setPreviewScope(e.target.value);
-                          setPreviewScopeId("");
-                          setMinBalance("");
-                          setMinUnpaidMonths(""); // ✅ reset
-                        }}
-                      >
-                        <MenuItem value="">All overdue</MenuItem>
-                        <MenuItem value="SCHEME">Scheme</MenuItem>
-                        <MenuItem value="ZONE">Zone</MenuItem>
-                        <MenuItem value="ROUTE">Route</MenuItem>
-                      </Select>
-                    </FormControl>
-
-                    {previewScope && (
-                      <>
-                        <FormControl size="small" sx={{ minWidth: 80 }}>
-                          <InputLabel>{getScopeLabel(previewScope)}</InputLabel>
-                          <Select
-                            value={previewScopeId}
-                            label={getScopeLabel(previewScope)}
-                            onChange={(e) => setPreviewScopeId(e.target.value)}
-                          >
-                            <MenuItem value="">— Select —</MenuItem>
-                            {previewScope === "SCHEME" &&
-                              schemes.map((s) => (
-                                <MenuItem key={s.id} value={String(s.id)}>
-                                  {s.name}
-                                </MenuItem>
-                              ))}
-                            {previewScope === "ZONE" &&
-                              zones.map((z) => (
-                                <MenuItem key={z.id} value={String(z.id)}>
-                                  {z.name}{" "}
-                                  {z.scheme?.name && `(${z.scheme.name})`}
-                                </MenuItem>
-                              ))}
-                            {previewScope === "ROUTE" &&
-                              routes.map((r) => (
-                                <MenuItem key={r.id} value={String(r.id)}>
-                                  {r.name} {r.zone?.name && `(${r.zone.name})`}
-                                </MenuItem>
-                              ))}
-                          </Select>
-                        </FormControl>
-
-                        {/* Min Balance Filter */}
-                        <TextField
-                          size="small"
-                          type="number"
-                          label="Min. Balance"
-                          placeholder="e.g. 1000"
-                          value={minBalance}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val === "" || Number(val) >= 0) {
-                              setMinBalance(val);
-                            }
-                          }}
-                          sx={{ maxWidth: 140 }}
-                          InputProps={{
-                            startAdornment: (
-                              <InputAdornment position="start">
-                                KES
-                              </InputAdornment>
-                            ),
-                          }}
-                          helperText="≥ this amount"
-                          variant="outlined"
-                        />
-
-                        <TextField
-                          size="small"
-                          type="number"
-                          label="Unpaid Months"
-                          placeholder="e.g. 2"
-                          value={minUnpaidMonths}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val === "" || Number(val) >= 1) {
-                              setMinUnpaidMonths(val);
-                            }
-                          }}
-                          sx={{ maxWidth: 140 }}
-                          helperText="≥ number of months unpaid"
-                          variant="outlined"
-                        />
-
-                        <Box sx={{ display: "flex", gap: 1.5 }}>
-                          <Button
-                            variant="contained"
-                            color="primary"
-                            size="small"
-                            startIcon={
-                              previewLoading ? (
-                                <CircularProgress size={20} color="inherit" />
-                              ) : (
-                                <Visibility />
-                              )
-                            }
-                            onClick={handleOpenDisconnectionPreview}
-                            disabled={previewLoading || !previewScopeId}
-                          >
-                            Preview
-                          </Button>
-
-                          <Button
-                            variant="outlined"
-                            color="theme.palette.primary.contrastText"
-                            size="small"
-                            startIcon={<GetApp />}
-                            onClick={handleDownloadDueForDisconnection}
-                            disabled={!previewScopeId}
-                          >
-                            Download PDF
-                          </Button>
-                        </Box>
-                      </>
-                    )}
-                  </Box>
-                </Box>
-              </Collapse>
-
-              {/* Filters Collapse */}
-              <Collapse in={filterOpen}>
+                {/* Data Grid + Details Panel Container */}
                 <Box
                   sx={{
-                    p: 2,
-                    bgcolor: "background.paper",
-                    borderRadius: 1,
-                    boxShadow: 1,
+                    display: "flex",
+                    gap: 1.5,
+                    flex: 1,
+                    overflow: "hidden",
+                    p: { xs: 1.5, sm: 2 },
                   }}
                 >
-                  <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-                    <FormControl sx={{ minWidth: 160 }}>
-                      <InputLabel>Status</InputLabel>
-                      <Select
-                        value={statusFilter}
-                        label="Status"
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                      >
-                        <MenuItem value="">All</MenuItem>
-                        {statusOptions.map((s) => (
-                          <MenuItem key={s} value={s}>
-                            {s}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
+                  <ConnectionsDataGrid
+                    connections={connections}
+                    loading={loading}
+                    page={page}
+                    pageSize={rowsPerPage}
+                    rowsPerPage={rowsPerPage}
+                    total={total}
+                    onPageChange={setPage}
+                    onPageSizeChange={setRowsPerPage}
+                    onEditClick={handleOpenEditModal}
+                    onAssignMeterClick={handleOpenAssignMeterModal}
+                    onViewDetailsClick={handleViewDetails}
+                  />
 
-                    <FormControl sx={{ minWidth: 180 }}>
-                      <InputLabel>Scheme</InputLabel>
-                      <Select
-                        value={schemeFilter}
-                        label="Scheme"
-                        onChange={(e) => setSchemeFilter(e.target.value)}
-                      >
-                        <MenuItem value="">All</MenuItem>
-                        {schemes.map((s) => (
-                          <MenuItem key={s.id} value={s.id}>
-                            {s.name}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-
-                    <FormControl
-                      sx={{ minWidth: 180 }}
-                      disabled={!schemeFilter}
-                    >
-                      <InputLabel>Zone</InputLabel>
-                      <Select
-                        value={zoneFilter}
-                        label="Zone"
-                        onChange={(e) => setZoneFilter(e.target.value)}
-                      >
-                        <MenuItem value="">All</MenuItem>
-                        {zones
-                          .filter(
-                            (z) =>
-                              !schemeFilter ||
-                              z.schemeId === Number(schemeFilter),
-                          )
-                          .map((z) => (
-                            <MenuItem key={z.id} value={z.id}>
-                              {z.name}
-                            </MenuItem>
-                          ))}
-                      </Select>
-                    </FormControl>
+                  {/* Connection Details Panel */}
+                  <Box
+                    sx={{
+                      flex: selectedConnectionForDetails ? "0 0 45%" : "0 0 0",
+                      transition: "flex 0.3s ease",
+                      overflow: "auto",
+                      borderRadius: 1,
+                      bgcolor: "background.paper",
+                      boxShadow: 1,
+                      display: selectedConnectionForDetails ? "block" : "none",
+                      p: 2,
+                    }}
+                  >
+                    <ConnectionDetailsPanel
+                      connection={selectedConnectionForDetails}
+                      onClose={handleCloseConnectionDetails}
+                    />
                   </Box>
                 </Box>
-              </Collapse>
-            </Box>
+              </>
+            )}
 
-            {/* Data Grid + Details Panel Container */}
-            <Box
-              sx={{
-                display: "flex",
-                gap: 1.5,
-                flex: 1,
-                overflow: "hidden",
-                p: { xs: 1.5, sm: 2 },
-              }}
-            >
-              {/* Data Grid */}
-              <Box
-                sx={{
-                  flex: selectedConnectionForDetails ? "0 0 55%" : "1",
-                  overflow: "hidden",
-                  borderRadius: 1,
-                  boxShadow: 1,
-                  transition: "flex 0.3s ease",
-                  bgcolor: "background.paper",
-                }}
-              >
-                {loading ? (
-                  <Box
-                    sx={{
-                      height: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <CircularProgress />
-                  </Box>
-                ) : (
-                  <DataGrid
-                    rows={connections}
-                    columns={columns}
-                    getRowId={(row) => row.id}
-                    pageSizeOptions={[10, 25, 50, 100]}
-                    paginationModel={{ page, pageSize: rowsPerPage }}
-                    onPaginationModelChange={({ page: p, pageSize: ps }) => {
-                      setPage(p);
-                      setRowsPerPage(ps);
-                    }}
-                    rowCount={total}
-                    paginationMode="server"
-                    disableRowSelectionOnClick
-                    sx={{
-                      height: "100%",
-                      border: "none",
-                      "& .MuiDataGrid-columnHeaders": {
-                        bgcolor: "background.default",
-                        fontWeight: 600,
-                      },
-                    }}
-                    localeText={{ noRowsLabel: "No connections found" }}
-                  />
-                )}
-              </Box>
-
-              {/* Connection Details Panel */}
-              <Box
-                sx={{
-                  flex: selectedConnectionForDetails ? "0 0 45%" : "0 0 0",
-                  transition: "flex 0.3s ease",
-                  overflow: "auto",
-                  borderRadius: 1,
-                  bgcolor: "background.paper",
-                  boxShadow: 1,
-                  display: selectedConnectionForDetails ? "block" : "none",
-                  p: 2,
-                }}
-              >
-                {selectedConnectionForDetails ? (
-                  <Box
-                    sx={{ display: "flex", flexDirection: "column", gap: 2 }}
-                  >
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      }}
-                    >
-                      <Typography variant="h6" fontWeight={600}>
-                        Connection #
-                        {selectedConnectionForDetails.connectionNumber}
-                      </Typography>
-                      <IconButton
-                        size="small"
-                        onClick={handleCloseConnectionDetails}
-                      >
-                        <Clear />
-                      </IconButton>
-                    </Box>
-
-                    <Divider />
-
-                    {/* Customer section */}
-                    <Box>
-                      <Typography
-                        variant="subtitle2"
-                        color="text.secondary"
-                        gutterBottom
-                        fontWeight={600}
-                      >
-                        Customer
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Name:</strong>{" "}
-                        {selectedConnectionForDetails.customerName || "—"}
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Phone:</strong>{" "}
-                        {selectedConnectionForDetails.customerPhoneNumber ||
-                          "—"}
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Email:</strong>{" "}
-                        {selectedConnectionForDetails.customerEmail || "—"}
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Account #:</strong>{" "}
-                        {selectedConnectionForDetails.customerAccount || "—"}
-                      </Typography>
-                    </Box>
-
-                    <Divider />
-
-                    {/* Connection / Meter section */}
-                    <Box>
-                      <Typography
-                        variant="subtitle2"
-                        color="text.secondary"
-                        gutterBottom
-                        fontWeight={600}
-                      >
-                        Connection & Meter
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Status:</strong>{" "}
-                        <Chip
-                          label={selectedConnectionForDetails.status}
-                          color={
-                            selectedConnectionForDetails.status === "ACTIVE"
-                              ? "success"
-                              : selectedConnectionForDetails.status ===
-                                  "PENDING_METER"
-                                ? "warning"
-                                : "error"
-                          }
-                          size="small"
-                        />
-                      </Typography>
-                      <Typography variant="body2" sx={{ mt: 1 }}>
-                        <strong>Meter Serial:</strong>{" "}
-                        {selectedConnectionForDetails.meterSerialNumber ||
-                          "Not assigned"}
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Meter Model:</strong>{" "}
-                        {selectedConnectionForDetails.meterModel || "—"}
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Plot Number:</strong>{" "}
-                        {selectedConnectionForDetails.plotNumber || "—"}
-                      </Typography>
-                    </Box>
-
-                    <Divider />
-
-                    {/* Location section */}
-                    <Box>
-                      <Typography
-                        variant="subtitle2"
-                        color="text.secondary"
-                        gutterBottom
-                        fontWeight={600}
-                      >
-                        Location
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Scheme:</strong>{" "}
-                        {selectedConnectionForDetails.schemeName || "—"}
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Zone:</strong>{" "}
-                        {selectedConnectionForDetails.zoneName || "—"}
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Route:</strong>{" "}
-                        {selectedConnectionForDetails.routeName || "—"}
-                      </Typography>
-                    </Box>
-
-                    <Divider />
-
-                    {/* Tariff & Financials */}
-                    <Box>
-                      <Typography
-                        variant="subtitle2"
-                        color="text.secondary"
-                        gutterBottom
-                        fontWeight={600}
-                      >
-                        Tariff & Balance
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Tariff Category:</strong>{" "}
-                        {selectedConnectionForDetails.tariffCategoryName || "—"}
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        color={
-                          selectedConnectionForDetails.customerAccountBalance <
-                          0
-                            ? "error"
-                            : "inherit"
-                        }
-                      >
-                        <strong>Account Balance:</strong> KES{" "}
-                        {selectedConnectionForDetails.customerAccountBalance?.toLocaleString() ||
-                          "0"}
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Deposit:</strong> KES{" "}
-                        {selectedConnectionForDetails.customerAccountDeposit?.toLocaleString() ||
-                          "0"}
-                      </Typography>
-                    </Box>
-                  </Box>
-                ) : (
-                  <Box sx={{ p: 3, textAlign: "center" }}>
-                    <Typography color="text.secondary">
-                      Select a connection to view details
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
-            </Box>
+            {/* Tab 1: Active Commitments */}
+            {activeTab === 1 && <ActiveCommitmentConnectionsTab />}
 
             {/* Dialogs */}
             <Dialog
