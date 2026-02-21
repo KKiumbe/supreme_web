@@ -27,8 +27,8 @@ const ConnectionsDataGrid = ({
       {
         field: "actions",
         headerName: "Actions",
-        width: 200,
-        flex: 0.8,
+        width: 280,
+        flex: 1.6,
         align: "center",
         renderCell: (params) => (
           <Box sx={{ display: "flex", gap: 0.5 }}>
@@ -78,8 +78,8 @@ const ConnectionsDataGrid = ({
       {
         field: "status",
         headerName: "Status",
-        width: 140,
-        flex: 0.9,
+        width: 160,
+        flex: 1.1,
         renderCell: (params) => (
           <Chip
             label={params.value}
@@ -96,13 +96,33 @@ const ConnectionsDataGrid = ({
           />
         ),
       },
-      { field: "connectionNumber", headerName: "Conn #", width: 120, flex: 0.8 },
-      { field: "customerName", headerName: "Customer", width: 180, flex: 1.2 },
-      { field: "customerPhoneNumber", headerName: "Phone", width: 140, flex: 1 },
-      { field: "schemeName", headerName: "Scheme", width: 140, flex: 1 },
-      { field: "zoneName", headerName: "Zone", width: 130, flex: 1 },
-      { field: "tariffCategoryName", headerName: "Tariff", width: 160, flex: 1 },
-      { field: "meterSerialNumber", headerName: "Meter", width: 140, flex: 1 },
+      {
+        field: "connectionNumber",
+        headerName: "Conn #",
+        width: 160,
+        flex: 1.2,
+      },
+      { field: "customerName", headerName: "Customer", width: 260, flex: 1.6 },
+      {
+        field: "customerPhoneNumber",
+        headerName: "Phone",
+        width: 200,
+        flex: 1.4,
+      },
+      { field: "schemeName", headerName: "Scheme", width: 200, flex: 1.4 },
+      { field: "zoneName", headerName: "Zone", width: 190, flex: 1.3 },
+      {
+        field: "tariffCategoryName",
+        headerName: "Tariff",
+        width: 220,
+        flex: 1.5,
+      },
+      {
+        field: "meterSerialNumber",
+        headerName: "Meter",
+        width: 200,
+        flex: 1.4,
+      },
     ],
     [onEditClick, onAssignMeterClick, onViewDetailsClick],
   );
@@ -110,7 +130,7 @@ const ConnectionsDataGrid = ({
   return (
     <Box
       sx={{
-        flex: connections.length > 0 ? "0 0 60%" : "1",
+        flex: 1,
         overflow: "hidden",
         borderRadius: 1,
         boxShadow: 1,

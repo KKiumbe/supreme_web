@@ -940,10 +940,11 @@ const ConnectionsScreen = () => {
                 <Box
                   sx={{
                     display: "flex",
-                    gap: 1.5,
+                    gap: 0,
                     flex: 1,
                     overflow: "hidden",
                     p: { xs: 1.5, sm: 2 },
+                    position: "relative",
                   }}
                 >
                   <ConnectionsDataGrid
@@ -960,17 +961,21 @@ const ConnectionsScreen = () => {
                     onViewDetailsClick={handleViewDetails}
                   />
 
-                  {/* Connection Details Panel */}
+                  {/* Connection Details Panel - Overlay */}
                   <Box
                     sx={{
-                      flex: selectedConnectionForDetails ? "0 0 40%" : "0 0 0",
-                      transition: "flex 0.3s ease",
+                      position: "absolute",
+                      right: selectedConnectionForDetails ? 0 : "-500px",
+                      top: 0,
+                      bottom: 0,
+                      width: "380px",
+                      transition: "right 0.3s ease",
                       overflow: "auto",
                       borderRadius: 1,
                       bgcolor: "background.paper",
-                      boxShadow: 1,
-                      display: selectedConnectionForDetails ? "block" : "none",
+                      boxShadow: 3,
                       p: 2,
+                      zIndex: 10,
                     }}
                   >
                     <ConnectionDetailsPanel
