@@ -1,139 +1,190 @@
-import React from "react";
-import { Box, Typography, IconButton, Divider } from "@mui/material";
-import { Clear } from "@mui/icons-material";
+import React, { useEffect, useState } from "react";
+import {
+  Box,
+  Typography,
+  IconButton,
+  CircularProgress,
+  Alert,
+  Divider,
+} from "@mui/material";
+import { Close } from "@mui/icons-material";
+import axios from "axios";
 
-const ConnectionDetailsPanel = ({ connection, onClose }) => {
-  if (!connection) {
-    return (
-      <Box sx={{ p: 3, textAlign: "center" }}>
-        <Typography color="text.secondary">
-          Select a connection to view details
-        </Typography>
-      </Box>
-    );
+const BASEURL = import.meta.env.VITE_BASE_URL;
+
+const ConnectionDetailsPanel = ({ connectionNumber, onClose }) => {
+  const [connection, setConnection] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!connectionNumber) {
+      return;
+    }
+
+    let active = true;
+
+    const fetchConnection = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const res = await axios.get(
+          `${BASEURL}/connection/${connectionNumber}`,
+          {
+            withCredentials: true,
+          },
+        );
+
+        if (active) {
+          setConnection(res.data.data);
+        }
+      } catch (err) {
+        if (active) {
+          setError(
+            err.response?.data?.message || "Failed to load connection details",
+          );
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchConnection();
+
+    return () => {
+      active = false;
+    };
+  }, [connectionNumber]);
+
+  if (!connectionNumber) {
+    return null;
   }
 
+  const account = connection?.customerAccounts?.[0];
+
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
+    <Box sx={{ position: "relative", minHeight: 350 }}>
+      <IconButton
+        sx={{ position: "absolute", top: 8, right: 8 }}
+        size="small"
+        onClick={onClose}
       >
-        <Typography variant="h6" fontWeight={600}>
-          Connection #{connection.connectionNumber}
-        </Typography>
-        <IconButton size="small" onClick={onClose}>
-          <Clear />
-        </IconButton>
-      </Box>
+        <Close />
+      </IconButton>
 
-      <Divider />
+      {loading && (
+        <Box sx={{ mt: 5, textAlign: "center" }}>
+          <CircularProgress size={28} />
+        </Box>
+      )}
 
-      {/* Customer section */}
-      <Box>
-        <Typography
-          variant="subtitle2"
-          color="text.secondary"
-          gutterBottom
-          fontWeight={600}
-        >
-          Customer
-        </Typography>
-        <Typography variant="body2">
-          <strong>Name:</strong> {connection.customerName || "—"}
-        </Typography>
-        <Typography variant="body2">
-          <strong>Phone:</strong> {connection.customerPhoneNumber || "—"}
-        </Typography>
-        <Typography variant="body2">
-          <strong>Email:</strong> {connection.customerEmail || "—"}
-        </Typography>
-        <Typography variant="body2">
-          <strong>Account #:</strong> {connection.customerAccount || "—"}
-        </Typography>
-      </Box>
+      {error && (
+        <Alert severity="error" sx={{ mt: 5 }}>
+          {error}
+        </Alert>
+      )}
 
-      <Divider />
+      {connection && !loading && (
+        <Box sx={{ mt: 4, display: "flex", flexDirection: "column", gap: 2 }}>
+          <Typography variant="h6">
+            Connection #{connection.connectionNumber}
+          </Typography>
 
-      {/* Connection / Meter section */}
-      <Box>
-        <Typography
-          variant="subtitle2"
-          color="text.secondary"
-          gutterBottom
-          fontWeight={600}
-        >
-          Connection & Meter
-        </Typography>
-        <Typography variant="body2">
-          <strong>Status:</strong> {connection.status}
-        </Typography>
-        <Typography variant="body2" sx={{ mt: 1 }}>
-          <strong>Meter Serial:</strong>{" "}
-          {connection.meterSerialNumber || "Not assigned"}
-        </Typography>
-        <Typography variant="body2">
-          <strong>Meter Model:</strong> {connection.meterModel || "—"}
-        </Typography>
-        <Typography variant="body2">
-          <strong>Plot Number:</strong> {connection.plotNumber || "—"}
-        </Typography>
-      </Box>
+          <Divider />
 
-      <Divider />
+          {/* Customer */}
+          <Box>
+            <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+              Customer
+            </Typography>
+            <Typography variant="body2">
+              <strong>Name:</strong> {connection.customer?.customerName || "—"}
+            </Typography>
+            <Typography variant="body2">
+              <strong>Phone:</strong> {connection.customer?.phoneNumber || "—"}
+            </Typography>
+            <Typography variant="body2">
+              <strong>Email:</strong> {connection.customer?.email || "—"}
+            </Typography>
+          </Box>
 
-      {/* Location section */}
-      <Box>
-        <Typography
-          variant="subtitle2"
-          color="text.secondary"
-          gutterBottom
-          fontWeight={600}
-        >
-          Location
-        </Typography>
-        <Typography variant="body2">
-          <strong>Scheme:</strong> {connection.schemeName || "—"}
-        </Typography>
-        <Typography variant="body2">
-          <strong>Zone:</strong> {connection.zoneName || "—"}
-        </Typography>
-        <Typography variant="body2">
-          <strong>Route:</strong> {connection.routeName || "—"}
-        </Typography>
-      </Box>
+          <Divider />
 
-      <Divider />
+          {/* Account */}
+          <Box>
+            <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+              Account
+            </Typography>
 
-      {/* Tariff & Financials */}
-      <Box>
-        <Typography
-          variant="subtitle2"
-          color="text.secondary"
-          gutterBottom
-          fontWeight={600}
-        >
-          Tariff & Balance
-        </Typography>
-        <Typography variant="body2">
-          <strong>Tariff Category:</strong>{" "}
-          {connection.tariffCategoryName || "—"}
-        </Typography>
-        <Typography
-          variant="body2"
-          color={connection.customerAccountBalance < 0 ? "error" : "inherit"}
-        >
-          <strong>Account Balance:</strong> KES{" "}
-          {connection.customerAccountBalance?.toLocaleString() || "0"}
-        </Typography>
-        <Typography variant="body2">
-          <strong>Deposit:</strong> KES{" "}
-          {connection.customerAccountDeposit?.toLocaleString() || "0"}
-        </Typography>
-      </Box>
+            {account ? (
+              <>
+                <Typography variant="body2">
+                  <strong>Account #:</strong> {account.customerAccount}
+                </Typography>
+
+                <Typography
+                  variant="body2"
+                  color={account.balance < 0 ? "error" : "inherit"}
+                >
+                  <strong>Balance:</strong> KES{" "}
+                  {account.balance?.toLocaleString()}
+                </Typography>
+
+                <Typography variant="body2">
+                  <strong>Deposit:</strong> KES{" "}
+                  {account.deposit?.toLocaleString()}
+                </Typography>
+              </>
+            ) : (
+              <Typography variant="body2">No account found</Typography>
+            )}
+          </Box>
+
+          <Divider />
+
+          {/* Meter */}
+          <Box>
+            <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+              Meter
+            </Typography>
+
+            <Typography variant="body2">
+              <strong>Serial:</strong>{" "}
+              {connection.meter?.serialNumber || "Not assigned"}
+            </Typography>
+
+            <Typography variant="body2">
+              <strong>Status:</strong> {connection.meter?.status || "—"}
+            </Typography>
+          </Box>
+
+          {/* Transactions */}
+          {account?.transactions?.length > 0 && (
+            <>
+              <Divider />
+              <Box>
+                <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                  Recent Transactions
+                </Typography>
+
+                {account.transactions.slice(0, 5).map((tx) => (
+                  <Box key={tx.id} sx={{ mb: 1 }}>
+                    <Typography variant="body2">
+                      {tx.type} — KES {tx.amount?.toLocaleString()}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {new Date(tx.createdAt).toLocaleDateString()}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            </>
+          )}
+        </Box>
+      )}
     </Box>
   );
 };

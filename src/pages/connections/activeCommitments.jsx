@@ -251,8 +251,7 @@ const ActiveCommitmentConnectionsTab = () => {
       { field: "customerName", headerName: "Customer", width: 160 },
       { field: "customerPhone", headerName: "Phone", width: 130 },
       { field: "scheme", headerName: "Scheme", width: 120 },
-      { field: "zone", headerName: "Zone", width: 110 },
-      { field: "route", headerName: "Route", width: 100 },
+
       { field: "meterNumber", headerName: "Meter", width: 130 },
       {
         field: "commitmentActive",

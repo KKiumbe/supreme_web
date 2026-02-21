@@ -1,19 +1,4 @@
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  CircularProgress,
-  Alert,
-  Typography,
-} from "@mui/material";
+import { Box, Button, Typography } from "@mui/material";
 import { Add, FilterList, GetApp, PowerOff } from "@mui/icons-material";
 
 const ConnectionHeaderBar = ({
@@ -24,7 +9,6 @@ const ConnectionHeaderBar = ({
   onFilterClick,
   onExportClick,
   onNewConnectionClick,
-  filterOpen,
 }) => {
   return (
     <Box

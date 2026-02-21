@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import {
   Box,
-  CircularProgress,
   Snackbar,
   Alert,
   Tabs,
@@ -193,21 +192,7 @@ const ConnectionsScreen = () => {
     }
   }, [currentUser, navigate]);
 
-  const customers = useMemo(() => {
-    const seen = new Set();
-    return connections
-      .filter((c) => c.customerId && !seen.has(c.customerId))
-      .map((c) => {
-        seen.add(c.customerId);
-        return {
-          id: c.customerId,
-          customerName: c.customerName,
-          phoneNumber: c.customerPhoneNumber,
-          email: c.customerEmail,
-          status: c.customerStatus,
-        };
-      });
-  }, [connections]);
+  // Removed unused customers variable
 
   const fetchConnections = useCallback(
     async (searchQuery = "", pageNum = 0, limit = 25, filters = {}) => {
@@ -314,7 +299,16 @@ const ConnectionsScreen = () => {
       setLoading(false);
     };
     init();
-  }, [page, rowsPerPage, statusFilter, schemeFilter, zoneFilter]);
+  }, [
+    page,
+    rowsPerPage,
+    statusFilter,
+    schemeFilter,
+    zoneFilter,
+    fetchConnections,
+    fetchMetaData,
+    fetchMeters,
+  ]);
 
   const debouncedSearch = useMemo(
     () =>
@@ -332,24 +326,11 @@ const ConnectionsScreen = () => {
   useEffect(() => {
     debouncedSearch(search);
     return () => debouncedSearch.cancel();
-  }, [search]);
+  }, [search, debouncedSearch]);
 
   // ────────────────────────────────────────────────
   // Disconnection Preview & Download with minBalance
   // ────────────────────────────────────────────────
-  const getScopeLabel = (scope) => {
-    const upper = scope?.toUpperCase();
-    switch (upper) {
-      case "SCHEME":
-        return "Scheme";
-      case "ZONE":
-        return "Zone";
-      case "ROUTE":
-        return "Route";
-      default:
-        return "Scope";
-    }
-  };
 
   const fetchDueForDisconnection = async () => {
     if (!previewScope || !previewScopeId) {
@@ -728,19 +709,6 @@ const ConnectionsScreen = () => {
     }
   };
 
-  const openTaskDialog = (connection) => {
-    if (!connection?.id || !connection?.customerId) {
-      setSnackbar({
-        open: true,
-        message: "Invalid connection selected",
-        severity: "error",
-      });
-      return;
-    }
-    setTaskConnection(connection);
-    setTaskDialogOpen(true);
-  };
-
   const handleViewDetails = (connection) => {
     if (selectedConnectionForDetails?.id === connection.id) {
       setSelectedConnectionForDetails(null); // Toggle off if already selected
@@ -762,92 +730,6 @@ const ConnectionsScreen = () => {
     "DORMANT",
   ];
 
-  const columns = useMemo(
-    () => [
-      {
-        field: "actions",
-        headerName: "Actions",
-        width: 180,
-        align: "center",
-        renderCell: (params) => (
-          <Box sx={{ display: "flex", gap: 0.5 }}>
-            <Tooltip title="Edit Connection">
-              <IconButton
-                size="small"
-                color="theme.palette.primary.contrastText"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleOpenEditModal(params.row);
-                }}
-              >
-                <Edit fontSize="small" />
-              </IconButton>
-            </Tooltip>
-
-            {/* Show Assign Meter button if no meter assigned */}
-            {!params?.row?.meterId ? (
-              <Tooltip title="Assign Meter">
-                <IconButton
-                  size="small"
-                  color="warning"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleOpenAssignMeterModal(params.row);
-                  }}
-                >
-                  <Devices fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            ) : (
-              <Tooltip title="View Details">
-                <IconButton
-                  size="small"
-                  color="info"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleViewDetails(params.row);
-                  }}
-                >
-                  <Visibility fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            )}
-          </Box>
-        ),
-      },
-      {
-        field: "status",
-        headerName: "Status",
-        width: 130,
-        renderCell: (params) => (
-          <Chip
-            label={params.value}
-            color={
-              params.value === "ACTIVE"
-                ? "success"
-                : params.value === "PENDING_METER"
-                  ? "warning"
-                  : params.value === "DISCONNECTED"
-                    ? "error"
-                    : "default"
-            }
-            size="small"
-          />
-        ),
-      },
-      { field: "connectionNumber", headerName: "Conn #", width: 100 },
-      { field: "customerName", headerName: "Customer", width: 150 },
-      { field: "customerPhoneNumber", headerName: "Phone", width: 120 },
-
-      { field: "schemeName", headerName: "Scheme", width: 120 },
-      { field: "zoneName", headerName: "Zone", width: 110 },
-
-      { field: "tariffCategoryName", headerName: "Tariff", width: 140 },
-      { field: "meterSerialNumber", headerName: "Meter", width: 120 },
-    ],
-    [],
-  );
-
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback}>
       <Box
@@ -857,6 +739,7 @@ const ConnectionsScreen = () => {
           flexDirection: "column",
           p: { xs: 1, sm: 1.5, md: 1.5 },
           gap: 1.5,
+          minWidth: "1200px",
         }}
       >
         <Snackbar
@@ -979,7 +862,9 @@ const ConnectionsScreen = () => {
                     }}
                   >
                     <ConnectionDetailsPanel
-                      connection={selectedConnectionForDetails}
+                      connectionNumber={
+                        selectedConnectionForDetails?.connectionNumber
+                      }
                       onClose={handleCloseConnectionDetails}
                     />
                   </Box>

@@ -8,17 +8,8 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Button,
-  CircularProgress,
 } from "@mui/material";
-import {
-  Search,
-  Clear,
-  FilterList,
-  Visibility,
-  GetApp,
-} from "@mui/icons-material";
-import { Typography } from "@mui/material";
+import { Search, Clear } from "@mui/icons-material";
 
 const ConnectionFilters = ({
   search,
@@ -30,7 +21,7 @@ const ConnectionFilters = ({
   zoneFilter,
   onZoneFilterChange,
   filterOpen,
-  onFilterToggle,
+
   disconnectionSection,
   schemes,
   zones,
