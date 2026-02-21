@@ -5,6 +5,7 @@ export type ReportKey =
   | "ABNORMAL_METER_READINGS"
   | "PAYMENTS_REPORT"
   | "PAYMENTS_PER_MODE_CURRENT_PERIOD"
+  | "PAYMENTS_PER_MODE_PER_PERIOD"
   | "BILLS_AGING_REPORT"
   | "BILLS_BY_TYPE"
   | "CUSTOMERS_REPORT"
@@ -18,9 +19,8 @@ export type ReportKey =
 export const PAYMENT_MODES = [
   "CASH",
   "MPESA",
-  "BANK_TRANSFER",
-  "CREDIT_CARD",
-  "DEBIT_CARD",
+  "BANK_TRANSFER_EQUITY",
+  "BANK_TRANSFER_CONSOLIDATED",
   "AIRTELMONEY",
 ] as const;
 
@@ -156,11 +156,17 @@ export const REPORT_SECTIONS: ReportSection[] = [
         ],
       },
       {
-        key: "PAYMENTS_REPORT1",
-        label: "Payments Report(coming)",
+        key: "PAYMENTS_PER_MODE_PER_PERIOD",
+        label: "Payments per Mode per Period",
         params: [
           { name: "startDate", label: "Start Date", type: "date" },
           { name: "endDate", label: "End Date", type: "date" },
+          {
+            name: "mode",
+            label: "Mode of Payment",
+            type: "select",
+            source: "PAYMENT_MODES",
+          },
         ],
       },
     ],
@@ -269,6 +275,34 @@ export interface Scheme {
   id: number;
   name: string;
 }
+
+export const PaymentsPerModeCurrentPeriodReport: ReportDefinition = {
+  key: "PAYMENTS_PER_MODE_CURRENT_PERIOD",
+  label: "Payments per Mode (Current Period)",
+  params: [
+    {
+      name: "mode",
+      label: "Mode of Payment",
+      type: "select",
+      source: "PAYMENT_MODES",
+    },
+  ],
+};
+
+export const PaymentsPerModePerPeriodReport: ReportDefinition = {
+  key: "PAYMENTS_PER_MODE_PER_PERIOD",
+  label: "Payments per Mode per Period",
+  params: [
+    { name: "startDate", label: "Start Date", type: "date" },
+    { name: "endDate", label: "End Date", type: "date" },
+    {
+      name: "mode",
+      label: "Mode of Payment",
+      type: "select",
+      source: "PAYMENT_MODES",
+    },
+  ],
+};
 
 export async function fetchSchemes(): Promise<Scheme[]> {
   const res = await fetch(`${BASEURL}/schemes`, {

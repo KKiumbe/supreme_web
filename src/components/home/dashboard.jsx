@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 
 import { Box, Card, CardContent, Typography } from "@mui/material";
@@ -13,11 +13,8 @@ import {
   Area,
   CartesianGrid,
   XAxis,
-  YAxis
+  YAxis,
 } from "recharts";
-
-
-
 
 const COLORS = ["#4caf50", "#f44336"]; // green = completed, red = open
 const TaskCompletionPieChart = ({ completed, open }) => {
@@ -53,7 +50,12 @@ const TaskCompletionPieChart = ({ completed, open }) => {
               dataKey="value"
             >
               {data.map((entry, index) => (
-                <Cell key={index} fill={COLORS[index]} stroke="white" strokeWidth={2} />
+                <Cell
+                  key={index}
+                  fill={COLORS[index]}
+                  stroke="white"
+                  strokeWidth={2}
+                />
               ))}
             </Pie>
             <Tooltip />
@@ -70,11 +72,6 @@ TaskCompletionPieChart.propTypes = {
   open: PropTypes.number.isRequired,
 };
 
-
-
-
-
-
 const TaskDailyTrendChart = ({ data }) => {
   return (
     <Card
@@ -82,7 +79,7 @@ const TaskDailyTrendChart = ({ data }) => {
         boxShadow: 3,
         borderRadius: 3,
         height: 400,
-        width:"100%",
+        width: "100%",
         transition: "transform .2s",
         "&:hover": { transform: "scale(1.02)" },
       }}
@@ -103,11 +100,7 @@ const TaskDailyTrendChart = ({ data }) => {
 
             <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
 
-            <XAxis
-              dataKey="day"
-              tick={{ fontSize: 12 }}
-              minTickGap={12}
-            />
+            <XAxis dataKey="day" tick={{ fontSize: 12 }} minTickGap={12} />
             <YAxis tick={{ fontSize: 12 }} />
             <Tooltip />
 
@@ -131,12 +124,9 @@ TaskDailyTrendChart.propTypes = {
     PropTypes.shape({
       day: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
       tasks: PropTypes.number.isRequired,
-    })
+    }),
   ).isRequired,
 };
-
-
-
 
 const ActiveConnectionsCircle = ({ value, max = 500 }) => {
   const [progress, setProgress] = useState(0);
@@ -194,9 +184,7 @@ const ActiveConnectionsCircle = ({ value, max = 500 }) => {
               strokeWidth="12"
               fill="none"
               strokeDasharray={`${2 * Math.PI * 60}`}
-              strokeDashoffset={
-                (1 - progress / 100) * 2 * Math.PI * 60
-              }
+              strokeDashoffset={(1 - progress / 100) * 2 * Math.PI * 60}
               strokeLinecap="round"
               style={{
                 transition: "stroke-dashoffset 1s ease",
@@ -235,8 +223,6 @@ ActiveConnectionsCircle.propTypes = {
   value: PropTypes.number.isRequired,
   max: PropTypes.number,
 };
-
-
 
 const DomarmantACC = ({ value }) => {
   return (
@@ -296,8 +282,6 @@ DomarmantACC.propTypes = {
   value: PropTypes.number.isRequired,
 };
 
-
-
 const DisconnectedConnectionsAlert = ({ value, max = 300 }) => {
   const [progress, setProgress] = useState(0);
 
@@ -340,7 +324,9 @@ const DisconnectedConnectionsAlert = ({ value, max = 300 }) => {
         }}
       />
 
-      <CardContent sx={{ textAlign: "center", position: "relative", zIndex: 2 }}>
+      <CardContent
+        sx={{ textAlign: "center", position: "relative", zIndex: 2 }}
+      >
         <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>
           Disconnected Connections
         </Typography>
@@ -405,9 +391,69 @@ DisconnectedConnectionsAlert.propTypes = {
   max: PropTypes.number,
 };
 
+export {
+  TaskCompletionPieChart,
+  TaskDailyTrendChart,
+  ActiveConnectionsCircle,
+  DomarmantACC,
+  DisconnectedConnectionsAlert,
+  SuspectedSelfReconnectionsAlert,
+};
 
+const SuspectedSelfReconnectionsAlert = ({ value }) => {
+  return (
+    <Card
+      sx={{
+        p: 0,
+        borderRadius: 3,
+        boxShadow: 4,
+        background: "linear-gradient(135deg, #d32f2f, #ff6f00)",
+        color: "white",
+        height: 180,
+        textAlign: "center",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      {/* Alert glow animation */}
+      <Box
+        sx={{
+          position: "absolute",
+          top: -40,
+          right: -40,
+          width: 120,
+          height: 120,
+          borderRadius: "50%",
+          background: "rgba(255,255,255,0.2)",
+          filter: "blur(40px)",
+          animation: "pulse 2s infinite",
+          "@keyframes pulse": {
+            "0%": { opacity: 0.7 },
+            "50%": { opacity: 0.2 },
+            "100%": { opacity: 0.7 },
+          },
+        }}
+      />
 
+      <CardContent sx={{ position: "relative", zIndex: 2 }}>
+        <Typography variant="h6" sx={{ fontWeight: "bold", mb: 1 }}>
+          Suspected Reconnections
+        </Typography>
 
+        <Typography
+          variant="h2"
+          sx={{
+            fontWeight: "bold",
+            textShadow: "0px 0px 10px rgba(255,255,255,0.4)",
+          }}
+        >
+          {value}
+        </Typography>
+      </CardContent>
+    </Card>
+  );
+};
 
-
-export { TaskCompletionPieChart, TaskDailyTrendChart, ActiveConnectionsCircle, DomarmantACC, DisconnectedConnectionsAlert };
+SuspectedSelfReconnectionsAlert.propTypes = {
+  value: PropTypes.number.isRequired,
+};

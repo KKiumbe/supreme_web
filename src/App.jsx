@@ -46,6 +46,7 @@ import Payments from "./pages/payments/payments";
 import Login from "./pages/auth/login";
 import MeterScreen from "./pages/meterInventory/meters";
 import ConnectionsScreen from "./pages/connections/connection";
+import DisconnectedConnectionsScreen from "./pages/connections/disconnected";
 import NewCustomersScreen from "./pages/customers/newCustomers";
 import AbnormalMeterReadingsList from "./pages/meterReading/abnormalReadings";
 import BillTypeScreen from "./pages/billing/billtypes";
@@ -59,6 +60,7 @@ import AdjustmentsList from "./pages/billing/adjustment/adjustment";
 import TaskTypesScreen from "./pages/tasks/tasksTypes";
 import BankUploadsScreen from "./pages/payments/bankuploads";
 import MeterReadingAdjustmentsScreen from "./pages/meterReading/readingsAdjustment";
+import SuspectedSelfReconnectionsScreen from "./pages/meterReading/suspectedSelfReconnections";
 import SmsScreen from "./pages/communication/sendSMS";
 
 const App = () => {
@@ -231,6 +233,15 @@ const App = () => {
                 />
 
                 <Route
+                  path="/suspected-self-reconnections"
+                  element={
+                    <ProtectedRoute>
+                      <SuspectedSelfReconnectionsScreen />
+                    </ProtectedRoute>
+                  }
+                />
+
+                <Route
                   path="/receipts"
                   element={
                     <ProtectedRoute>
@@ -368,6 +379,15 @@ const App = () => {
                   element={
                     <ProtectedRoute>
                       <ConnectionsScreen />
+                    </ProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="disconnected-connections"
+                  element={
+                    <ProtectedRoute>
+                      <DisconnectedConnectionsScreen />
                     </ProtectedRoute>
                   }
                 />

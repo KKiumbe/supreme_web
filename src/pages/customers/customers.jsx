@@ -369,7 +369,7 @@ const CustomersScreen = () => {
         </Box>
       ),
     },
-    { field: "accountNumber", headerName: "Account #", width: 130 },
+
     {
       field: "status",
       headerName: "Status",
@@ -388,17 +388,6 @@ const CustomersScreen = () => {
         />
       ),
     },
-    { field: "customerName", headerName: "Name", width: 180 },
-    { field: "customerBalance", headerName: "Balance", width: 140 },
-    { field: "phoneNumber", headerName: "Phone", width: 140 },
-    { field: "email", headerName: "Email", width: 200 },
-    { field: "customerIdNo", headerName: "ID No", width: 130 },
-    { field: "customerKraPin", headerName: "KRA PIN", width: 140 },
-    { field: "schemeName", headerName: "Scheme", width: 140 },
-    { field: "zoneName", headerName: "Zone", width: 120 },
-    { field: "routeName", headerName: "Route", width: 120 },
-    { field: "tariffName", headerName: "Tariff", width: 150 },
-    { field: "customerDeposit", headerName: "Deposit", width: 110 },
     {
       field: "connectionNumbers",
       headerName: "Connections",
@@ -409,7 +398,17 @@ const CustomersScreen = () => {
         </Tooltip>
       ),
     },
-    { field: "firstMeterModel", headerName: "Meter Model", width: 140 },
+    { field: "customerName", headerName: "Name", width: 180 },
+    { field: "customerBalance", headerName: "Balance", width: 140 },
+    { field: "phoneNumber", headerName: "Phone", width: 140 },
+
+    { field: "customerIdNo", headerName: "ID No", width: 130 },
+    { field: "customerKraPin", headerName: "KRA PIN", width: 140 },
+    { field: "schemeName", headerName: "Scheme", width: 140 },
+
+    { field: "tariffName", headerName: "Tariff", width: 150 },
+    { field: "customerDeposit", headerName: "Deposit", width: 110 },
+
     {
       field: "currentReading",
       headerName: "Current Reading",
@@ -444,9 +443,7 @@ const CustomersScreen = () => {
         </span>
       ),
     },
-    { field: "customerDiscoType", headerName: "Disco Type", width: 120 },
-    { field: "hasWater", headerName: "Water", width: 90 },
-    { field: "hasSewer", headerName: "Sewer", width: 90 },
+
     { field: "createdAt", headerName: "Created", width: 160 },
   ];
 

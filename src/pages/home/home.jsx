@@ -34,8 +34,8 @@ import { toast } from "react-toastify";
 import {
   ActiveConnectionsCircle,
   DisconnectedConnectionsAlert,
-  DomarmantACC,
   TaskCompletionPieChart,
+  SuspectedSelfReconnectionsAlert,
 } from "../../components/home/dashboard";
 
 const HomeScreen = () => {
@@ -388,10 +388,10 @@ const HomeScreen = () => {
           }}
         >
           <StatCard
-            title="Dormant Accounts"
-            value={dashboardStats?.dormantAccounts || 0}
-            icon={HourglassEmpty}
-            color="warning"
+            title="Suspected Self-Reconnections"
+            value={dashboardStats?.suspectedSelfReconnections?.total || 0}
+            icon={TrendingDown}
+            color="error"
           />
           <StatCard
             title="Tasks Older Than 1 Month"
@@ -455,7 +455,9 @@ const HomeScreen = () => {
             max={500}
           />
 
-          <DomarmantACC value={dashboardStats?.dormantAccounts || 0} />
+          <SuspectedSelfReconnectionsAlert
+            value={dashboardStats?.suspectedSelfReconnections?.total || 0}
+          />
 
           <DisconnectedConnectionsAlert
             value={dashboardStats?.disconnectedConnections || 0}

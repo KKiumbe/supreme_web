@@ -136,7 +136,6 @@ const Sidebar = () => {
           </ListItemIcon>
           {open && <ListItemText primary="Dashboard" />}
         </ListItemButton>
-
         {/* ACCOUNTS */}
         <ListItemButton
           onClick={() => toggleSubmenu("Accounts")}
@@ -148,7 +147,6 @@ const Sidebar = () => {
           {open && <ListItemText primary="Accounts" />}
           {open && (submenuOpen.Accounts ? <ExpandLess /> : <ExpandMore />)}
         </ListItemButton>
-
         {renderSubmenu("Accounts", [
           {
             icon: <Search sx={{ fontSize: 20 }} />,
@@ -159,6 +157,11 @@ const Sidebar = () => {
             icon: <HomeWorkIcon sx={{ fontSize: 20 }} />,
             label: "Connections",
             path: "/connections",
+          },
+          {
+            icon: <FlashOn sx={{ fontSize: 20 }} />,
+            label: "Disconnected Connections",
+            path: "/disconnected-connections",
           },
           {
             icon: <HowToReg sx={{ fontSize: 20 }} />,
@@ -195,7 +198,6 @@ const Sidebar = () => {
             ],
           },
         ])}
-
         {/* BILLING */}
         <ListItemButton onClick={() => toggleSubmenu("Billing")} sx={{ py: 1 }}>
           <ListItemIcon sx={{ minWidth: 40 }}>
@@ -204,7 +206,6 @@ const Sidebar = () => {
           {open && <ListItemText primary="Billing" />}
           {open && (submenuOpen.Billing ? <ExpandLess /> : <ExpandMore />)}
         </ListItemButton>
-
         {renderSubmenu("Billing", [
           {
             icon: <Receipt sx={{ fontSize: 20 }} />,
@@ -243,10 +244,14 @@ const Sidebar = () => {
                 label: "Meter Reading Adjustments",
                 path: "/meter-reading-adjustments",
               },
+              {
+                icon: <FlashOn sx={{ fontSize: 20 }} />,
+                label: "Suspected Self-Reconnections",
+                path: "/suspected-self-reconnections",
+              },
             ],
           },
-        ])}
-
+        ])}{" "}
         {/* PAYMENTS */}
         <ListItemButton
           onClick={() => toggleSubmenu("payments")}
@@ -258,7 +263,6 @@ const Sidebar = () => {
           {open && <ListItemText primary="Payments" />}
           {open && (submenuOpen.payments ? <ExpandLess /> : <ExpandMore />)}
         </ListItemButton>
-
         {renderSubmenu("payments", [
           {
             icon: <Payment sx={{ fontSize: 20 }} />,
@@ -281,7 +285,6 @@ const Sidebar = () => {
             path: "/receipts",
           },
         ])}
-
         {/* METER MANAGER */}
         <ListItemButton
           onClick={() => toggleSubmenu("meterManager")}
@@ -293,7 +296,6 @@ const Sidebar = () => {
           {open && <ListItemText primary="Meter Manager" />}
           {open && (submenuOpen.meterManager ? <ExpandLess /> : <ExpandMore />)}
         </ListItemButton>
-
         {renderSubmenu("meterManager", [
           {
             icon: <Business sx={{ fontSize: 20 }} />,
@@ -301,7 +303,6 @@ const Sidebar = () => {
             path: "/meter-inventory",
           },
         ])}
-
         {/* TASKS */}
         <ListItemButton onClick={() => toggleSubmenu("tasks")} sx={{ py: 1 }}>
           <ListItemIcon sx={{ minWidth: 40 }}>
@@ -310,7 +311,6 @@ const Sidebar = () => {
           {open && <ListItemText primary="Tasks" />}
           {open && (submenuOpen.tasks ? <ExpandLess /> : <ExpandMore />)}
         </ListItemButton>
-
         {renderSubmenu("tasks", [
           {
             icon: <Assignment sx={{ fontSize: 20 }} />,
@@ -325,7 +325,6 @@ const Sidebar = () => {
           },
           //{ icon: <AttachMoney sx={{ fontSize: 20 }} />, label: "Attachments", path: "/tasks/attachments" },
         ])}
-
         {/* COMMUNICATION */}
         <ListItemButton
           onClick={() => toggleSubmenu("communication")}
@@ -338,7 +337,6 @@ const Sidebar = () => {
           {open &&
             (submenuOpen.communication ? <ExpandLess /> : <ExpandMore />)}
         </ListItemButton>
-
         {renderSubmenu("communication", [
           {
             icon: <Chat sx={{ fontSize: 20 }} />,
@@ -356,7 +354,6 @@ const Sidebar = () => {
             path: "/send-bills",
           },
         ])}
-
         {/* REPORTS */}
         <ListItemButton onClick={() => toggleSubmenu("reports")} sx={{ py: 1 }}>
           <ListItemIcon sx={{ minWidth: 40 }}>
@@ -365,7 +362,6 @@ const Sidebar = () => {
           {open && <ListItemText primary="Reports" />}
           {open && (submenuOpen.reports ? <ExpandLess /> : <ExpandMore />)}
         </ListItemButton>
-
         {renderSubmenu("reports", [
           {
             icon: <Assignment sx={{ fontSize: 20 }} />,
@@ -378,7 +374,6 @@ const Sidebar = () => {
             path: "/request-custom-reports",
           },
         ])}
-
         {/* SETTINGS */}
         <ListItemButton
           onClick={() => toggleSubmenu("settings")}
@@ -390,7 +385,6 @@ const Sidebar = () => {
           {open && <ListItemText primary="Settings" />}
           {open && (submenuOpen.settings ? <ExpandLess /> : <ExpandMore />)}
         </ListItemButton>
-
         {renderSubmenu("settings", [
           {
             icon: <Person sx={{ fontSize: 20 }} />,

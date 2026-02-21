@@ -20,6 +20,7 @@ import {
   FormControl,
   InputLabel,
   Select,
+  Divider,
 } from "@mui/material";
 import {
   Add,
@@ -128,7 +129,7 @@ const flattenConnection = (conn) => ({
 
 const ConnectionsScreen = () => {
   const { currentUser } = useAuthStore();
-  const { theme } = useThemeStore();
+  const { darkMode } = useThemeStore();
   const navigate = useNavigate();
 
   const [connections, setConnections] = useState([]);
@@ -170,7 +171,8 @@ const ConnectionsScreen = () => {
 
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [taskConnection, setTaskConnection] = useState(null);
-  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedConnectionForDetails, setSelectedConnectionForDetails] =
+    useState(null);
 
   const [previewScope, setPreviewScope] = useState("");
   const [previewScopeId, setPreviewScopeId] = useState("");
@@ -749,8 +751,15 @@ const ConnectionsScreen = () => {
   };
 
   const handleViewDetails = (connection) => {
-    setSelectedConnection(connection);
-    setDetailsDialogOpen(true);
+    if (selectedConnectionForDetails?.id === connection.id) {
+      setSelectedConnectionForDetails(null); // Toggle off if already selected
+    } else {
+      setSelectedConnectionForDetails(connection); // Show details for new connection
+    }
+  };
+
+  const handleCloseConnectionDetails = () => {
+    setSelectedConnectionForDetails(null);
   };
 
   const statusOptions = [
@@ -836,14 +845,14 @@ const ConnectionsScreen = () => {
         ),
       },
       { field: "connectionNumber", headerName: "Conn #", width: 100 },
-      { field: "customerName", headerName: "Customer", width: 180 },
-      { field: "customerPhoneNumber", headerName: "Phone", width: 130 },
-      { field: "customerEmail", headerName: "Email", width: 220 },
-      { field: "schemeName", headerName: "Scheme", width: 140 },
-      { field: "zoneName", headerName: "Zone", width: 130 },
-      { field: "routeName", headerName: "Route", width: 110 },
-      { field: "tariffCategoryName", headerName: "Tariff", width: 160 },
-      { field: "meterSerialNumber", headerName: "Meter", width: 130 },
+      { field: "customerName", headerName: "Customer", width: 150 },
+      { field: "customerPhoneNumber", headerName: "Phone", width: 120 },
+
+      { field: "schemeName", headerName: "Scheme", width: 120 },
+      { field: "zoneName", headerName: "Zone", width: 110 },
+
+      { field: "tariffCategoryName", headerName: "Tariff", width: 140 },
+      { field: "meterSerialNumber", headerName: "Meter", width: 120 },
     ],
     [],
   );
@@ -852,11 +861,11 @@ const ConnectionsScreen = () => {
     <ErrorBoundary FallbackComponent={ErrorFallback}>
       <Box
         sx={{
-          height: "100vh",
+          height: "calc(100vh - 48px)",
           display: "flex",
           flexDirection: "column",
-          p: 3,
-          gap: 2,
+          p: { xs: 1, sm: 1.5, md: 1.5 },
+          gap: 1.5,
         }}
       >
         <Snackbar
@@ -1167,51 +1176,244 @@ const ConnectionsScreen = () => {
               </Collapse>
             </Box>
 
-            {/* Data Grid */}
+            {/* Data Grid + Details Panel Container */}
             <Box
               sx={{
+                display: "flex",
+                gap: 1.5,
                 flex: 1,
                 overflow: "hidden",
-                borderRadius: 1,
-                boxShadow: 1,
+                p: { xs: 1.5, sm: 2 },
               }}
             >
-              {loading ? (
-                <Box
-                  sx={{
-                    height: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <CircularProgress />
-                </Box>
-              ) : (
-                <DataGrid
-                  rows={connections}
-                  columns={columns}
-                  getRowId={(row) => row.id}
-                  pageSizeOptions={[10, 25, 50, 100]}
-                  paginationModel={{ page, pageSize: rowsPerPage }}
-                  onPaginationModelChange={({ page: p, pageSize: ps }) => {
-                    setPage(p);
-                    setRowsPerPage(ps);
-                  }}
-                  rowCount={total}
-                  paginationMode="server"
-                  disableRowSelectionOnClick
-                  sx={{
-                    height: "100%",
-                    border: "none",
-                    "& .MuiDataGrid-columnHeaders": {
-                      bgcolor: "background.default",
-                      fontWeight: 600,
-                    },
-                  }}
-                  localeText={{ noRowsLabel: "No connections found" }}
-                />
-              )}
+              {/* Data Grid */}
+              <Box
+                sx={{
+                  flex: selectedConnectionForDetails ? "0 0 55%" : "1",
+                  overflow: "hidden",
+                  borderRadius: 1,
+                  boxShadow: 1,
+                  transition: "flex 0.3s ease",
+                  bgcolor: "background.paper",
+                }}
+              >
+                {loading ? (
+                  <Box
+                    sx={{
+                      height: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <CircularProgress />
+                  </Box>
+                ) : (
+                  <DataGrid
+                    rows={connections}
+                    columns={columns}
+                    getRowId={(row) => row.id}
+                    pageSizeOptions={[10, 25, 50, 100]}
+                    paginationModel={{ page, pageSize: rowsPerPage }}
+                    onPaginationModelChange={({ page: p, pageSize: ps }) => {
+                      setPage(p);
+                      setRowsPerPage(ps);
+                    }}
+                    rowCount={total}
+                    paginationMode="server"
+                    disableRowSelectionOnClick
+                    sx={{
+                      height: "100%",
+                      border: "none",
+                      "& .MuiDataGrid-columnHeaders": {
+                        bgcolor: "background.default",
+                        fontWeight: 600,
+                      },
+                    }}
+                    localeText={{ noRowsLabel: "No connections found" }}
+                  />
+                )}
+              </Box>
+
+              {/* Connection Details Panel */}
+              <Box
+                sx={{
+                  flex: selectedConnectionForDetails ? "0 0 45%" : "0 0 0",
+                  transition: "flex 0.3s ease",
+                  overflow: "auto",
+                  borderRadius: 1,
+                  bgcolor: "background.paper",
+                  boxShadow: 1,
+                  display: selectedConnectionForDetails ? "block" : "none",
+                  p: 2,
+                }}
+              >
+                {selectedConnectionForDetails ? (
+                  <Box
+                    sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+                  >
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Typography variant="h6" fontWeight={600}>
+                        Connection #
+                        {selectedConnectionForDetails.connectionNumber}
+                      </Typography>
+                      <IconButton
+                        size="small"
+                        onClick={handleCloseConnectionDetails}
+                      >
+                        <Clear />
+                      </IconButton>
+                    </Box>
+
+                    <Divider />
+
+                    {/* Customer section */}
+                    <Box>
+                      <Typography
+                        variant="subtitle2"
+                        color="text.secondary"
+                        gutterBottom
+                        fontWeight={600}
+                      >
+                        Customer
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Name:</strong>{" "}
+                        {selectedConnectionForDetails.customerName || "—"}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Phone:</strong>{" "}
+                        {selectedConnectionForDetails.customerPhoneNumber ||
+                          "—"}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Email:</strong>{" "}
+                        {selectedConnectionForDetails.customerEmail || "—"}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Account #:</strong>{" "}
+                        {selectedConnectionForDetails.customerAccount || "—"}
+                      </Typography>
+                    </Box>
+
+                    <Divider />
+
+                    {/* Connection / Meter section */}
+                    <Box>
+                      <Typography
+                        variant="subtitle2"
+                        color="text.secondary"
+                        gutterBottom
+                        fontWeight={600}
+                      >
+                        Connection & Meter
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Status:</strong>{" "}
+                        <Chip
+                          label={selectedConnectionForDetails.status}
+                          color={
+                            selectedConnectionForDetails.status === "ACTIVE"
+                              ? "success"
+                              : selectedConnectionForDetails.status ===
+                                  "PENDING_METER"
+                                ? "warning"
+                                : "error"
+                          }
+                          size="small"
+                        />
+                      </Typography>
+                      <Typography variant="body2" sx={{ mt: 1 }}>
+                        <strong>Meter Serial:</strong>{" "}
+                        {selectedConnectionForDetails.meterSerialNumber ||
+                          "Not assigned"}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Meter Model:</strong>{" "}
+                        {selectedConnectionForDetails.meterModel || "—"}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Plot Number:</strong>{" "}
+                        {selectedConnectionForDetails.plotNumber || "—"}
+                      </Typography>
+                    </Box>
+
+                    <Divider />
+
+                    {/* Location section */}
+                    <Box>
+                      <Typography
+                        variant="subtitle2"
+                        color="text.secondary"
+                        gutterBottom
+                        fontWeight={600}
+                      >
+                        Location
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Scheme:</strong>{" "}
+                        {selectedConnectionForDetails.schemeName || "—"}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Zone:</strong>{" "}
+                        {selectedConnectionForDetails.zoneName || "—"}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Route:</strong>{" "}
+                        {selectedConnectionForDetails.routeName || "—"}
+                      </Typography>
+                    </Box>
+
+                    <Divider />
+
+                    {/* Tariff & Financials */}
+                    <Box>
+                      <Typography
+                        variant="subtitle2"
+                        color="text.secondary"
+                        gutterBottom
+                        fontWeight={600}
+                      >
+                        Tariff & Balance
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Tariff Category:</strong>{" "}
+                        {selectedConnectionForDetails.tariffCategoryName || "—"}
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        color={
+                          selectedConnectionForDetails.customerAccountBalance <
+                          0
+                            ? "error"
+                            : "inherit"
+                        }
+                      >
+                        <strong>Account Balance:</strong> KES{" "}
+                        {selectedConnectionForDetails.customerAccountBalance?.toLocaleString() ||
+                          "0"}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Deposit:</strong> KES{" "}
+                        {selectedConnectionForDetails.customerAccountDeposit?.toLocaleString() ||
+                          "0"}
+                      </Typography>
+                    </Box>
+                  </Box>
+                ) : (
+                  <Box sx={{ p: 3, textAlign: "center" }}>
+                    <Typography color="text.secondary">
+                      Select a connection to view details
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
             </Box>
 
             {/* Dialogs */}
@@ -1333,153 +1535,10 @@ const ConnectionsScreen = () => {
                 RelatedSurveyId=""
                 assigneeId={currentUser?.id || ""}
                 onTaskCreated={handleTaskCreated}
-                theme={theme}
+                theme={darkMode}
                 taskTitle="Meter Installation Task"
                 taskDescription={`Install meter for #${taskConnection?.connectionNumber}`}
               />
-            </Dialog>
-
-            <Dialog
-              open={detailsDialogOpen}
-              onClose={() => setDetailsDialogOpen(false)}
-              fullWidth
-              maxWidth="md"
-            >
-              <DialogTitle>
-                Connection Details – #
-                {selectedConnection?.connectionNumber || "—"}
-              </DialogTitle>
-
-              <DialogContent dividers>
-                {selectedConnection ? (
-                  <Box
-                    sx={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 2.5,
-                      py: 1,
-                    }}
-                  >
-                    {/* Customer section */}
-                    <Box>
-                      <Typography
-                        variant="subtitle2"
-                        color="text.secondary"
-                        gutterBottom
-                      >
-                        Customer
-                      </Typography>
-                      <Typography variant="body1">
-                        <strong>Name:</strong>{" "}
-                        {selectedConnection.customerName || "—"}
-                      </Typography>
-                      <Typography>
-                        <strong>Phone:</strong>{" "}
-                        {selectedConnection.customerPhoneNumber || "—"}
-                      </Typography>
-                      <Typography>
-                        <strong>Email:</strong>{" "}
-                        {selectedConnection.customerEmail || "—"}
-                      </Typography>
-                      <Typography>
-                        <strong>Account #:</strong>{" "}
-                        {selectedConnection.customerAccount || "—"}
-                      </Typography>
-                    </Box>
-
-                    {/* Connection / Meter section */}
-                    <Box>
-                      <Typography
-                        variant="subtitle2"
-                        color="text.secondary"
-                        gutterBottom
-                      >
-                        Connection & Meter
-                      </Typography>
-                      <Typography>
-                        <strong>Status:</strong> {selectedConnection.status}
-                      </Typography>
-                      <Typography>
-                        <strong>Meter Serial:</strong>{" "}
-                        {selectedConnection.meterSerialNumber || "Not assigned"}
-                      </Typography>
-                      <Typography>
-                        <strong>Meter Model:</strong>{" "}
-                        {selectedConnection.meterModel || "—"}
-                      </Typography>
-                      <Typography>
-                        <strong>Plot Number:</strong>{" "}
-                        {selectedConnection.plotNumber || "—"}
-                      </Typography>
-                    </Box>
-
-                    {/* Location section */}
-                    <Box>
-                      <Typography
-                        variant="subtitle2"
-                        color="text.secondary"
-                        gutterBottom
-                      >
-                        Location
-                      </Typography>
-                      <Typography>
-                        <strong>Scheme:</strong>{" "}
-                        {selectedConnection.schemeName || "—"}
-                      </Typography>
-                      <Typography>
-                        <strong>Zone:</strong>{" "}
-                        {selectedConnection.zoneName || "—"}
-                      </Typography>
-                      <Typography>
-                        <strong>Route:</strong>{" "}
-                        {selectedConnection.routeName || "—"}
-                      </Typography>
-                    </Box>
-
-                    {/* Tariff & Financials */}
-                    <Box>
-                      <Typography
-                        variant="subtitle2"
-                        color="text.secondary"
-                        gutterBottom
-                      >
-                        Tariff & Balance
-                      </Typography>
-                      <Typography>
-                        <strong>Tariff Category:</strong>{" "}
-                        {selectedConnection.tariffCategoryName || "—"}
-                      </Typography>
-                      <Typography
-                        color={
-                          selectedConnection.customerAccountBalance < 0
-                            ? "error"
-                            : "inherit"
-                        }
-                      >
-                        <strong>Account Balance:</strong> KES{" "}
-                        {selectedConnection.customerAccountBalance?.toLocaleString() ||
-                          "0"}
-                      </Typography>
-                      <Typography>
-                        <strong>Deposit:</strong> KES{" "}
-                        {selectedConnection.customerAccountDeposit?.toLocaleString() ||
-                          "0"}
-                      </Typography>
-                    </Box>
-                  </Box>
-                ) : (
-                  <Typography color="text.secondary">
-                    No connection selected
-                  </Typography>
-                )}
-              </DialogContent>
-
-              <DialogActions>
-                <Button onClick={() => setDetailsDialogOpen(false)}>
-                  Close
-                </Button>
-                {/* Optional: Add Edit / Assign meter / Create task buttons here later */}
-              </DialogActions>
             </Dialog>
 
             <Dialog
