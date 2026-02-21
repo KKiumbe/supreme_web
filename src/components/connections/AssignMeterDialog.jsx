@@ -31,7 +31,9 @@ const AssignMeterDialog = ({
   return (
     <Dialog open={open} onClose={onReset} fullWidth maxWidth="sm">
       <DialogTitle>Assign Meter to Connection</DialogTitle>
-      <DialogContent sx={{ pt: 3, display: "flex", flexDirection: "column", gap: 2 }}>
+      <DialogContent
+        sx={{ pt: 3, display: "flex", flexDirection: "column", gap: 2 }}
+      >
         <TextField
           fullWidth
           label="Connection Number"

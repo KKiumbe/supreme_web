@@ -40,7 +40,9 @@ const EditConnectionDialog = ({
   return (
     <Dialog open={open} onClose={onReset} fullWidth maxWidth="sm">
       <DialogTitle>Edit Connection</DialogTitle>
-      <DialogContent sx={{ pt: 3, display: "flex", flexDirection: "column", gap: 2 }}>
+      <DialogContent
+        sx={{ pt: 3, display: "flex", flexDirection: "column", gap: 2 }}
+      >
         <TextField
           fullWidth
           label="Connection Number"
@@ -118,9 +120,7 @@ const EditConnectionDialog = ({
               <MenuItem value="">None</MenuItem>
               {schemes
                 .find((s) => String(s.id) === selectedSchemeId)
-                ?.zones?.find(
-                  (z) => String(z.id) === selectedZoneId,
-                )
+                ?.zones?.find((z) => String(z.id) === selectedZoneId)
                 ?.routes?.map((r) => (
                   <MenuItem key={r.id} value={String(r.id)}>
                     {r.name}

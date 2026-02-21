@@ -889,8 +889,8 @@ const ConnectionsScreen = () => {
 
             {/* Tabs */}
             <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-              <Tabs 
-                value={activeTab} 
+              <Tabs
+                value={activeTab}
                 onChange={(e, newValue) => setActiveTab(newValue)}
                 aria-label="connections tabs"
               >
@@ -963,7 +963,7 @@ const ConnectionsScreen = () => {
                   {/* Connection Details Panel */}
                   <Box
                     sx={{
-                      flex: selectedConnectionForDetails ? "0 0 45%" : "0 0 0",
+                      flex: selectedConnectionForDetails ? "0 0 40%" : "0 0 0",
                       transition: "flex 0.3s ease",
                       overflow: "auto",
                       borderRadius: 1,
@@ -986,103 +986,71 @@ const ConnectionsScreen = () => {
             {activeTab === 1 && <ActiveCommitmentConnectionsTab />}
 
             {/* Dialogs */}
-            <Dialog
+            <CreateConnectionDialog
               open={modalOpen}
               onClose={resetModal}
-              fullWidth
-              maxWidth="sm"
-            >
-              <DialogTitle>New Connection</DialogTitle>
-              <DialogContent>
-                {/* Your connection creation form fields go here */}
-              </DialogContent>
-              <DialogActions>
-                <Button onClick={resetModal} disabled={loading}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="contained"
-                  onClick={handleCreateConnection}
-                  disabled={loading}
-                >
-                  {loading ? <CircularProgress size={20} /> : "Create"}
-                </Button>
-              </DialogActions>
-            </Dialog>
+              connectionNumber={connectionNumber}
+              onConnectionNumberChange={setConnectionNumber}
+              selectedCustomerId={selectedCustomerId}
+              onCustomerChange={setSelectedCustomerId}
+              status={status}
+              onStatusChange={setStatus}
+              selectedSchemeId={selectedSchemeId}
+              onSchemeChange={setSelectedSchemeId}
+              selectedZoneId={selectedZoneId}
+              onZoneChange={setSelectedZoneId}
+              selectedRouteId={selectedRouteId}
+              onRouteChange={setSelectedRouteId}
+              selectedTariffCategoryId={selectedTariffCategoryId}
+              onTariffChange={setSelectedTariffCategoryId}
+              schemes={schemes}
+              zones={zones}
+              routes={routes}
+              tariffCategories={tariffCategories}
+              loading={loading}
+              onSubmit={handleCreateConnection}
+              onReset={resetModal}
+            />
 
-            <Dialog
+            <AssignMeterDialog
               open={assignMeterOpen}
               onClose={resetAssignModal}
-              fullWidth
-              maxWidth="sm"
-            >
-              <DialogTitle>Assign Meter to Connection</DialogTitle>
-              <DialogContent
-                sx={{ pt: 3, display: "flex", flexDirection: "column", gap: 2 }}
-              >
-                {selectedConnection && (
-                  <>
-                    <TextField
-                      fullWidth
-                      label="Connection Number"
-                      value={selectedConnection.connectionNumber || ""}
-                      disabled
-                    />
-                    <TextField
-                      fullWidth
-                      label="Customer"
-                      value={selectedConnection.customerName || ""}
-                      disabled
-                    />
+              connectionNumber={selectedConnection?.connectionNumber}
+              customerName={selectedConnection?.customerName}
+              selectedMeterId={selectedMeterId}
+              onMeterChange={setSelectedMeterId}
+              meters={meters}
+              loading={loading}
+              onSubmit={handleAssignMeter}
+              onReset={resetAssignModal}
+              meterId={selectedConnection?.meterId}
+              meterSerialNumber={selectedConnection?.meterSerialNumber}
+            />
 
-                    {/* Warning if connection already has a meter */}
-                    {selectedConnection.meterId && (
-                      <Alert severity="warning">
-                        ⚠️ This connection already has a meter:{" "}
-                        <strong>{selectedConnection.meterSerialNumber}</strong>
-                      </Alert>
-                    )}
-                  </>
-                )}
-
-                <FormControl fullWidth disabled={loading}>
-                  <InputLabel>Select Meter</InputLabel>
-                  <Select
-                    value={selectedMeterId}
-                    onChange={(e) => setSelectedMeterId(e.target.value)}
-                    label="Select Meter"
-                  >
-                    <MenuItem value="">-- Choose a meter --</MenuItem>
-                    {meters
-                      .filter((m) => m.status === "AVAILABLE")
-                      .map((m) => (
-                        <MenuItem key={m.id} value={m.id}>
-                          {m.serialNumber} ({m.model})
-                        </MenuItem>
-                      ))}
-                  </Select>
-                </FormControl>
-
-                {!meters.some((m) => m.status === "AVAILABLE") && (
-                  <Typography color="warning.main" variant="caption">
-                    ⚠️ No available meters. Please add a new meter first.
-                  </Typography>
-                )}
-              </DialogContent>
-
-              <DialogActions>
-                <Button onClick={resetAssignModal} disabled={loading}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="contained"
-                  onClick={handleAssignMeter}
-                  disabled={loading || !selectedMeterId}
-                >
-                  {loading ? <CircularProgress size={20} /> : "Assign Meter"}
-                </Button>
-              </DialogActions>
-            </Dialog>
+            {/* Edit Connection Modal */}
+            <EditConnectionDialog
+              open={editModalOpen}
+              onClose={resetEditModal}
+              connectionNumber={editConnectionNumber}
+              onConnectionNumberChange={setEditConnectionNumber}
+              status={editStatus}
+              onStatusChange={setEditStatus}
+              selectedSchemeId={editSelectedSchemeId}
+              onSchemeChange={setEditSelectedSchemeId}
+              selectedZoneId={editSelectedZoneId}
+              onZoneChange={setEditSelectedZoneId}
+              selectedRouteId={editSelectedRouteId}
+              onRouteChange={setEditSelectedRouteId}
+              selectedTariffCategoryId={editSelectedTariffCategoryId}
+              onTariffChange={setEditSelectedTariffCategoryId}
+              schemes={schemes}
+              zones={zones}
+              routes={routes}
+              tariffCategories={tariffCategories}
+              loading={editSubmitting}
+              onSubmit={handleEditConnection}
+              onReset={resetEditModal}
+            />
 
             <Dialog
               open={taskDialogOpen}
@@ -1127,139 +1095,6 @@ const ConnectionsScreen = () => {
               <DialogActions>
                 <Button onClick={() => setDisconnectionDialogOpen(false)}>
                   Close
-                </Button>
-              </DialogActions>
-            </Dialog>
-
-            {/* Edit Connection Modal */}
-            <Dialog
-              open={editModalOpen}
-              onClose={resetEditModal}
-              fullWidth
-              maxWidth="sm"
-            >
-              <DialogTitle>Edit Connection</DialogTitle>
-              <DialogContent
-                sx={{ pt: 3, display: "flex", flexDirection: "column", gap: 2 }}
-              >
-                <TextField
-                  fullWidth
-                  label="Connection Number"
-                  value={editConnectionNumber}
-                  onChange={(e) => setEditConnectionNumber(e.target.value)}
-                  type="number"
-                  disabled={editSubmitting}
-                />
-
-                <FormControl fullWidth disabled={editSubmitting}>
-                  <InputLabel>Status</InputLabel>
-                  <Select
-                    value={editStatus}
-                    onChange={(e) => setEditStatus(e.target.value)}
-                    label="Status"
-                  >
-                    <MenuItem value="ACTIVE">Active</MenuItem>
-                    <MenuItem value="PENDING_METER">Pending Meter</MenuItem>
-                    <MenuItem value="DISCONNECTED">Disconnected</MenuItem>
-                    <MenuItem value="INACTIVE">Inactive</MenuItem>
-                  </Select>
-                </FormControl>
-
-                <FormControl fullWidth disabled={editSubmitting}>
-                  <InputLabel>Scheme</InputLabel>
-                  <Select
-                    value={editSelectedSchemeId}
-                    onChange={(e) => {
-                      setEditSelectedSchemeId(e.target.value);
-                      setEditSelectedZoneId("");
-                      setEditSelectedRouteId("");
-                    }}
-                    label="Scheme"
-                  >
-                    <MenuItem value="">None</MenuItem>
-                    {schemes.map((s) => (
-                      <MenuItem key={s.id} value={String(s.id)}>
-                        {s.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                {editSelectedSchemeId && (
-                  <FormControl fullWidth disabled={editSubmitting}>
-                    <InputLabel>Zone</InputLabel>
-                    <Select
-                      value={editSelectedZoneId}
-                      onChange={(e) => {
-                        setEditSelectedZoneId(e.target.value);
-                        setEditSelectedRouteId("");
-                      }}
-                      label="Zone"
-                    >
-                      <MenuItem value="">None</MenuItem>
-                      {schemes
-                        .find((s) => String(s.id) === editSelectedSchemeId)
-                        ?.zones?.map((z) => (
-                          <MenuItem key={z.id} value={String(z.id)}>
-                            {z.name}
-                          </MenuItem>
-                        ))}
-                    </Select>
-                  </FormControl>
-                )}
-
-                {editSelectedZoneId && (
-                  <FormControl fullWidth disabled={editSubmitting}>
-                    <InputLabel>Route</InputLabel>
-                    <Select
-                      value={editSelectedRouteId}
-                      onChange={(e) => setEditSelectedRouteId(e.target.value)}
-                      label="Route"
-                    >
-                      <MenuItem value="">None</MenuItem>
-                      {schemes
-                        .find((s) => String(s.id) === editSelectedSchemeId)
-                        ?.zones?.find(
-                          (z) => String(z.id) === editSelectedZoneId,
-                        )
-                        ?.routes?.map((r) => (
-                          <MenuItem key={r.id} value={String(r.id)}>
-                            {r.name}
-                          </MenuItem>
-                        ))}
-                    </Select>
-                  </FormControl>
-                )}
-
-                <FormControl fullWidth disabled={editSubmitting}>
-                  <InputLabel>Tariff Category</InputLabel>
-                  <Select
-                    value={editSelectedTariffCategoryId}
-                    onChange={(e) =>
-                      setEditSelectedTariffCategoryId(e.target.value)
-                    }
-                    label="Tariff Category"
-                  >
-                    <MenuItem value="">None</MenuItem>
-                    {tariffCategories.map((t) => (
-                      <MenuItem key={t.id} value={String(t.id)}>
-                        {t.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </DialogContent>
-
-              <DialogActions>
-                <Button onClick={resetEditModal} disabled={editSubmitting}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="contained"
-                  onClick={handleEditConnection}
-                  disabled={editSubmitting}
-                >
-                  {editSubmitting ? <CircularProgress size={20} /> : "Update"}
                 </Button>
               </DialogActions>
             </Dialog>

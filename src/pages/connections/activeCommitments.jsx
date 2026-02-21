@@ -93,7 +93,7 @@ const ActiveCommitmentConnectionsTab = () => {
       try {
         const response = await axios.get(
           `${BASEURL}/connections/${connectionId}`,
-          { withCredentials: true }
+          { withCredentials: true },
         );
 
         if (response.data?.data) {
@@ -110,7 +110,7 @@ const ActiveCommitmentConnectionsTab = () => {
         setDetailsLoading(false);
       }
     },
-    [currentUser]
+    [currentUser],
   );
 
   // Fetch connections with active commitments
@@ -133,12 +133,12 @@ const ActiveCommitmentConnectionsTab = () => {
               sortOrder: "asc",
             },
             withCredentials: true,
-          }
+          },
         );
 
         if (res.data?.data) {
           const flattened = res.data.data.map((conn) =>
-            flattenConnectionWithCommitment(conn)
+            flattenConnectionWithCommitment(conn),
           );
           setConnections(flattened);
           setTotal(res.data.pagination?.total || 0);
@@ -161,7 +161,7 @@ const ActiveCommitmentConnectionsTab = () => {
         setLoading(false);
       }
     },
-    [currentUser]
+    [currentUser],
   );
 
   // Initialize
@@ -182,7 +182,7 @@ const ActiveCommitmentConnectionsTab = () => {
           status: statusFilter,
         });
       }, 500),
-    [fetchConnections, rowsPerPage, statusFilter]
+    [fetchConnections, rowsPerPage, statusFilter],
   );
 
   useEffect(() => {
@@ -200,7 +200,7 @@ const ActiveCommitmentConnectionsTab = () => {
         fetchDetailedConnection(connection.id);
       }
     },
-    [selectedConnectionForDetails, fetchDetailedConnection]
+    [selectedConnectionForDetails, fetchDetailedConnection],
   );
 
   const statusOptions = ["ACTIVE", "DISCONNECTED", "PENDING_METER"];
@@ -297,7 +297,7 @@ const ActiveCommitmentConnectionsTab = () => {
         ),
       },
     ],
-    [handleViewDetails]
+    [handleViewDetails],
   );
 
   if (permissionDenied) {
@@ -314,7 +314,14 @@ const ActiveCommitmentConnectionsTab = () => {
       }}
     >
       {/* Header */}
-      <Box sx={{ p: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <Box
+        sx={{
+          p: 2,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
         <Typography variant="h5" fontWeight={600}>
           Connections with Active Commitments
         </Typography>
@@ -384,10 +391,7 @@ const ActiveCommitmentConnectionsTab = () => {
       </Box>
 
       {/* Filter Panel */}
-      <Collapse
-        in={filterOpen}
-        sx={{ borderBottom: "1px solid #ddd" }}
-      >
+      <Collapse in={filterOpen} sx={{ borderBottom: "1px solid #ddd" }}>
         <Box
           sx={{
             p: 2,
@@ -513,13 +517,16 @@ const ActiveCommitmentConnectionsTab = () => {
                     Connection Details
                   </Typography>
                   <Typography variant="body2">
-                    <strong>Conn #:</strong> {selectedConnectionForDetails.connectionNumber}
+                    <strong>Conn #:</strong>{" "}
+                    {selectedConnectionForDetails.connectionNumber}
                   </Typography>
                   <Typography variant="body2">
-                    <strong>Status:</strong> {selectedConnectionForDetails.status}
+                    <strong>Status:</strong>{" "}
+                    {selectedConnectionForDetails.status}
                   </Typography>
                   <Typography variant="body2">
-                    <strong>Tariff:</strong> {selectedConnectionForDetails.tariff}
+                    <strong>Tariff:</strong>{" "}
+                    {selectedConnectionForDetails.tariff}
                   </Typography>
                 </Box>
 
@@ -534,7 +541,8 @@ const ActiveCommitmentConnectionsTab = () => {
                     Location
                   </Typography>
                   <Typography variant="body2">
-                    <strong>Scheme:</strong> {selectedConnectionForDetails.scheme}
+                    <strong>Scheme:</strong>{" "}
+                    {selectedConnectionForDetails.scheme}
                   </Typography>
                   <Typography variant="body2">
                     <strong>Zone:</strong> {selectedConnectionForDetails.zone}
@@ -555,7 +563,8 @@ const ActiveCommitmentConnectionsTab = () => {
                     Meter
                   </Typography>
                   <Typography variant="body2">
-                    <strong>Serial:</strong> {selectedConnectionForDetails.meterNumber}
+                    <strong>Serial:</strong>{" "}
+                    {selectedConnectionForDetails.meterNumber}
                   </Typography>
                 </Box>
 
@@ -584,19 +593,18 @@ const ActiveCommitmentConnectionsTab = () => {
                   />
                   <Typography variant="body2">
                     <strong>Commitment Amount:</strong>{" "}
-                    {parseFloat(selectedConnectionForDetails.commitmentAmount || 0).toLocaleString(
-                      "en-KE",
-                      {
-                        style: "currency",
-                        currency: "KES",
-                      }
-                    )}
+                    {parseFloat(
+                      selectedConnectionForDetails.commitmentAmount || 0,
+                    ).toLocaleString("en-KE", {
+                      style: "currency",
+                      currency: "KES",
+                    })}
                   </Typography>
                   {selectedConnectionForDetails.commitmentStartDate && (
                     <Typography variant="body2">
                       <strong>Started:</strong>{" "}
                       {new Date(
-                        selectedConnectionForDetails.commitmentStartDate
+                        selectedConnectionForDetails.commitmentStartDate,
                       ).toLocaleDateString()}
                     </Typography>
                   )}
@@ -604,7 +612,7 @@ const ActiveCommitmentConnectionsTab = () => {
                     <Typography variant="body2">
                       <strong>Last Paid:</strong>{" "}
                       {new Date(
-                        selectedConnectionForDetails.commitmentLastPaidAt
+                        selectedConnectionForDetails.commitmentLastPaidAt,
                       ).toLocaleDateString()}
                     </Typography>
                   )}
@@ -621,25 +629,26 @@ const ActiveCommitmentConnectionsTab = () => {
                     Account Status
                   </Typography>
                   <Typography variant="body2">
-                    <strong>Status:</strong> {selectedConnectionForDetails.accountStatus}
+                    <strong>Status:</strong>{" "}
+                    {selectedConnectionForDetails.accountStatus}
                   </Typography>
                   <Typography
                     variant="body2"
                     color={
-                      parseFloat(selectedConnectionForDetails.accountBalance) > 0
+                      parseFloat(selectedConnectionForDetails.accountBalance) >
+                      0
                         ? "error"
                         : "success"
                     }
                     fontWeight={600}
                   >
                     <strong>Balance:</strong>{" "}
-                    {parseFloat(selectedConnectionForDetails.accountBalance || 0).toLocaleString(
-                      "en-KE",
-                      {
-                        style: "currency",
-                        currency: "KES",
-                      }
-                    )}
+                    {parseFloat(
+                      selectedConnectionForDetails.accountBalance || 0,
+                    ).toLocaleString("en-KE", {
+                      style: "currency",
+                      currency: "KES",
+                    })}
                   </Typography>
                 </Box>
               </Box>

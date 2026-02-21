@@ -27,7 +27,8 @@ const ConnectionsDataGrid = ({
       {
         field: "actions",
         headerName: "Actions",
-        width: 180,
+        width: 200,
+        flex: 0.8,
         align: "center",
         renderCell: (params) => (
           <Box sx={{ display: "flex", gap: 0.5 }}>
@@ -77,7 +78,8 @@ const ConnectionsDataGrid = ({
       {
         field: "status",
         headerName: "Status",
-        width: 130,
+        width: 140,
+        flex: 0.9,
         renderCell: (params) => (
           <Chip
             label={params.value}
@@ -94,13 +96,13 @@ const ConnectionsDataGrid = ({
           />
         ),
       },
-      { field: "connectionNumber", headerName: "Conn #", width: 100 },
-      { field: "customerName", headerName: "Customer", width: 150 },
-      { field: "customerPhoneNumber", headerName: "Phone", width: 120 },
-      { field: "schemeName", headerName: "Scheme", width: 120 },
-      { field: "zoneName", headerName: "Zone", width: 110 },
-      { field: "tariffCategoryName", headerName: "Tariff", width: 140 },
-      { field: "meterSerialNumber", headerName: "Meter", width: 120 },
+      { field: "connectionNumber", headerName: "Conn #", width: 120, flex: 0.8 },
+      { field: "customerName", headerName: "Customer", width: 180, flex: 1.2 },
+      { field: "customerPhoneNumber", headerName: "Phone", width: 140, flex: 1 },
+      { field: "schemeName", headerName: "Scheme", width: 140, flex: 1 },
+      { field: "zoneName", headerName: "Zone", width: 130, flex: 1 },
+      { field: "tariffCategoryName", headerName: "Tariff", width: 160, flex: 1 },
+      { field: "meterSerialNumber", headerName: "Meter", width: 140, flex: 1 },
     ],
     [onEditClick, onAssignMeterClick, onViewDetailsClick],
   );
@@ -108,7 +110,7 @@ const ConnectionsDataGrid = ({
   return (
     <Box
       sx={{
-        flex: connections.length > 0 ? "0 0 55%" : "1",
+        flex: connections.length > 0 ? "0 0 60%" : "1",
         overflow: "hidden",
         borderRadius: 1,
         boxShadow: 1,

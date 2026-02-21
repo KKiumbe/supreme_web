@@ -1,16 +1,8 @@
 import React from "react";
-import {
-  Box,
-  Typography,
-  IconButton,
-  Divider,
-} from "@mui/material";
+import { Box, Typography, IconButton, Divider } from "@mui/material";
 import { Clear } from "@mui/icons-material";
 
-const ConnectionDetailsPanel = ({
-  connection,
-  onClose,
-}) => {
+const ConnectionDetailsPanel = ({ connection, onClose }) => {
   if (!connection) {
     return (
       <Box sx={{ p: 3, textAlign: "center" }}>
@@ -77,8 +69,7 @@ const ConnectionDetailsPanel = ({
           Connection & Meter
         </Typography>
         <Typography variant="body2">
-          <strong>Status:</strong>{" "}
-          {connection.status}
+          <strong>Status:</strong> {connection.status}
         </Typography>
         <Typography variant="body2" sx={{ mt: 1 }}>
           <strong>Meter Serial:</strong>{" "}
@@ -133,9 +124,7 @@ const ConnectionDetailsPanel = ({
         </Typography>
         <Typography
           variant="body2"
-          color={
-            connection.customerAccountBalance < 0 ? "error" : "inherit"
-          }
+          color={connection.customerAccountBalance < 0 ? "error" : "inherit"}
         >
           <strong>Account Balance:</strong> KES{" "}
           {connection.customerAccountBalance?.toLocaleString() || "0"}

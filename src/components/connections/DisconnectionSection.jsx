@@ -97,8 +97,7 @@ const DisconnectionSection = ({
                   {previewScope === "ZONE" &&
                     zones.map((z) => (
                       <MenuItem key={z.id} value={String(z.id)}>
-                        {z.name}{" "}
-                        {z.scheme?.name && `(${z.scheme.name})`}
+                        {z.name} {z.scheme?.name && `(${z.scheme.name})`}
                       </MenuItem>
                     ))}
                   {previewScope === "ROUTE" &&
@@ -125,9 +124,7 @@ const DisconnectionSection = ({
                 sx={{ maxWidth: 140 }}
                 InputProps={{
                   startAdornment: (
-                    <InputAdornment position="start">
-                      KES
-                    </InputAdornment>
+                    <InputAdornment position="start">KES</InputAdornment>
                   ),
                 }}
                 helperText="≥ this amount"
