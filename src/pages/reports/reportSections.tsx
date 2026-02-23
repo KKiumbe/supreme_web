@@ -4,8 +4,8 @@ export type ReportKey =
   | "MISSING_METER_READINGS"
   | "ABNORMAL_METER_READINGS"
   | "PAYMENTS_REPORT"
-  | "PAYMENTS_PER_MODE_CURRENT_PERIOD"
-  | "PAYMENTS_PER_MODE_PER_PERIOD"
+  | "ALL_PAYMENTS_PER_MODE_PER_PERIOD_SUMMARY"
+  | "PAYMENTS_PER_MODE_PER_PERIOD_SUMMARY"
   | "BILLS_AGING_REPORT"
   | "BILLS_BY_TYPE"
   | "CUSTOMERS_REPORT"
@@ -151,21 +151,40 @@ export const REPORT_SECTIONS: ReportSection[] = [
       },
 
       {
-        key: "PAYMENTS_PER_MODE_CURRENT_PERIOD",
-        label: "Payments per Mode (Current Period)",
+        key: "ALL_PAYMENTS_PER_MODE_PER_PERIOD_SUMMARY",
+        label: "All Payments per Mode Summary",
         params: [
           {
-            name: "mode",
-            label: "Mode of Payment",
+            name: "month",
+            label: "Month",
             type: "select",
-            source: "PAYMENT_MODES",
+            options: [
+              { label: "January", value: 1 },
+              { label: "February", value: 2 },
+              { label: "March", value: 3 },
+              { label: "April", value: 4 },
+              { label: "May", value: 5 },
+              { label: "June", value: 6 },
+              { label: "July", value: 7 },
+              { label: "August", value: 8 },
+              { label: "September", value: 9 },
+              { label: "October", value: 10 },
+              { label: "November", value: 11 },
+              { label: "December", value: 12 },
+            ],
+          },
+          {
+            name: "year",
+            label: "Year",
+            type: "select",
+            options: yearOptions,
           },
         ],
       },
 
       {
-        key: "PAYMENTS_PER_MODE_PER_PERIOD",
-        label: "Payments per Mode per Period",
+        key: "PAYMENTS_PER_MODE_PER_PERIOD_SUMMARY",
+        label: "Payments per Mode per Period summary",
         params: [
           {
             name: "month",
@@ -311,14 +330,7 @@ export interface Scheme {
 export const PaymentsPerModeCurrentPeriodReport: ReportDefinition = {
   key: "PAYMENTS_PER_MODE_CURRENT_PERIOD",
   label: "Payments per Mode (Current Period)",
-  params: [
-    {
-      name: "mode",
-      label: "Mode of Payment",
-      type: "select",
-      source: "PAYMENT_MODES",
-    },
-  ],
+  params: [],
 };
 
 export const PaymentsPerModePerPeriodReport: ReportDefinition = {
