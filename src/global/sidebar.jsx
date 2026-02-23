@@ -41,6 +41,7 @@ import {
 import BusinessIcon from "@mui/icons-material/Business";
 import HomeWorkIcon from "@mui/icons-material/HomeWork";
 import MenuIcon from "@mui/icons-material/Menu";
+import PlumbingIcon from "@mui/icons-material/Plumbing";
 import { useNavigate } from "react-router-dom";
 
 const Sidebar = () => {
@@ -244,6 +245,14 @@ const Sidebar = () => {
                 label: "Meter Reading Adjustments",
                 path: "/meter-reading-adjustments",
               },
+
+              {
+                icon: <PlumbingIcon sx={{ fontSize: 20 }} />,
+                label: "Disconnection final meter readings",
+                path: "/disconnection-meter-readings",
+              },
+
+              //disconnection-meter-readings
               {
                 icon: <FlashOn sx={{ fontSize: 20 }} />,
                 label: "Suspected Self-Reconnections",
