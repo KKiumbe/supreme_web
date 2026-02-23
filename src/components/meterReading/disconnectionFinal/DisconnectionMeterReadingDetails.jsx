@@ -6,7 +6,6 @@ import {
   Paper,
   Divider,
   Chip,
-  Avatar,
   IconButton,
   Button,
 } from "@mui/material";
@@ -19,7 +18,10 @@ import PropTypes from "prop-types";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
-export default function MeterReadingDetails({ readingId, onClose }) {
+export default function DisconnectionMeterReadingDetails({
+  readingId,
+  onClose,
+}) {
   const [reading, setReading] = useState(null);
   const [loading, setLoading] = useState(true);
   const [imageOpen, setImageOpen] = useState(false);
@@ -32,12 +34,12 @@ export default function MeterReadingDetails({ readingId, onClose }) {
     const fetchData = async () => {
       try {
         const res = await axios.get(
-          `${BASE_URL}/get-meter-reading/${readingId}`,
+          `${BASE_URL}/disconnection-meter-readings/${readingId}`,
           { withCredentials: true },
         );
         setReading(res.data.data);
       } catch (err) {
-        console.error("Failed to fetch reading:", err);
+        console.error("Failed to fetch disconnection reading:", err);
       } finally {
         setLoading(false);
       }
@@ -46,7 +48,7 @@ export default function MeterReadingDetails({ readingId, onClose }) {
     fetchData();
   }, [readingId]);
 
-  // Prepare variables for useMemo so it is always called
+  /* ---------------- Location ---------------- */
   const lat = reading?.latitude ? Number(reading.latitude) : null;
   const lng = reading?.longitude ? Number(reading.longitude) : null;
   const hasLocation = lat && lng;
@@ -69,29 +71,30 @@ export default function MeterReadingDetails({ readingId, onClose }) {
   if (!reading) {
     return (
       <Box p={3}>
-        <Typography color="error">Unable to load meter reading.</Typography>
+        <Typography color="error">
+          Unable to load disconnection meter reading.
+        </Typography>
       </Box>
     );
   }
 
   const {
+    finalReading,
     previousReading,
-    currentReading,
-    consumption,
-    readingDate,
+    finalConsumption,
+    disconnectionDate,
     notes,
     imageUrl,
-    ExceptionType,
     meter,
-    readBy,
-    latitude,
-    longitude,
+    connection,
+    customer,
+    task,
   } = reading;
 
   return (
     <>
       <Box p={2} sx={{ position: "relative" }}>
-        {/* Close */}
+        {/* Close Button */}
         <IconButton
           onClick={onClose}
           sx={{ position: "absolute", top: 4, left: 4 }}
@@ -101,28 +104,28 @@ export default function MeterReadingDetails({ readingId, onClose }) {
 
         <Box mb={2} mt={4}>
           <Typography variant="h6" fontWeight={600}>
-            Meter Reading Details
+            Disconnection Meter Reading
           </Typography>
         </Box>
 
         <Divider sx={{ mb: 2 }} />
 
-        {/* SUMMARY */}
+        {/* READING SUMMARY */}
         <Paper sx={{ p: 2, mb: 2 }}>
           <Typography fontWeight={600}>Reading Summary</Typography>
           <Divider sx={{ my: 1 }} />
 
           <Info label="Previous Reading" value={previousReading} />
-          <Info label="Current Reading" value={currentReading} />
-          <Info label="Consumption" value={consumption} />
+          <Info label="Final Reading" value={finalReading} />
+          <Info label="Final Consumption" value={finalConsumption} />
           <Info
-            label="Reading Date"
-            value={new Date(readingDate).toLocaleString()}
+            label="Disconnection Date"
+            value={new Date(disconnectionDate).toLocaleString()}
           />
 
-          {ExceptionType && (
+          {task?.status && (
             <Chip
-              label={ExceptionType.name}
+              label={`Task: ${task.status}`}
               color="warning"
               size="small"
               sx={{ mt: 1 }}
@@ -130,26 +133,6 @@ export default function MeterReadingDetails({ readingId, onClose }) {
           )}
 
           {notes && <Info label="Notes" value={notes} />}
-        </Paper>
-
-        {/* READ BY */}
-        <Paper sx={{ p: 2, mb: 2 }}>
-          <Typography fontWeight={600}>Read By</Typography>
-          <Divider sx={{ my: 1 }} />
-
-          {readBy ? (
-            <Box display="flex" gap={2} alignItems="center">
-              <Avatar>{readBy.firstName?.[0]}</Avatar>
-              <Box>
-                <Typography fontWeight={600}>
-                  {readBy.firstName} {readBy.lastName}
-                </Typography>
-                <Typography>{readBy.phoneNumber}</Typography>
-              </Box>
-            </Box>
-          ) : (
-            <Typography color="text.secondary">Unknown Reader</Typography>
-          )}
         </Paper>
 
         {/* METER */}
@@ -160,12 +143,11 @@ export default function MeterReadingDetails({ readingId, onClose }) {
           <Info label="Meter Serial" value={meter?.serialNumber} />
           <Info
             label="Connection Number"
-            value={meter?.connection?.connectionNumber}
+            value={connection?.connectionNumber}
           />
-          <Info
-            label="Tariff"
-            value={meter?.connection?.tariffCategory?.name}
-          />
+          <Info label="Route ID" value={connection?.routeId} />
+          <Info label="Zone ID" value={connection?.zoneId} />
+          <Info label="Scheme ID" value={connection?.schemeId} />
         </Paper>
 
         {/* CUSTOMER */}
@@ -173,21 +155,12 @@ export default function MeterReadingDetails({ readingId, onClose }) {
           <Typography fontWeight={600}>Customer</Typography>
           <Divider sx={{ my: 1 }} />
 
-          <Info
-            label="Customer Name"
-            value={meter?.connection?.customer?.customerName}
-          />
-          <Info
-            label="Phone"
-            value={meter?.connection?.customer?.phoneNumber}
-          />
-          <Info
-            label="Account Number"
-            value={meter?.connection?.customer?.accountNumber}
-          />
+          <Info label="Customer Name" value={customer?.customerName} />
+          <Info label="Phone" value={customer?.phoneNumber} />
+          <Info label="Account Number" value={customer?.accountNumber} />
         </Paper>
 
-        {/* LOCATION + MAP */}
+        {/* LOCATION */}
         <Paper sx={{ p: 2, mb: 2 }}>
           <Typography
             fontWeight={600}
@@ -216,7 +189,6 @@ export default function MeterReadingDetails({ readingId, onClose }) {
                 </Button>
               </Box>
 
-              {/* MAP PREVIEW */}
               <Box
                 sx={{
                   mt: 1,
@@ -227,11 +199,10 @@ export default function MeterReadingDetails({ readingId, onClose }) {
                 }}
               >
                 <iframe
-                  title="Meter Location"
+                  title="Disconnection Location"
                   width="100%"
                   height="220"
                   loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
                   src={`https://www.google.com/maps?q=${lat},${lng}&z=18&output=embed`}
                 />
               </Box>
@@ -300,6 +271,8 @@ export default function MeterReadingDetails({ readingId, onClose }) {
   );
 }
 
+/* ---------------- Helper ---------------- */
+
 function Info({ label, value }) {
   return (
     <Box display="flex" justifyContent="space-between" mb={0.5}>
@@ -314,8 +287,7 @@ Info.propTypes = {
   value: PropTypes.any,
 };
 
-MeterReadingDetails.propTypes = {
-  readingId: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
-    .isRequired,
+DisconnectionMeterReadingDetails.propTypes = {
+  readingId: PropTypes.string.isRequired,
   onClose: PropTypes.func.isRequired,
 };

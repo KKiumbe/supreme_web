@@ -62,6 +62,8 @@ import BankUploadsScreen from "./pages/payments/bankuploads";
 import MeterReadingAdjustmentsScreen from "./pages/meterReading/readingsAdjustment";
 import SuspectedSelfReconnectionsScreen from "./pages/meterReading/suspectedSelfReconnections";
 import SmsScreen from "./pages/communication/sendSMS";
+import DisconnectionMeterReadingDetails from "./pages/meterReading/DisconnectionMeterReadingDetails";
+import DisconnectionMeterReadingsList from "./pages/meterReading/DisconnectionMeterReadingDetails";
 
 const App = () => {
   const { isAuthenticated } = useAuthStore();
@@ -237,6 +239,15 @@ const App = () => {
                   element={
                     <ProtectedRoute>
                       <SuspectedSelfReconnectionsScreen />
+                    </ProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="/disconnection-meter-readings"
+                  element={
+                    <ProtectedRoute>
+                      <DisconnectionMeterReadingsList />
                     </ProtectedRoute>
                   }
                 />
