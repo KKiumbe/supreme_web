@@ -84,15 +84,15 @@ const ActiveCommitmentConnectionsTab = () => {
 
   // Fetch detailed connection
   const fetchDetailedConnection = useCallback(
-    async (connectionId) => {
-      if (!currentUser || !connectionId) {
+    async (connectionNumber) => {
+      if (!currentUser || !connectionNumber) {
         return;
       }
 
       setDetailsLoading(true);
       try {
         const response = await axios.get(
-          `${BASEURL}/connections/${connectionId}`,
+          `${BASEURL}/connection/${connectionNumber}`,
           { withCredentials: true },
         );
 
