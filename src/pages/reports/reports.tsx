@@ -38,41 +38,28 @@ import {
 
 const BASEURL = import.meta.env.VITE_BASE_URL;
 
-/* ----------------------------------
-   PARAM NORMALIZER (DEFENSIVE)
----------------------------------- */
+/* ---------------- PARAM NORMALIZER ---------------- */
 function normalizeParams(params?: any) {
   if (!Array.isArray(params)) {
     return [];
   }
   return params.map((p) =>
     typeof p === "string"
-      ? {
-          name: p,
-          label: p,
-          type: "date",
-          optional: false,
-        }
+      ? { name: p, label: p, type: "date", optional: false }
       : p,
   );
 }
 
 export default function ReportsPage() {
-  /* ---------------- STATE ---------------- */
   const [jobs, setJobs] = useState<ReportJob[]>([]);
   const [activeReport, setActiveReport] = useState<ActiveReport | null>(null);
-
   const [params, setParams] = useState<Record<string, any>>({});
-
   const [format, setFormat] = useState<ReportFormat>("pdf");
-
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
-
   const [billTypes, setBillTypes] = useState<BillType[]>([]);
   const [schemes, setSchemes] = useState<Scheme[]>([]);
-
   const [search, setSearch] = useState("");
 
   /* ---------------- LOAD LOOKUPS ---------------- */
@@ -85,14 +72,9 @@ export default function ReportsPage() {
         ]);
         setBillTypes(billTypesData);
         setSchemes(schemesData);
-        setPermissionDenied(false);
       } catch (err: any) {
         if (isPermissionDenied(err)) {
           setPermissionDenied(true);
-          setBillTypes([]);
-          setSchemes([]);
-        } else {
-          console.error(err);
         }
       }
     };
@@ -130,23 +112,14 @@ export default function ReportsPage() {
         params: { ...params, format },
       };
 
-      console.warn("📊 Sending Report Request to API:", {
-        reportType: requestPayload.reportType,
-        reportLabel: activeReport.label,
-        format: requestPayload.params.format,
-        parameters: requestPayload.params,
-      });
-
       const job = await requestReportJob(requestPayload);
 
       setJobs((prev) => [job, ...prev]);
       setActiveReport(null);
       setParams({});
-      setPermissionDenied(false);
     } catch (err: any) {
       if (isPermissionDenied(err)) {
         setPermissionDenied(true);
-        setError("");
       } else {
         setError(err.message ?? "Failed to request report");
       }
@@ -165,19 +138,15 @@ export default function ReportsPage() {
     }
 
     const poll = async () => {
-      try {
-        const updates = await Promise.all(
-          pending.map((j) => fetchReportStatus(j.reportJobId)),
-        );
+      const updates = await Promise.all(
+        pending.map((j) => fetchReportStatus(j.reportJobId)),
+      );
 
-        setJobs((prev) =>
-          prev.map(
-            (j) => updates.find((u) => u.reportJobId === j.reportJobId) ?? j,
-          ),
-        );
-      } catch (err) {
-        console.error(err);
-      }
+      setJobs((prev) =>
+        prev.map(
+          (j) => updates.find((u) => u.reportJobId === j.reportJobId) ?? j,
+        ),
+      );
     };
 
     poll();
@@ -186,58 +155,51 @@ export default function ReportsPage() {
   }, [jobs]);
 
   /* ---------------- COLUMNS ---------------- */
-  const columns: GridColDef[] = useMemo(
-    () => [
-      { field: "reportType", headerName: "Report", flex: 1 },
-      {
-        field: "createdAt",
-        headerName: "Requested At",
-        width: 180,
-      },
-      {
-        field: "status",
-        headerName: "Status",
-        width: 180,
-        renderCell: (p) => (
-          <Stack spacing={0.5}>
-            <Chip
-              size="small"
-              label={p.value}
-              color={
-                p.value === "COMPLETED"
-                  ? "success"
-                  : p.value === "FAILED"
-                    ? "error"
-                    : "warning"
-              }
-            />
-            {p.value !== "COMPLETED" && p.value !== "FAILED" && (
-              <LinearProgress />
-            )}
-          </Stack>
+  const columns: GridColDef[] = [
+    { field: "reportType", headerName: "Report", flex: 1 },
+    { field: "createdAt", headerName: "Requested At", width: 180 },
+    {
+      field: "status",
+      headerName: "Status",
+      width: 180,
+      renderCell: (p) => (
+        <Stack spacing={0.5}>
+          <Chip
+            size="small"
+            label={p.value}
+            color={
+              p.value === "COMPLETED"
+                ? "success"
+                : p.value === "FAILED"
+                  ? "error"
+                  : "warning"
+            }
+          />
+          {p.value !== "COMPLETED" && p.value !== "FAILED" && (
+            <LinearProgress />
+          )}
+        </Stack>
+      ),
+    },
+    {
+      field: "actions",
+      headerName: "",
+      width: 160,
+      renderCell: (p) =>
+        p.row.status === "COMPLETED" ? (
+          <Button
+            size="small"
+            onClick={() =>
+              (window.location.href = `${BASEURL}${p.row.downloadUrl}`)
+            }
+          >
+            Download
+          </Button>
+        ) : (
+          <CircularProgress size={16} />
         ),
-      },
-      {
-        field: "actions",
-        headerName: "",
-        width: 160,
-        renderCell: (p) =>
-          p.row.status === "COMPLETED" ? (
-            <Button
-              size="small"
-              onClick={() =>
-                (window.location.href = `${BASEURL}${p.row.downloadUrl}`)
-              }
-            >
-              Download
-            </Button>
-          ) : (
-            <CircularProgress size={16} />
-          ),
-      },
-    ],
-    [],
-  );
+    },
+  ];
 
   /* ---------------- FILTER ---------------- */
   const filteredSections = useMemo(() => {
@@ -254,16 +216,7 @@ export default function ReportsPage() {
 
   /* ---------------- RENDER ---------------- */
   return (
-    <Box
-      sx={{
-        height: "100vh",
-        px: 4,
-        py: 3,
-        //maxWidth: 1400,
-        mx: "auto",
-        minWidth: 1200,
-      }}
-    >
+    <Box sx={{ height: "100vh", px: 4, py: 3, minWidth: 1200 }}>
       {permissionDenied ? (
         <PermissionDeniedUI permission="reports:view" />
       ) : (
@@ -274,17 +227,11 @@ export default function ReportsPage() {
 
           <Divider sx={{ my: 3 }} />
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
-              {error}
-            </Alert>
-          )}
+          {error && <Alert severity="error">{error}</Alert>}
 
-          {/* REPORT SELECTION */}
           <Paper sx={{ p: 3, mb: 4 }}>
             <Stack direction="row" justifyContent="space-between" mb={2}>
               <Typography fontWeight={600}>Select Report</Typography>
-
               <TextField
                 size="small"
                 placeholder="Search report…"
@@ -312,28 +259,13 @@ export default function ReportsPage() {
                             onClick={() => {
                               setActiveReport(isActive ? null : r);
                               setParams({});
-                              setError(null);
                             }}
                           >
                             <Typography fontWeight={600}>{r.label}</Typography>
-                            {/* <Typography
-                            variant="caption"
-                            color="text.secondary"
-                          >
-                            {r.description}
-                          </Typography> */}
                           </Box>
 
-                          {/* INLINE PARAMETERS */}
                           <Collapse in={isActive}>
-                            <Box
-                              sx={{
-                                mt: 3,
-                                p: 2.5,
-                                borderRadius: 1.5,
-                                //bgcolor: "grey.50",
-                              }}
-                            >
+                            <Box sx={{ mt: 3 }}>
                               <Stack spacing={2.5}>
                                 <TextField
                                   select
@@ -347,7 +279,8 @@ export default function ReportsPage() {
                                   <MenuItem value="excel">Excel</MenuItem>
                                 </TextField>
 
-                                {normalizeParams(r.params).map((param) => {
+                                {normalizedParams.map((param) => {
+                                  /* DATE */
                                   if (param.type === "date") {
                                     return (
                                       <TextField
@@ -355,9 +288,7 @@ export default function ReportsPage() {
                                         type="date"
                                         label={param.label}
                                         required={!param.optional}
-                                        InputLabelProps={{
-                                          shrink: true,
-                                        }}
+                                        InputLabelProps={{ shrink: true }}
                                         value={params[param.name] ?? ""}
                                         onChange={(e) =>
                                           setParams((prev) => ({
@@ -369,6 +300,39 @@ export default function ReportsPage() {
                                     );
                                   }
 
+                                  /* SELECT WITH options */
+                                  if (
+                                    param.type === "select" &&
+                                    param.options
+                                  ) {
+                                    return (
+                                      <TextField
+                                        key={param.name}
+                                        select
+                                        label={param.label}
+                                        value={params[param.name] ?? ""}
+                                        onChange={(e) =>
+                                          setParams((prev) => ({
+                                            ...prev,
+                                            [param.name]: Number(
+                                              e.target.value,
+                                            ),
+                                          }))
+                                        }
+                                      >
+                                        {param.options.map((opt: any) => (
+                                          <MenuItem
+                                            key={opt.value}
+                                            value={opt.value}
+                                          >
+                                            {opt.label}
+                                          </MenuItem>
+                                        ))}
+                                      </TextField>
+                                    );
+                                  }
+
+                                  /* PAYMENT MODES */
                                   if (
                                     param.type === "select" &&
                                     param.source === "PAYMENT_MODES"
@@ -395,6 +359,7 @@ export default function ReportsPage() {
                                     );
                                   }
 
+                                  /* BILL TYPES */
                                   if (
                                     param.type === "select" &&
                                     param.source === "BILL_TYPES"
@@ -447,7 +412,6 @@ export default function ReportsPage() {
             ))}
           </Paper>
 
-          {/* JOBS */}
           <Paper sx={{ p: 3 }}>
             <Typography fontWeight={600} mb={2}>
               Report Jobs

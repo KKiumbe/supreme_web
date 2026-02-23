@@ -28,6 +28,13 @@ export interface BillType {
   id: number;
   name: string;
 }
+
+const currentYear = new Date().getFullYear();
+
+const yearOptions = Array.from({ length: 5 }, (_, i) => ({
+  label: String(currentYear - i),
+  value: currentYear - i,
+}));
 export const REPORT_SECTIONS: ReportSection[] = [
   {
     section: "Customers",
@@ -155,12 +162,36 @@ export const REPORT_SECTIONS: ReportSection[] = [
           },
         ],
       },
+
       {
         key: "PAYMENTS_PER_MODE_PER_PERIOD",
         label: "Payments per Mode per Period",
         params: [
-          { name: "startDate", label: "Start Date", type: "date" },
-          { name: "endDate", label: "End Date", type: "date" },
+          {
+            name: "month",
+            label: "Month",
+            type: "select",
+            options: [
+              { label: "January", value: 1 },
+              { label: "February", value: 2 },
+              { label: "March", value: 3 },
+              { label: "April", value: 4 },
+              { label: "May", value: 5 },
+              { label: "June", value: 6 },
+              { label: "July", value: 7 },
+              { label: "August", value: 8 },
+              { label: "September", value: 9 },
+              { label: "October", value: 10 },
+              { label: "November", value: 11 },
+              { label: "December", value: 12 },
+            ],
+          },
+          {
+            name: "year",
+            label: "Year",
+            type: "select",
+            options: yearOptions,
+          },
           {
             name: "mode",
             label: "Mode of Payment",
@@ -201,7 +232,8 @@ export type ReportParam =
       name: string;
       label: string;
       type: "select";
-      source: "BILL_TYPES" | "SCHEMES" | "PAYMENT_MODES";
+      source?: "BILL_TYPES" | "SCHEMES" | "PAYMENT_MODES";
+      options?: { label: string; value: any }[];
       optional?: boolean;
     };
 
