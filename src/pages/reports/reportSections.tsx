@@ -14,7 +14,9 @@ export type ReportKey =
   | "CUSTOMERS_REPORT1"
   | "PAYMENTS_REPORT1"
   | "METER_READINGS"
-  | "TOTAL_VOLUME_CONSUMED";
+  | "TOTAL_VOLUME_CONSUMED"
+  | "INCOME_PER_BILL_TYPE"
+  | "ALL_INCOME_PER_BILL_TYPE_SUMMARY";
 
 export const PAYMENT_MODES = [
   "CASH",
@@ -217,6 +219,33 @@ export const REPORT_SECTIONS: ReportSection[] = [
             type: "select",
             source: "PAYMENT_MODES",
           },
+        ],
+      },
+    ],
+  },
+  {
+    section: "Income",
+    reports: [
+      {
+        key: "INCOME_PER_BILL_TYPE",
+        label: "Income per Bill Type (Paid Invoices)",
+        params: [
+          {
+            name: "billTypeId",
+            label: "Bill Type",
+            type: "select",
+            source: "BILL_TYPES",
+          },
+          { name: "startDate", label: "Start Date", type: "date" },
+          { name: "endDate", label: "End Date", type: "date" },
+        ],
+      },
+      {
+        key: "ALL_INCOME_PER_BILL_TYPE_SUMMARY",
+        label: "All Income per Bill Type Summary",
+        params: [
+          { name: "startDate", label: "Start Date", type: "date" },
+          { name: "endDate", label: "End Date", type: "date" },
         ],
       },
     ],
