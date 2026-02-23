@@ -244,7 +244,7 @@ export default function DisconnectionMeterReadingsList() {
       >
         {selectedReadingId && (
           <DisconnectionMeterReadingDetails
-            id={selectedReadingId}
+            readingId={selectedReadingId}
             onClose={() => setSelectedReadingId(null)}
           />
         )}
